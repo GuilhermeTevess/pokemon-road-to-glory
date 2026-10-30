@@ -231,7 +231,7 @@ export function BattleScreen() {
               {showInfo === 'wild' && (
                 <div className="weak-pop below">
                   <MatchupPanel types={wildTypes} />
-                  <p className="weak-pop-hint">Toque num tipo para ver o que vence ele.</p>
+                  <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
                 </div>
               )}
             </div>
@@ -257,7 +257,7 @@ export function BattleScreen() {
               {showInfo === 'player' && playerActive && (
                 <div className="weak-pop above">
                   <MatchupPanel types={playerActive.getTypes()} />
-                  <p className="weak-pop-hint">Toque num tipo para ver o que vence ele.</p>
+                  <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
                 </div>
               )}
               <div className="info-name">

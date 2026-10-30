@@ -40,7 +40,7 @@ export function TypeBadge({type, small, info}: {type: string; small?: boolean; i
       <button
         className={`type-badge info ${small ? 'small' : ''}`}
         style={style}
-        title={`Ver o que vence ${TYPE_PT[type] ?? type}`}
+        title={`Ver fraquezas de ${TYPE_PT[type] ?? type}`}
         onClick={e => {
           e.stopPropagation();
           useGame.getState().openTypeCalc([type]);
@@ -111,10 +111,10 @@ export function MatchupPanel({types, title}: {types: readonly string[]; title?: 
   return (
     <div className="matchups">
       {title && <div className="mu-title">{title}</div>}
-      {row('Fraco 4x', m.x4, 'mu-x4')}
-      {row('Fraco 2x', m.x2, 'mu-x2')}
-      {row('Resiste ½', m.half, 'mu-half')}
-      {row('Resiste ¼', m.quarter, 'mu-quarter')}
+      {row('Toma 4x', m.x4, 'mu-x4')}
+      {row('Toma 2x', m.x2, 'mu-x2')}
+      {row('Toma ½', m.half, 'mu-half')}
+      {row('Toma ¼', m.quarter, 'mu-quarter')}
       {row('Imune', m.immune, 'mu-immune')}
     </div>
   );
@@ -300,22 +300,15 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
 }
 
 /**
- * Calculadora de tipos: escolha 1 ou 2 tipos e veja o que vence, o que aguenta
- * os golpes dele e o que os golpes dele vencem. Abre ao tocar em qualquer tipo
- * das fraquezas ou pelo botão "Tipos".
+ * Calculadora de tipos: escolha 1 ou 2 tipos e veja quanto cada tipo de golpe tira
+ * deles (4x, 2x, ½, ¼, imune) e quanto os golpes deles tiram dos outros. Abre ao
+ * tocar em qualquer tipo das fraquezas ou pelo botão "Tipos".
  */
 export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => void}) {
   const [sel, setSel] = useState<string[]>(initial.slice(0, 2));
   const toggle = (t: string) =>
     setSel(cur => (cur.includes(t) ? cur.filter(x => x !== t) : cur.length >= 2 ? [cur[1], t] : [...cur, t]));
   const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
-  const m = sel.length ? defensiveMatchups(sel) : null;
-  // Tipos que aguentam todos os golpes "do tipo" (STAB) do alvo.
-  const walls = sel.length ? ALL_TYPES.filter(d => sel.every(a => typeMultiplier(a, [d]) < 1)) : [];
-  // Melhores escolhas: aguentam os golpes dele E batem super efetivo nele.
-  const best = m ? walls.filter(t => [...m.x4, ...m.x2].includes(t)) : [];
-  const badges = (list: string[]) =>
-    list.length ? list.map(t => <TypeBadge key={t} type={t} small />) : <span className="muted">nenhum</span>;
   return (
     <Modal onClose={onClose} wide>
       <h2>Calculadora de tipos</h2>
@@ -332,65 +325,35 @@ export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => 
           </button>
         ))}
       </div>
-      {m && (
+      {sel.length > 0 && (
         <div className="calc-grid">
-          <section className="calc-box good">
-            <h3>Para vencer {name}</h3>
-            <div className="calc-row">
-              <span>Use golpes de:</span>
-              {m.x4.map(t => (
-                <span key={t} className="row">
-                  <TypeBadge type={t} small /> <b>4x</b>
-                </span>
-              ))}
-              {badges(m.x2)}
-            </div>
-            <div className="calc-row">
-              <span>Pokémon que aguentam os golpes de {name}:</span>
-              {badges(walls)}
-            </div>
-            {best.length > 0 && (
-              <div className="calc-row best">
-                <span>Melhor escolha (aguenta e bate forte):</span>
-                {badges(best)}
-              </div>
-            )}
-          </section>
-          <section className="calc-box bad">
-            <h3>Evite contra {name}</h3>
-            <div className="calc-row">
-              <span>Golpes que quase não machucam:</span>
-              {badges([...m.half, ...m.quarter])}
-            </div>
-            <div className="calc-row">
-              <span>Golpes que não fazem nada:</span>
-              {badges(m.immune)}
-            </div>
+          <section className="calc-box">
+            <MatchupPanel types={sel} title={`${name} defendendo`} />
           </section>
           {sel.map(a => {
-            const strong = ALL_TYPES.filter(d => typeMultiplier(a, [d]) > 1);
-            const weak = ALL_TYPES.filter(d => {
-              const x = typeMultiplier(a, [d]);
-              return x > 0 && x < 1;
-            });
-            const none = ALL_TYPES.filter(d => typeMultiplier(a, [d]) === 0);
+            const by = (f: (x: number) => boolean) => ALL_TYPES.filter(d => f(typeMultiplier(a, [d])));
+            const rows: [string, string[], string][] = [
+              ['Dá 2x em', by(x => x > 1), 'mu-x2'],
+              ['Dá ½ em', by(x => x > 0 && x < 1), 'mu-half'],
+              ['Não afeta', by(x => x === 0), 'mu-immune'],
+            ];
             return (
               <section key={a} className="calc-box">
-                <h3>Golpes de {TYPE_PT[a] ?? a}</h3>
-                <div className="calc-row">
-                  <span>Super efetivos contra:</span>
-                  {badges(strong)}
+                <div className="matchups">
+                  <div className="mu-title">{TYPE_PT[a] ?? a} atacando</div>
+                  {rows.map(([label, list, cls]) =>
+                    list.length ? (
+                      <div key={label} className={`mu-row ${cls}`}>
+                        <span className="mu-label">{label}</span>
+                        <span className="mu-types">
+                          {list.map(t => (
+                            <TypeBadge key={t} type={t} small />
+                          ))}
+                        </span>
+                      </div>
+                    ) : null,
+                  )}
                 </div>
-                <div className="calc-row">
-                  <span>Pouco efetivos contra:</span>
-                  {badges(weak)}
-                </div>
-                {none.length > 0 && (
-                  <div className="calc-row">
-                    <span>Não afetam:</span>
-                    {badges(none)}
-                  </div>
-                )}
               </section>
             );
           })}
