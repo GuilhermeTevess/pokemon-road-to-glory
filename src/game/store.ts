@@ -2,21 +2,23 @@
 import {create} from 'zustand';
 import {BIOMES} from '../data/biomes';
 import {dex, species, teachableMoves} from '../data/dex';
-import {getItem} from '../data/items';
+import {POWER_EVS, VITAMIN_EVS, getItem} from '../data/items';
 import {BattleController} from './battle';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
 import {
-  CANDY, COST_CUT_PRICE, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
+  CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
+  addStatEvs, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
   registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
-import type {Collection} from './meta';
+import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
-import type {OwnedMon, PendingEvent, RunState, StatTable} from './types';
+import {STAT_LABEL} from './types';
+import type {OwnedMon, PendingEvent, RunState, StatId, StatTable} from './types';
 
 export const PARTY_SIZE = 6;
 export const STARTER_LEVEL = 5;
@@ -54,7 +56,8 @@ export function getBattle(run: RunState): BattleController | null {
   if (!battle || battleFor !== run.encounter.mon.uid) {
     const col = useGame.getState().collection;
     const hearts: Record<string, number> = {};
-    for (const m of run.party) hearts[m.uid] = heartsOf(col.entries[lineRoot(m.species)]);
+    // Buffs de batalha (curar status, aguentar com 1 HP, crítico) são só do parceiro.
+    for (const m of run.party) hearts[m.uid] = m.partner ? heartsOf(col.entries[lineRoot(m.species)]) : 0;
     battle = new BattleController(run.party, run.encounter, hearts);
     battleFor = run.encounter.mon.uid;
   }
@@ -100,6 +103,11 @@ interface Store {
   buyCostCut(line: string): void;
   buyShiny(line: string): void;
   setFavorite(line: string | null): void;
+  /** Aula do Tutor; devolve a mensagem do resultado. */
+  tutor(line: string, kind: 'nature' | 'ability', target: string, plan: TutorPlan): string;
+  allocateEv(line: string, stat: StatId, n: number): void;
+  resetLineEvs(line: string): void;
+  presetEvs(line: string, preset: number): void;
   abandonRun(): void;
   chooseStartBiome(id: string): void;
   finishBattle(outcome: 'won' | 'caught' | 'fled' | 'lost'): void;
@@ -221,7 +229,7 @@ export const useGame = create<Store>((set, get) => {
   };
 
   /** Usa um item da mochila (fora da batalha). Devolve a mensagem para o jogador. */
-  const applyItem = (run: RunState, itemId: string, monUid: string): string => {
+  const applyItem = (run: RunState, col: Collection, itemId: string, monUid: string): string => {
     if (!run.bag[itemId]) return '';
     const item = getItem(itemId);
     const mon = findMon(run, monUid);
@@ -296,6 +304,18 @@ export const useGame = create<Store>((set, get) => {
             used = true;
             message = `${mon.species} agora tem a habilidade ${other}: ${dex.abilities.get(other).shortDesc}`;
           } else message = `${mon.species} só tem uma habilidade comum.`;
+          break;
+        }
+        case 'vitamin': {
+          const stat = item.evStat!;
+          const total = Object.values(mon.evs).reduce((a, b) => a + b, 0);
+          const add = Math.min(VITAMIN_EVS, EV_MAX_STAT - mon.evs[stat], EV_MAX_TOTAL - total);
+          if (add > 0) {
+            mon.evs[stat] += add;
+            addStatEvs(col, mon.species, stat, add);
+            used = true;
+            message = `${displayName(mon)} ganhou ${add} EVs de ${STAT_LABEL[stat]} (também na ficha da coleção).`;
+          } else message = `${displayName(mon)} já está no máximo de EVs aí.`;
           break;
         }
         case 'held':
@@ -438,6 +458,38 @@ export const useGame = create<Store>((set, get) => {
         e.shinyLv++;
       });
     },
+    tutor(line, kind, target, plan) {
+      let msg = '';
+      editCollection(col => {
+        const r = tutorRoll(col, line, kind, target, plan);
+        if (!r) return false;
+        const what = kind === 'nature' ? 'nature' : 'habilidade';
+        msg = r.wanted ? `Deu certo! ${what} ${r.got} desbloqueada.` : `Não saiu ${target}, mas você desbloqueou a ${what} ${r.got}.`;
+      });
+      return msg;
+    },
+    allocateEv(line, stat, n) {
+      editCollection(col => allocateEvs(entryOf(col, line), stat, n));
+    },
+    resetLineEvs(line) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (!evTotal(e.evs) || !spendCandies(col, line, EV_RESET_PRICE)) return false;
+        resetEvs(e);
+      });
+    },
+    presetEvs(line, preset) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        const p = EV_PRESETS[preset];
+        if (!p) return false;
+        if (evTotal(e.evs)) {
+          if (!spendCandies(col, line, EV_RESET_PRICE)) return false;
+          resetEvs(e);
+        }
+        for (const [k, v] of Object.entries(p.evs)) allocateEvs(e, k as StatId, v);
+      });
+    },
     setFavorite(line) {
       editCollection(col => {
         col.favorite = line ?? undefined;
@@ -500,7 +552,17 @@ export const useGame = create<Store>((set, get) => {
           for (const m of run.party) {
             if (m.hp <= 0) continue;
             const fought = ctl?.participants.has(m.uid);
-            if (fought) candy(m.species, enc.boss ? CANDY.boss : CANDY.defeat);
+            if (fought) {
+              candy(m.species, enc.boss ? CANDY.boss : CANDY.defeat);
+              bankEvs(col, m.species, evYield(enc.mon.species).amount * EV_MULT * (enc.boss ? 2 : 1));
+            }
+            const power = m.item ? getItem(m.item).evStat : undefined;
+            if (power) {
+              const total = Object.values(m.evs).reduce((a, b) => a + b, 0);
+              const add = Math.min(POWER_EVS, EV_MAX_STAT - m.evs[power], EV_MAX_TOTAL - total);
+              if (add > 0) m.evs[power] += add;
+              addStatEvs(col, m.species, power, POWER_EVS);
+            }
             const share = fought ? 1 : 0.5;
             const bonus = expBonus(heartsOf(col.entries[lineRoot(m.species)]));
             const r = gainExp(m, Math.floor(exp * share * bonus));
@@ -570,7 +632,7 @@ export const useGame = create<Store>((set, get) => {
           message = `+₽ ${v}`;
         } else {
           run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
-          if (target !== undefined) message = applyItem(run, itemId, target);
+          if (target !== undefined) message = applyItem(run, col, itemId, target);
         }
         run.rewardOptions = [];
         afterReward(run);
@@ -625,8 +687,8 @@ export const useGame = create<Store>((set, get) => {
     useItem(itemId, monUid) {
       if (!get().run?.bag[itemId]) return;
       let message = '';
-      mutate(run => {
-        message = applyItem(run, itemId, monUid);
+      mutate((run, col) => {
+        message = applyItem(run, col, itemId, monUid);
       });
       if (message) get().toast(message);
     },

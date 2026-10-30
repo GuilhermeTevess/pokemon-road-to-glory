@@ -40,6 +40,7 @@ export const SHOP: {title: string; items: string[]}[] = [
   {title: 'Pokébolas', items: ['pokeball', 'greatball', 'ultraball']},
   {title: 'Cura', items: ['potion', 'superpotion', 'hyperpotion', 'maxpotion', 'revive']},
   {title: 'Para a batalha', items: ['xattack', 'xdefense', 'xspatk', 'xspdef', 'xspeed', 'xaccuracy']},
+  {title: 'Treino (EVs)', items: ['hpup', 'protein', 'iron', 'calcium', 'zinc', 'carbos']},
   {title: 'Viagem', items: ['map']},
 ];
 

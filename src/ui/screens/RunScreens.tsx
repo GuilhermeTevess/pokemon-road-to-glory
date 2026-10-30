@@ -6,6 +6,7 @@ import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
+import {EV_MAX_STAT} from '../../game/meta';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
 import {playCoins, playItem} from '../audio';
@@ -30,6 +31,8 @@ function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: O
         return `Natureza atual: ${m.nature}`;
       case 'ability':
         return `Habilidade: ${m.ability}`;
+      case 'vitamin':
+        return `EVs: ${m.evs[item.evStat!]}/${EV_MAX_STAT}`;
       default:
         return `Nv. ${m.level}`;
     }
@@ -40,6 +43,7 @@ function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: O
     if (item.kind === 'revive') return m.hp <= 0;
     if (item.kind === 'evolution') return itemEvolutions(m).length > 0;
     if (item.kind === 'mint') return m.nature !== item.nature;
+    if (item.kind === 'vitamin') return m.evs[item.evStat!] < EV_MAX_STAT;
     return true;
   };
   return (
@@ -209,7 +213,7 @@ const BAG_GROUPS: {title: string; kinds: string[]}[] = [
   {title: 'Pokébolas', kinds: ['ball']},
   {title: 'Cura', kinds: ['heal', 'revive']},
   {title: 'Para a batalha', kinds: ['battle']},
-  {title: 'Para melhorar Pokémon', kinds: ['candy', 'evolution', 'tm', 'mint', 'ability']},
+  {title: 'Para melhorar Pokémon', kinds: ['candy', 'evolution', 'tm', 'mint', 'ability', 'vitamin']},
   {title: 'Itens para segurar', kinds: ['held']},
   {title: 'Viagem', kinds: ['map', 'incense']},
 ];

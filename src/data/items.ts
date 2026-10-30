@@ -1,6 +1,6 @@
 // Itens do jogo. Os "held" são itens reais do Showdown e funcionam dentro da batalha.
 
-export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability';
+export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin';
 export type ItemTier = 'common' | 'great' | 'ultra' | 'master';
 
 export interface ItemDef {
@@ -19,6 +19,8 @@ export interface ItemDef {
   showdown?: string;
   /** Atributo que um item X aumenta na batalha. */
   stat?: 'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy';
+  /** Atributo que ganha EVs (vitaminas e itens Power). */
+  evStat?: 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
   /** Natureza que a menta aplica. */
   nature?: string;
   /** Peso no sorteio de recompensas (padrão 1). */
@@ -36,6 +38,18 @@ const xItem = (id: string, name: string, stat: ItemDef['stat'], label: string, s
 const mint = (id: string, name: string, nature: string, label: string, sprite: string): ItemDef => ({
   id, name, desc: `Muda a natureza para ${nature} (${label}).`, kind: 'mint', tier: 'great', sprite, price: 0, nature, weight: 0.35,
 });
+
+/** Itens Power: de segurar, dão EVs a cada vitória (não vão para o Showdown, então não deixam lento). */
+const powerItem = (id: string, name: string, evStat: ItemDef['evStat'], label: string, sprite: string): ItemDef => ({
+  id, name, desc: `Segure: +${POWER_EVS} EVs de ${label} a cada vitória, guardados na ficha da coleção.`, kind: 'held', tier: 'great', sprite, price: 0, evStat, weight: 0.25,
+});
+
+const vitamin = (id: string, name: string, evStat: ItemDef['evStat'], label: string, sprite: string): ItemDef => ({
+  id, name, desc: `+${VITAMIN_EVS} EVs de ${label} no Pokémon e na ficha da linha dele.`, kind: 'vitamin', tier: 'great', sprite, price: 1500, evStat, weight: 0.3,
+});
+
+export const POWER_EVS = 8;
+export const VITAMIN_EVS = 10;
 
 /** Itens que fortalecem golpes de um tipo em 20%. */
 const typeBoost = (id: string, name: string, showdown: string, type: string, sprite: string): ItemDef =>
@@ -105,6 +119,20 @@ export const ITEMS: ItemDef[] = [
   held('weaknesspolicy', 'Seguro Fraqueza', 'Weakness Policy', 'Ao levar golpe super efetivo: Ataque e Atq. Esp. +2.', 'ultra', 'weakness-policy'),
   held('blacksludge', 'Lodo Negro', 'Black Sludge', 'Tipo Veneno: recupera 1/16 do HP por turno (outros perdem).', 'great', 'black-sludge', 0.4),
 
+  powerItem('powerweight', 'Peso Power', 'hp', 'HP', 'power-weight'),
+  powerItem('powerbracer', 'Bracelete Power', 'atk', 'Ataque', 'power-bracer'),
+  powerItem('powerbelt', 'Cinto Power', 'def', 'Defesa', 'power-belt'),
+  powerItem('powerlens', 'Lente Power', 'spa', 'Atq. Esp.', 'power-lens'),
+  powerItem('powerband', 'Faixa Power', 'spd', 'Def. Esp.', 'power-band'),
+  powerItem('poweranklet', 'Tornozeleira Power', 'spe', 'Velocidade', 'power-anklet'),
+
+  vitamin('hpup', 'HP Up', 'hp', 'HP', 'hp-up'),
+  vitamin('protein', 'Proteína', 'atk', 'Ataque', 'protein'),
+  vitamin('iron', 'Ferro', 'def', 'Defesa', 'iron'),
+  vitamin('calcium', 'Cálcio', 'spa', 'Atq. Esp.', 'calcium'),
+  vitamin('zinc', 'Zinco', 'spd', 'Def. Esp.', 'zinc'),
+  vitamin('carbos', 'Carbos', 'spe', 'Velocidade', 'carbos'),
+
   typeBoost('charcoal', 'Carvão', 'Charcoal', 'Fogo', 'charcoal'),
   typeBoost('mysticwater', 'Água Mística', 'Mystic Water', 'Água', 'mystic-water'),
   typeBoost('miracleseed', 'Semente Milagrosa', 'Miracle Seed', 'Planta', 'miracle-seed'),
@@ -156,6 +184,7 @@ export function itemUsage(item: ItemDef): string {
     case 'tm':
     case 'mint':
     case 'ability':
+    case 'vitamin':
       return 'Use ao pegar ou depois, pela Mochila, escolhendo um Pokémon.';
     case 'battle':
       return 'Só na batalha: Mochila > item. Vale até o fim da luta.';
@@ -171,5 +200,5 @@ export function itemUsage(item: ItemDef): string {
 
 /** Itens que pedem um Pokémon como alvo fora da batalha. */
 export function needsTarget(item: ItemDef): boolean {
-  return ['heal', 'revive', 'candy', 'evolution', 'tm', 'held', 'mint', 'ability'].includes(item.kind);
+  return ['heal', 'revive', 'candy', 'evolution', 'tm', 'held', 'mint', 'ability', 'vitamin'].includes(item.kind);
 }

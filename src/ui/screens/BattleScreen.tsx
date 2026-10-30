@@ -156,7 +156,7 @@ export function BattleScreen() {
       setMenu('switch');
       setMessage('Escolha o próximo Pokémon!');
     } else {
-      setMessage(`O que ${player?.species ?? 'seu Pokémon'} vai fazer?`);
+      setMessage(`O que ${player ? player.nickname || species(player.species).name : 'seu Pokémon'} vai fazer?`);
     }
   }, [busy, ctl, finishBattle, player?.species]);
 

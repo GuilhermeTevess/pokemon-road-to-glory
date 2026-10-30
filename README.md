@@ -20,7 +20,7 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
 - **Time inicial com pontos**: os 3 iniciais de cada geração (1 a 9) numa página
   só, com filtro por tipo e setinhas para ver as evoluções. Cada linha tem um custo
-  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 10 pontos, então
+  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 6 pontos, então
   dá para começar com mais de um. Capturados ficam numa aba separada.
 - **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
   (ou depois de usar um **Mapa**).
@@ -57,6 +57,11 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   **doces** da linha (capturar, vencer, chefe, evoluir) e **corações de amizade**.
 - **Doces** compram golpe inicial (ex.: Charmander começando com Flamethrower),
   custo menor no time e mais chance de shiny.
+- **Tutor** na ficha: escolha a nature ou habilidade e um plano (quanto mais doces,
+  mais chance); se não sair, ganha outra que ainda não tem.
+- **EVs** por linha: vitórias enchem um banco que você distribui na ficha, com
+  sugestões prontas. Vitaminas e itens Power ajudam.
+- **Parceiro** (um por time) e **apelidos**.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).
