@@ -77,6 +77,13 @@ export interface RunPerks {
   money: number;
   balls: number;
   discount: number;
+  level?: number;
+  rest?: number;
+  candy?: number;
+  catch?: number;
+  reroll?: number;
+  hatch?: number;
+  evs?: number;
 }
 
 export interface RunState {

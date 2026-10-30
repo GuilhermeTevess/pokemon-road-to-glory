@@ -104,7 +104,8 @@ export class BattleController {
   private cursor = 0;
 
   /** `hearts`: corações de amizade de cada Pokémon do jogador (por uid). */
-  constructor(party: OwnedMon[], encounter: Encounter, hearts: Record<string, number> = {}) {
+  /** `catchBonus`: multiplicador de captura das melhorias (Mão boa). */
+  constructor(party: OwnedMon[], encounter: Encounter, hearts: Record<string, number> = {}, private readonly catchBonus = 1) {
     this.encounter = encounter;
     const alive = party.filter(m => m.hp > 0);
     if (!alive.length) throw new Error('Nenhum Pokémon em condições de lutar');
@@ -213,7 +214,7 @@ export class BattleController {
       const base = RARITY_CATCH[this.encounter.rarity] ?? 0.4;
       const hpFactor = 1 - (2 / 3) * (wild.hp / wild.maxhp);
       const statusBonus = wild.status === 'slp' || wild.status === 'frz' ? 2 : wild.status ? 1.5 : 1;
-      p = base * (ball.power ?? 1) * hpFactor * 1.5 * statusBonus * (this.encounter.boss ? 0.5 : 1);
+      p = base * (ball.power ?? 1) * hpFactor * 1.5 * statusBonus * (this.encounter.boss ? 0.5 : 1) * this.catchBonus;
     }
     p = Math.min(1, p);
     // Cada "balançada" passa com p^(1/4), igual aos jogos.
