@@ -16,7 +16,7 @@ import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEv
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
-import {applyPerks, buyUpgrade, discounted, gloryFor, perksOf, teamBudget} from './glory';
+import {START_LEVELS, applyPerks, buyUpgrade, discounted, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
@@ -61,7 +61,7 @@ export function getBattle(run: RunState): BattleController | null {
     const hearts: Record<string, number> = {};
     // Buffs de batalha (curar status, aguentar com 1 HP, crítico) são só do parceiro.
     for (const m of run.party) hearts[m.uid] = m.partner ? heartsOf(col.entries[lineRoot(m.species)]) : 0;
-    battle = new BattleController(run.party, run.encounter, hearts);
+    battle = new BattleController(run.party, run.encounter, hearts, 1 + 0.15 * (run.perks?.catch ?? 0));
     battleFor = run.encounter.mon.uid;
   }
   return battle;
@@ -439,7 +439,7 @@ export const useGame = create<Store>((set, get) => {
       applyPerks(run, perksOf(col));
       run.party = picked.map(name => {
         const mon = createMon(name, {
-          level: STARTER_LEVEL,
+          level: START_LEVELS[perksOf(col).level ?? 0] ?? STARTER_LEVEL,
           ivs: starterIvs(col, name),
           ivMin: 10,
           hiddenAbilityChance: 0,
@@ -463,7 +463,7 @@ export const useGame = create<Store>((set, get) => {
       }
       const egg = eggId ? col.eggs?.find(e => e.id === eggId) : undefined;
       if (egg) {
-        run.egg = {...egg, left: egg.waves};
+        run.egg = {...egg, left: Math.max(1, Math.ceil(egg.waves * (1 - 0.2 * (run.perks?.hatch ?? 0))))};
         col.eggs = col.eggs!.filter(e => e.id !== egg.id);
       }
       run.phase = 'biome';
@@ -681,7 +681,8 @@ export const useGame = create<Store>((set, get) => {
           return;
         }
         // Descanso: quem não desmaiou recupera 20% do HP depois de cada ronda.
-        for (const m of run.party) if (m.hp > 0) m.hp = Math.min(maxHp(m), m.hp + Math.ceil(maxHp(m) * 0.2));
+        const rest = 0.2 + 0.1 * (run.perks?.rest ?? 0);
+        for (const m of run.party) if (m.hp > 0) m.hp = Math.min(maxHp(m), m.hp + Math.ceil(maxHp(m) * rest));
         const gained = new Map<string, number>();
         const candy = (name: string, n: number) => {
           addCandies(col, name, n);
@@ -703,8 +704,9 @@ export const useGame = create<Store>((set, get) => {
             const fought = ctl?.participants.has(m.uid);
             if (fought) {
               const big = enc.boss || !!enc.trainer;
-              candy(m.species, big ? CANDY.boss : CANDY.defeat);
-              bankEvs(col, m.species, evYield(enc.mon.species).amount * EV_MULT * (big ? 2 : 1));
+              candy(m.species, (big ? CANDY.boss : CANDY.defeat) + (run.perks?.candy ?? 0));
+              const evBoost = 1 + 0.5 * (run.perks?.evs ?? 0);
+              bankEvs(col, m.species, Math.round(evYield(enc.mon.species).amount * EV_MULT * (big ? 2 : 1) * evBoost));
             }
             const power = m.item ? getItem(m.item).evStat : undefined;
             if (power) {
@@ -816,7 +818,7 @@ export const useGame = create<Store>((set, get) => {
 
     reroll() {
       mutate(run => {
-        const cost = discounted(run, rerollCost(run.rerolls, run.wave));
+        const cost = rerollPrice(run, rerollCost(run.rerolls, run.wave));
         if (run.money < cost) return;
         run.money -= cost;
         run.rerolls++;

@@ -6,7 +6,7 @@ import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
-import {discounted, gloryFor} from '../../game/glory';
+import {discounted, gloryFor, rerollPrice} from '../../game/glory';
 import {EV_MAX_STAT} from '../../game/meta';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
@@ -97,7 +97,7 @@ export function RewardScreen() {
   const [tab, setTab] = useState<'reward' | 'shop'>('reward');
   const [choosing, setChoosing] = useState<string | null>(null);
   if (!run) return null;
-  const cost = discounted(run, rerollCost(run.rerolls, run.wave));
+  const cost = rerollPrice(run, rerollCost(run.rerolls, run.wave));
   const nextWave = run.wave + 1;
   const notes = [
     run.wave >= STAGE_LENGTH ? (['trophy', 'Última ronda da etapa vencida!'] as const) : null,
@@ -141,7 +141,7 @@ export function RewardScreen() {
           </div>
           <div className="row center">
             <button className="btn" disabled={run.money < cost} onClick={reroll}>
-              <PixelIcon name="dice" /> Sortear de novo · ₽ {cost}
+              <PixelIcon name="dice" /> Sortear de novo · {cost ? `₽ ${cost}` : 'grátis'}
             </button>
             <button className="btn" onClick={skipReward}>
               Pular
