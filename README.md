@@ -20,7 +20,7 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
 - **Time inicial com pontos**: os 3 iniciais de cada geração (1 a 9) numa página
   só, com filtro por tipo e setinhas para ver as evoluções. Cada linha tem um custo
-  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 6 pontos, então
+  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 6 pontos (até 10 com Glória), então
   dá para começar com mais de um. Capturados ficam numa aba separada.
 - **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
   (ou depois de usar um **Mapa**).
@@ -69,6 +69,10 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Creche**: dois Pokémon da coleção do mesmo egg group (ou Ditto) fazem um ovo, com
   Pedra Eterna (nature), Laço do Destino (5 IVs) e itens Power (IV garantido). O ovo vai
   numa run e choca depois de 5/10/15 rondas vencidas. Tem o **Manual do Criador**.
+- **Glória**: moeda permanente ganha no fim de cada run (1 por ronda, bônus por chefes e
+  por terminar a etapa). Compra melhorias gerais: orçamento do time até 10, faro para
+  raros e shiny, mais biomas para escolher, 4 recompensas por ronda, começo rico,
+  mochila cheia e descontos na loja.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).

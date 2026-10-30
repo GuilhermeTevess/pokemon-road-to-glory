@@ -72,6 +72,9 @@ export interface Collection {
   entries: Record<string, CollectionEntry>;
   runs: RunSummary[];
   stats?: TrainerStats;
+  /** Glória (moeda permanente) e níveis das melhorias gerais. */
+  glory?: number;
+  upgrades?: Partial<Record<string, number>>;
   /** Itens guardados para a Creche e ovos esperando para ir numa run. */
   items?: Record<string, number>;
   eggs?: Egg[];
@@ -274,7 +277,6 @@ export function favoriteOf(c: Collection): string | null {
 
 // ---------------------------------------------------------------- Custo de time
 
-export const TEAM_BUDGET = 6;
 export const MAX_COST_CUT = 2;
 export const COST_CUT_PRICE = [15, 30];
 

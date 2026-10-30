@@ -569,3 +569,14 @@ table.move-info td { padding: 3px 0; }
 .parent-slot.dad { background: #e1efff; border-color: var(--sky-d); }
 .parent-label { font-weight: 700; }
 .genders { font-weight: 700; }
+
+/* Glória */
+.glory-total { font-family: 'Press Start 2P', monospace; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+.upgrade-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.upgrade { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.upgrade-head { display: flex; justify-content: space-between; align-items: center; }
+.upgrade-pips { display: flex; gap: 3px; }
+.pip { width: 12px; height: 12px; border: 2px solid var(--line); background: var(--panel-2); }
+.pip.on { background: var(--butter-d); }
+.upgrade-max { font-weight: 700; color: var(--mint-d); }
+.glory-earned { font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }

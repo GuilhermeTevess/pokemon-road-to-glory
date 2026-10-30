@@ -6,6 +6,7 @@ import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
+import {discounted, gloryFor} from '../../game/glory';
 import {EV_MAX_STAT} from '../../game/meta';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
@@ -96,7 +97,7 @@ export function RewardScreen() {
   const [tab, setTab] = useState<'reward' | 'shop'>('reward');
   const [choosing, setChoosing] = useState<string | null>(null);
   if (!run) return null;
-  const cost = rerollCost(run.rerolls, run.wave);
+  const cost = discounted(run, rerollCost(run.rerolls, run.wave));
   const nextWave = run.wave + 1;
   const notes = [
     run.wave >= STAGE_LENGTH ? (['trophy', 'Última ronda da etapa vencida!'] as const) : null,
@@ -167,8 +168,8 @@ export function RewardScreen() {
                         <span className="muted">{it.desc}</span>
                         <span className="muted">Na mochila: {run.bag[id] ?? 0}</span>
                       </div>
-                      <button className="btn small primary" disabled={run.money < it.price} onClick={() => { playCoins(); buy(id); }}>
-                        ₽ {it.price}
+                      <button className="btn small primary" disabled={run.money < discounted(run, it.price)} onClick={() => { playCoins(); buy(id); }}>
+                        ₽ {discounted(run, it.price)}
                       </button>
                     </div>
                   );
@@ -579,6 +580,10 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
       </div>
       <p className="muted">
         Derrotados: {run.stats.defeated} · Capturados: {run.stats.caught} · Fugas: {run.stats.fled}
+      </p>
+      <p className="glory-earned">
+        <PixelIcon name="trophy" color="#e0a100" /> +{run.gloryEarned ?? gloryFor(run.wave, kind === 'stageClear' ? 'stageClear' : 'lost')} de Glória para
+        gastar em melhorias gerais
       </p>
       <button className="btn primary" onClick={abandonRun}>
         Voltar ao início

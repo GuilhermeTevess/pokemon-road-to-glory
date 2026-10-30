@@ -3,10 +3,11 @@ import type {Species} from '@pkmn/sim';
 import {BIOMES, getBiome} from '../../data/biomes';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
-import {TEAM_BUDGET, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
+import {lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
 import {PARTY_SIZE, useGame} from '../../game/store';
+import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
 import {FX} from '../fx';
 import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter} from '../components';
@@ -162,6 +163,9 @@ export function TitleScreen() {
           <button className="btn" onClick={() => setScreen('collection')}>
             Coleção · {Object.keys(collection.entries).length}
           </button>
+          <button className="btn" onClick={() => setScreen('glory')}>
+            <PixelIcon name="trophy" /> Glória · {collection.glory ?? 0}
+          </button>
           <button className="btn" onClick={() => setScreen('daycare')}>
             Creche{collection.eggs?.length ? ` · ${collection.eggs.length} ovo${collection.eggs.length > 1 ? 's' : ''}` : ''}
           </button>
@@ -222,6 +226,7 @@ export function StarterSelect() {
   }, [unlocked, tab]);
 
   const used = team.reduce((n, s) => n + teamCost(collection, s), 0);
+  const TEAM_BUDGET = teamBudget(collection);
   const sel = selected ? species(selected) : null;
   const shown = view && sel && lineRoot(view.name) === lineRoot(sel.name) ? view : sel;
   const owned = sel ? peekEntry(collection, sel.name) : undefined;
@@ -426,7 +431,7 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
   const {run, chooseStartBiome, chooseNextBiome} = useGame();
   const options = useMemo(() => {
     if (mode === 'start') return BIOMES;
-    return shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, 3);
+    return shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, 3 + (run?.perks?.biomes ?? 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, run?.wave]);
   if (!run) return null;
