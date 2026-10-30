@@ -5,33 +5,36 @@ import type {Rarity} from './dex';
 export interface Biome {
   id: string;
   name: string;
-  emoji: string;
   types: string[];
-  /** Cores do gradiente de fundo da batalha (céu, chão). */
-  colors: [string, string];
+  /** Fundo em pixel art (public/fx/bg/<bg>.png, do Pokémon Showdown). */
+  bg: string;
+  /** Filtro CSS para variar fundos reaproveitados. */
+  filter?: string;
+  /** Cor de destaque do bioma (cartões e reserva do fundo). */
+  color: string;
 }
 
 export const BIOMES: Biome[] = [
-  {id: 'plains', name: 'Campos', emoji: '🌾', types: ['Normal', 'Grass', 'Bug'], colors: ['#9fd7ff', '#7fc06a']},
-  {id: 'forest', name: 'Floresta', emoji: '🌲', types: ['Grass', 'Bug', 'Poison'], colors: ['#6aa66f', '#2f6b3a']},
-  {id: 'lake', name: 'Lago', emoji: '🏞️', types: ['Water', 'Flying', 'Bug'], colors: ['#a8e0ff', '#4b9fd8']},
-  {id: 'sea', name: 'Mar Aberto', emoji: '🌊', types: ['Water', 'Ice'], colors: ['#7fc8ff', '#1f5fa8']},
-  {id: 'beach', name: 'Praia', emoji: '🏖️', types: ['Water', 'Ground', 'Normal'], colors: ['#bfe8ff', '#f0d98c']},
-  {id: 'cave', name: 'Caverna', emoji: '🕳️', types: ['Rock', 'Ground', 'Dark'], colors: ['#5a4c44', '#2e2622']},
-  {id: 'mountain', name: 'Montanha', emoji: '⛰️', types: ['Rock', 'Flying', 'Fighting'], colors: ['#b9c6d6', '#7d6e5d']},
-  {id: 'volcano', name: 'Vulcão', emoji: '🌋', types: ['Fire', 'Ground', 'Rock'], colors: ['#ff9b6a', '#6b2a1a']},
-  {id: 'snow', name: 'Tundra Gelada', emoji: '❄️', types: ['Ice', 'Water', 'Steel'], colors: ['#e3f4ff', '#bcd9ea']},
-  {id: 'desert', name: 'Deserto', emoji: '🏜️', types: ['Ground', 'Rock', 'Fire'], colors: ['#ffe2a1', '#d9a95a']},
-  {id: 'swamp', name: 'Pântano', emoji: '🐸', types: ['Poison', 'Water', 'Ghost'], colors: ['#8fa88a', '#3f5a3c']},
-  {id: 'city', name: 'Cidade', emoji: '🏙️', types: ['Normal', 'Electric', 'Steel'], colors: ['#c9d3e0', '#7a8594']},
-  {id: 'powerplant', name: 'Usina', emoji: '⚡', types: ['Electric', 'Steel'], colors: ['#fff3a0', '#6d6d7a']},
-  {id: 'graveyard', name: 'Cemitério', emoji: '🪦', types: ['Ghost', 'Dark', 'Poison'], colors: ['#5d4f7a', '#2a2238']},
-  {id: 'ruins', name: 'Ruínas Antigas', emoji: '🏛️', types: ['Psychic', 'Rock', 'Ghost'], colors: ['#e8d7b0', '#9d8a63']},
-  {id: 'fairy', name: 'Bosque Encantado', emoji: '🍄', types: ['Fairy', 'Psychic', 'Grass'], colors: ['#ffd1f0', '#b78bd6']},
-  {id: 'dojo', name: 'Dojo', emoji: '🥋', types: ['Fighting', 'Normal'], colors: ['#f2d9b5', '#a0703e']},
-  {id: 'sky', name: 'Céu', emoji: '☁️', types: ['Flying', 'Dragon', 'Psychic'], colors: ['#d8f0ff', '#8cc3f2']},
-  {id: 'dragon', name: 'Covil do Dragão', emoji: '🐉', types: ['Dragon', 'Fire', 'Dark'], colors: ['#7a5fb0', '#2b1f45']},
-  {id: 'abyss', name: 'Abismo', emoji: '🌑', types: ['Dark', 'Ghost', 'Psychic'], colors: ['#3a3355', '#0f0d18']},
+  {id: 'plains', name: 'Campos', types: ['Normal', 'Grass', 'Bug'], bg: 'route', color: '#a7d98b'},
+  {id: 'forest', name: 'Floresta', types: ['Grass', 'Bug', 'Poison'], bg: 'forest', color: '#7cc47f'},
+  {id: 'lake', name: 'Lago', types: ['Water', 'Flying', 'Bug'], bg: 'beachshore', color: '#8fd3f0'},
+  {id: 'sea', name: 'Mar Profundo', types: ['Water', 'Ice'], bg: 'deepsea', filter: 'brightness(1.25) saturate(1.2)', color: '#6aa6d8'},
+  {id: 'beach', name: 'Praia', types: ['Water', 'Ground', 'Normal'], bg: 'beach', color: '#f4e3a1'},
+  {id: 'cave', name: 'Caverna', types: ['Rock', 'Ground', 'Dark'], bg: 'earthycave', color: '#c9a77c'},
+  {id: 'mountain', name: 'Montanha', types: ['Rock', 'Flying', 'Fighting'], bg: 'mountain', color: '#d6b98a'},
+  {id: 'volcano', name: 'Vulcão', types: ['Fire', 'Ground', 'Rock'], bg: 'volcanocave', color: '#f0937a'},
+  {id: 'snow', name: 'Caverna de Gelo', types: ['Ice', 'Water', 'Steel'], bg: 'icecave', color: '#a9e6ef'},
+  {id: 'desert', name: 'Deserto', types: ['Ground', 'Rock', 'Fire'], bg: 'desert', color: '#f2cf86'},
+  {id: 'swamp', name: 'Pântano', types: ['Poison', 'Water', 'Ghost'], bg: 'river', filter: 'hue-rotate(-25deg) saturate(0.85)', color: '#a3b26f'},
+  {id: 'city', name: 'Cidade', types: ['Normal', 'Electric', 'Steel'], bg: 'city', color: '#c7b8a8'},
+  {id: 'powerplant', name: 'Planície Elétrica', types: ['Electric', 'Steel'], bg: 'thunderplains', color: '#f2e27a'},
+  {id: 'graveyard', name: 'Gruta Sombria', types: ['Ghost', 'Dark', 'Poison'], bg: 'dampcave', filter: 'hue-rotate(220deg) saturate(1.3) brightness(0.9)', color: '#a08cc8'},
+  {id: 'ruins', name: 'Ruínas Antigas', types: ['Psychic', 'Rock', 'Ghost'], bg: 'desert', filter: 'sepia(0.4) hue-rotate(-15deg)', color: '#d9c39a'},
+  {id: 'fairy', name: 'Bosque Encantado', types: ['Fairy', 'Psychic', 'Grass'], bg: 'meadow', filter: 'hue-rotate(250deg) saturate(1.1)', color: '#f2b8de'},
+  {id: 'dojo', name: 'Pradaria', types: ['Fighting', 'Normal'], bg: 'meadow', color: '#b9d98a'},
+  {id: 'sky', name: 'Pico Celeste', types: ['Flying', 'Dragon', 'Psychic'], bg: 'mountain', filter: 'hue-rotate(170deg) brightness(1.1)', color: '#a8c8f0'},
+  {id: 'dragon', name: 'Covil do Dragão', types: ['Dragon', 'Fire', 'Dark'], bg: 'volcanocave', filter: 'hue-rotate(230deg) saturate(1.2)', color: '#b39ae0'},
+  {id: 'abyss', name: 'Abismo', types: ['Dark', 'Ghost', 'Psychic'], bg: 'deepsea', filter: 'hue-rotate(60deg) saturate(1.2)', color: '#8a7fb8'},
 ];
 
 export function getBiome(id: string): Biome {

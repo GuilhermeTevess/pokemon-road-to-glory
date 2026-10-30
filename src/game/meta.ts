@@ -55,23 +55,20 @@ export function saveCollection(c: Collection): void {
 }
 
 /** Registra uma captura. Repetidos melhoram os IVs guardados (o maior de cada atributo, +1 de bônus). */
-export function registerCatch(c: Collection, mon: OwnedMon): {duplicate: boolean; improved: string[]} {
+export function registerCatch(c: Collection, mon: OwnedMon): {duplicate: boolean; before: StatTable; after: StatTable} {
   const id = lineRoot(mon.species);
   const prev = c.entries[id];
   if (!prev) {
     c.entries[id] = {caught: 1, bestIvs: {...mon.ivs}, shiny: mon.shiny, firstCaughtAt: Date.now()};
-    return {duplicate: false, improved: []};
+    return {duplicate: false, before: zeroStats(), after: {...mon.ivs}};
   }
-  const improved: string[] = [];
+  const before = {...prev.bestIvs};
   const next = zeroStats();
-  for (const s of STAT_IDS) {
-    next[s] = Math.min(31, Math.max(prev.bestIvs[s], mon.ivs[s]) + (prev.bestIvs[s] < 31 ? 1 : 0));
-    if (next[s] > prev.bestIvs[s]) improved.push(s);
-  }
+  for (const s of STAT_IDS) next[s] = Math.min(31, Math.max(prev.bestIvs[s], mon.ivs[s]) + (prev.bestIvs[s] < 31 ? 1 : 0));
   prev.bestIvs = next;
   prev.caught++;
   prev.shiny ||= mon.shiny;
-  return {duplicate: true, improved};
+  return {duplicate: true, before, after: {...next}};
 }
 
 /** IVs para um inicial: os melhores da coleção ou aleatórios. */

@@ -152,3 +152,82 @@ export function effectivenessLabel(mult: number | null): {text: string; cls: str
   if (mult < 1) return {text: 'Pouco efetivo ½', cls: 'eff-h'};
   return {text: 'Efeito normal 1x', cls: 'eff-1'};
 }
+
+// ---------------------------------------------------------------- Ícones pixel
+
+const ICONS: Record<string, string[]> = {
+  sound: ['...#....', '..##.#..', '####..#.', '####.#.#', '####.#.#', '####..#.', '..##.#..', '...#....'],
+  mute: ['...#....', '..##....', '####.#.#', '####..#.', '####..#.', '####.#.#', '..##....', '...#....'],
+  home: ['...##...', '..####..', '.######.', '########', '.##..##.', '.##..##.', '.######.', '........'],
+  back: ['...#....', '..##....', '.#######', '########', '.#######', '..##....', '...#....', '........'],
+  star: ['...#....', '...#....', '#######.', '.#####..', '..###...', '.##.##..', '##...##.', '........'],
+  help: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...', '...##...'],
+  dice: ['########', '#......#', '#.##...#', '#.##.#.#', '#...##.#', '#...##.#', '#......#', '########'],
+  heart: ['........', '.##.##..', '#######.', '#######.', '.#####..', '..###...', '...#....', '........'],
+  map: ['##.##.##', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '##.##.##'],
+  trophy: ['########', '#.####.#', '#.####.#', '.######.', '..####..', '...##...', '..####..', '.######.'],
+};
+
+export function PixelIcon({name, size = 16, color = 'currentColor'}: {name: keyof typeof ICONS | string; size?: number; color?: string}) {
+  const rows = ICONS[name] ?? ICONS.star;
+  return (
+    <svg className="pixel-icon" width={size} height={size} viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden>
+      {rows.flatMap((r, y) => [...r].map((ch, x) => (ch === '#' ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={color} /> : null)))}
+    </svg>
+  );
+}
+
+/** Filtro por tipo (chips clicáveis). */
+export function TypeFilter({value, onChange, types}: {value: string | null; onChange: (t: string | null) => void; types: string[]}) {
+  return (
+    <div className="type-filter">
+      <button className={`chip ${value === null ? 'active' : ''}`} onClick={() => onChange(null)}>
+        Todos
+      </button>
+      {types.map(t => (
+        <button
+          key={t}
+          className={`chip type-chip ${value === t ? 'active' : ''}`}
+          style={{['--tc' as string]: TYPE_COLORS[t]}}
+          onClick={() => onChange(value === t ? null : t)}
+        >
+          {TYPE_PT[t] ?? t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Teia (hexágono) de IVs: antes em cinza, depois em cor, com o ganho de cada atributo. */
+export function IvWeb({before, after, size = 260}: {before: Record<string, number>; after: Record<string, number>; size?: number}) {
+  const r = size / 2 - 56;
+  const c = size / 2;
+  const pt = (i: number, v: number) => {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 3;
+    const d = (v / 31) * r;
+    return [c + Math.cos(ang) * d, c + Math.sin(ang) * d];
+  };
+  const poly = (vals: Record<string, number>) => STAT_IDS.map((s, i) => pt(i, vals[s]).join(',')).join(' ');
+  return (
+    <svg className="iv-web" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {[0.25, 0.5, 0.75, 1].map(f => (
+        <polygon key={f} points={STAT_IDS.map((_, i) => pt(i, 31 * f).join(',')).join(' ')} className="iv-grid" />
+      ))}
+      <polygon points={poly(before)} className="iv-before" />
+      <polygon points={poly(after)} className="iv-after" />
+      {STAT_IDS.map((s, i) => {
+        const [x, y] = pt(i, 31 * 1.38);
+        const gain = after[s] - before[s];
+        return (
+          <text key={s} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="iv-label">
+            <tspan>{STAT_LABEL[s].replace('Velocidade', 'Vel.')}</tspan>
+            <tspan x={x} dy="1.1em" className={gain > 0 ? 'iv-gain' : ''}>
+              {after[s]}
+              {gain > 0 ? ` +${gain}` : ''}
+            </tspan>
+          </text>
+        );
+      })}
+    </svg>
+  );
+}

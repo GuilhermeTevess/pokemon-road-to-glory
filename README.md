@@ -16,8 +16,8 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 
 ## O que já tem (etapa 1)
 
-- **Inicial de qualquer geração** (1 a 9, incluindo formas regionais), com busca,
-  status base e fraquezas.
+- **Os 3 iniciais de cada geração** (1 a 9) numa página só, com filtro por tipo.
+  Pokémon capturados também viram opção de inicial.
 - **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
   (ou depois de usar um **Mapa**).
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
@@ -35,16 +35,23 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Tudo mastigado**: tipos sempre visíveis, fraquezas do selvagem na tela, painel
   completo de fraquezas/resistências e cada golpe mostrando se é super efetivo,
   pouco efetivo ou sem efeito. Na troca, mostra quem resiste ao selvagem.
-- **Sons**: grito original de cada Pokémon e efeitos de golpe por tipo (botão 🔊).
-- **Coleção** permanente: repetidos melhoram os IVs, e o inicial começa com os
-  melhores IVs da linha evolutiva.
+- **Visual pixel art** em cores claras, com fundos de batalha por bioma e animações
+  de golpe por tipo e formato (soco, lança-chamas, raio, chuva de pedras...).
+- **Sons**: gritos modernos de cada Pokémon e efeitos de golpe por tipo e formato
+  (botão Som).
+- **Ajuda** dentro do jogo explicando rondas e itens.
+- **Coleção** permanente com filtro por tipo: repetidos melhoram os IVs (mostrados
+  numa teia de atributos), e o inicial começa com os melhores IVs da linha.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).
+
+Ideias para as próximas etapas: [docs/IDEIAS.md](docs/IDEIAS.md).
 
 Veja [docs/ARQUITETURA.md](docs/ARQUITETURA.md) para a organização do código e o
 plano das etapas 2 e 3.
 
 ## Créditos
 
+Fundos de batalha e sprites de efeito em `public/fx`: Pokémon Showdown client.
 Dados e simulador: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown)
 via [`@pkmn/sim`](https://github.com/pkmn/ps). Sprites e gritos: Pokémon Showdown e
 [PokéAPI](https://github.com/PokeAPI/sprites). Pokémon é marca da Nintendo / Game

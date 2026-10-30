@@ -1,12 +1,12 @@
 import {useEffect, useState} from 'react';
 import {dex, species} from '../../data/dex';
-import {TIER_COLORS, getItem} from '../../data/items';
+import {TIER_COLORS, getItem, itemUsage} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
 import {calcStats, expForLevel, itemEvolutions} from '../../game/mon';
 import {rerollCost, shopItems} from '../../game/rewards';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
-import {HpBar, ItemIcon, MatchupPanel, Modal, Sprite, StatsTable, TypeBadge, Types} from '../components';
+import {HpBar, ItemIcon, MatchupPanel, Modal, PixelIcon, Sprite, StatsTable, TypeBadge, Types} from '../components';
 
 export function RewardScreen() {
   const {run, pickReward, reroll, buy, skipReward} = useGame();
@@ -15,16 +15,16 @@ export function RewardScreen() {
   const cost = rerollCost(run.rerolls, run.wave);
   const nextWave = run.wave + 1;
   const notes = [
-    run.wave >= STAGE_LENGTH ? '🏆 Última ronda da etapa vencida!' : null,
-    run.wave % HEAL_EVERY === 0 ? '💖 Seu time será curado no Centro Pokémon.' : null,
-    run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady ? '🗺️ Você vai poder trocar de bioma.' : null,
-  ].filter(Boolean);
+    run.wave >= STAGE_LENGTH ? (['trophy', 'Última ronda da etapa vencida!'] as const) : null,
+    run.wave % HEAL_EVERY === 0 ? (['heart', 'Seu time será curado no Centro Pokémon.'] as const) : null,
+    run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady ? (['map', 'Você vai poder trocar de bioma.'] as const) : null,
+  ].filter(n => n !== null);
   return (
     <div className="screen reward-screen">
       <h2>Ronda {run.wave} concluída!</h2>
-      {notes.map(n => (
-        <p key={n} className="hint">
-          {n}
+      {notes.map(([icon, text]) => (
+        <p key={text} className="note">
+          <PixelIcon name={icon} /> {text}
         </p>
       ))}
       <div className="tabs">
@@ -46,13 +46,14 @@ export function RewardScreen() {
                   <ItemIcon id={id} size={48} />
                   <span className="reward-name">{it.name}</span>
                   <span className="reward-desc">{it.desc}</span>
+                  <span className="reward-usage">{itemUsage(it)}</span>
                 </button>
               );
             })}
           </div>
           <div className="row center">
             <button className="btn" disabled={run.money < cost} onClick={reroll}>
-              🎲 Sortear de novo (₽ {cost})
+              <PixelIcon name="dice" /> Sortear de novo · ₽ {cost}
             </button>
             <button className="btn" onClick={skipReward}>
               Pular
@@ -117,6 +118,7 @@ export function PartyPanel({onClose}: {onClose: () => void}) {
                         {it.name} x{n}
                       </strong>
                       <span className="muted">{it.desc}</span>
+                      <span className="usage">{itemUsage(it)}</span>
                     </div>
                     {usable && (
                       <button className="btn small" disabled={needsMon && !mon} onClick={() => useItem(id, mon?.uid ?? '')}>
@@ -175,7 +177,7 @@ function MonRow({mon, lead, selected, onClick}: {mon: OwnedMon; lead: boolean; s
       <Sprite name={mon.species} still shiny={mon.shiny} size={48} />
       <span className="mon-row-info">
         <span>
-          {lead && '⭐ '}
+          {lead && <PixelIcon name="star" color="#e0a100" />} 
           {mon.species} Nv.{mon.level} {mon.item && <ItemIcon id={mon.item} size={18} />}
         </span>
         <HpBar hp={mon.hp} maxhp={max} showNumbers />
@@ -194,7 +196,7 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
         <Sprite name={mon.species} shiny={mon.shiny} />
         <div>
           <h3>
-            {mon.shiny && <span className="shiny">★ </span>}
+            {mon.shiny && <span className="shiny"><PixelIcon name="star" color="#e0a100" /> </span>}
             {s.name} <span className="lv">Nv. {mon.level}</span>
           </h3>
           <Types name={mon.species} />
@@ -240,7 +242,7 @@ export function PendingModal() {
         <h2>O quê? {mon.species} está evoluindo!</h2>
         <div className="evo">
           <Sprite name={mon.species} shiny={mon.shiny} className="evo-from" />
-          <span className="arrow">➜</span>
+          <span className="arrow"><PixelIcon name="back" size={28} /></span>
           <div className="evo-options">
             {ev.into.map(n => (
               <button key={n} className="evo-option" onClick={() => resolvePending(n)}>
@@ -290,7 +292,7 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
   if (!run) return null;
   return (
     <div className="screen end-screen">
-      <h1>{kind === 'stageClear' ? '🏆 Etapa 1 concluída!' : 'Fim da run'}</h1>
+      <h1>{kind === 'stageClear' ? 'Etapa 1 concluída!' : 'Fim da run'}</h1>
       <p>
         {kind === 'stageClear'
           ? 'Você chegou à ronda 30! Na etapa 3, é aqui que você enfrentaria seus amigos.'

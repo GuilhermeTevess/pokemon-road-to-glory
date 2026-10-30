@@ -10,7 +10,7 @@ import type {Collection} from './meta';
 import {createMon, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
 import {moneyBag, moneyReward, rerollCost, rollRewards} from './rewards';
-import type {OwnedMon, PendingEvent, RunState} from './types';
+import type {OwnedMon, PendingEvent, RunState, StatTable} from './types';
 
 const RUN_KEY = 'rtg-run';
 export const PARTY_SIZE = 6;
@@ -63,6 +63,9 @@ interface Store {
   run: RunState | null;
   collection: Collection;
   toasts: Toast[];
+  /** Último repetido capturado: IVs antes/depois (teia de IVs). */
+  ivGain: {species: string; before: StatTable; after: StatTable} | null;
+  clearIvGain(): void;
   setScreen(s: Screen): void;
   toast(text: string): void;
   newRun(starter: string): void;
@@ -171,6 +174,8 @@ export const useGame = create<Store>((set, get) => {
     run: loadRun(),
     collection: loadCollection(),
     toasts: [],
+    ivGain: null,
+    clearIvGain: () => set({ivGain: null}),
 
     setScreen: screen => set({screen}),
 
@@ -248,13 +253,7 @@ export const useGame = create<Store>((set, get) => {
           mon.metWave = run.wave;
           mon.metBiome = run.biome;
           const reg = registerCatch(col, mon);
-          if (reg.duplicate) {
-            get().toast(
-              reg.improved.length
-                ? `${mon.species} repetido! IVs da coleção melhoraram (${reg.improved.length} atributos).`
-                : `${mon.species} repetido! IVs da coleção já estão no máximo.`,
-            );
-          }
+          if (reg.duplicate) set({ivGain: {species: mon.species, before: reg.before, after: reg.after}});
           if (run.party.length < PARTY_SIZE) run.party.push(mon);
           else {
             run.box.push(mon);
