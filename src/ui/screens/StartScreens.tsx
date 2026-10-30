@@ -162,6 +162,9 @@ export function TitleScreen() {
           <button className="btn" onClick={() => setScreen('collection')}>
             Coleção · {Object.keys(collection.entries).length}
           </button>
+          <button className="btn" onClick={() => setScreen('daycare')}>
+            Creche{collection.eggs?.length ? ` · ${collection.eggs.length} ovo${collection.eggs.length > 1 ? 's' : ''}` : ''}
+          </button>
         </div>
       </div>
       <p className="hint">Escolha seu inicial e sobreviva até a ronda 30.</p>
@@ -196,6 +199,8 @@ export function StarterSelect() {
   const [partnerPick, setPartner] = useState<string | null>(null);
   const partner = partnerPick && team.includes(partnerPick) ? partnerPick : team[0];
   const [sheet, setSheet] = useState<string | null>(null);
+  const [eggId, setEggId] = useState<string | null>(null);
+  const eggs = collection.eggs ?? [];
   const [tab, setTab] = useState<'starters' | 'collection'>('starters');
 
   // Pokémon já capturados por ESTE treinador (primeiro estágio, não lendários) também podem ser iniciais.
@@ -285,6 +290,21 @@ export function StarterSelect() {
             </span>
           )}
         </div>
+        {eggs.length > 0 && (
+          <div className="egg-pick">
+            <span className="hint">Levar um ovo (não gasta pontos):</span>
+            <div className="chips">
+              <button className={`chip ${!eggId ? 'active' : ''}`} onClick={() => setEggId(null)}>
+                Nenhum
+              </button>
+              {eggs.map(e => (
+                <button key={e.id} className={`chip ${eggId === e.id ? 'active' : ''}`} onClick={() => setEggId(e.id)} title={`Choca em ${e.waves} rondas`}>
+                  <PixelIcon name="egg" size={14} color="#c9b27a" /> {e.species} · {e.waves} rondas
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="budget">
           <div className="budget-label">
             Pontos <b>{used}</b>/{TEAM_BUDGET}
@@ -292,7 +312,7 @@ export function StarterSelect() {
           <div className="budget-track">
             <div className="budget-fill" style={{width: `${(used / TEAM_BUDGET) * 100}%`}} />
           </div>
-          <button className="btn primary" disabled={!team.length} onClick={() => newRun(team, partner)}>
+          <button className="btn primary" disabled={!team.length} onClick={() => newRun(team, partner, eggId ?? undefined)}>
             Começar run
           </button>
         </div>

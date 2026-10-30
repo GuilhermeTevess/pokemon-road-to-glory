@@ -12,6 +12,7 @@ import type {OwnedMon} from '../../game/types';
 import {playCoins, playItem} from '../audio';
 import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {TrainerAvatar} from './StartScreens';
+import {EggInfo} from './DaycareScreen';
 
 /** Lista de Pokémon para escolher em quem usar um item. */
 function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: OwnedMon[]; onPick: (uid: string) => void; children?: React.ReactNode}) {
@@ -380,6 +381,11 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           </button>
         ))}
       </div>
+      {run.egg && (
+        <div className="panel sb-egg" title="Choca depois de rondas vencidas">
+          <EggInfo egg={run.egg} left={run.egg.left} />
+        </div>
+      )}
       <div className="sb-buttons">
         <button className="btn" onClick={() => onOpen('bag')}>
           <ItemIcon id="pokeball" size={24} /> Mochila · {bagCount}
