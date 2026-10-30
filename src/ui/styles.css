@@ -580,3 +580,50 @@ table.move-info td { padding: 3px 0; }
 .pip.on { background: var(--butter-d); }
 .upgrade-max { font-weight: 700; color: var(--mint-d); }
 .glory-earned { font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
+
+/* Cena de evolução */
+.evo-scene { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(circle at 50% 45%, #2c3a66 0%, #11152b 70%); color: #fff; overflow: hidden; cursor: pointer; padding: 16px; }
+.evo-rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.08) 0deg 10deg, transparent 10deg 20deg); opacity: 0; transition: opacity .6s; }
+.evo-scene.glow .evo-rays, .evo-scene.done .evo-rays { opacity: 1; animation: evo-spin 12s linear infinite; }
+.evo-stage { position: relative; width: 192px; height: 192px; display: grid; place-items: center; }
+.evo-stage .sprite { position: absolute; width: 192px; height: 192px; object-fit: contain; image-rendering: pixelated; }
+.evo-new { opacity: 0; }
+.evo-scene.glow .evo-old { animation: evo-swap-a 3.2s ease-in forwards; }
+.evo-scene.glow .evo-new { animation: evo-swap-b 3.2s ease-in forwards; }
+.evo-scene.flash .evo-old { opacity: 0; }
+.evo-scene.flash .evo-new { opacity: 1; filter: brightness(0) invert(1); }
+.evo-scene.done .evo-old { opacity: 0; }
+.evo-scene.done .evo-new { opacity: 1; animation: evo-pop .5s ease-out; }
+.evo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.evo-scene.flash .evo-flash { animation: evo-flash .5s ease-out forwards; }
+.evo-sparkles { position: absolute; inset: 0; opacity: 0; }
+.evo-scene.glow .evo-sparkles, .evo-scene.done .evo-sparkles { opacity: 1; }
+.evo-sparkles i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; background: #fff7b0; box-shadow: 0 0 6px #fff; transform: rotate(var(--a)) translateY(-40px); animation: evo-spark 1.2s ease-out infinite; animation-delay: var(--d); }
+.evo-text { position: relative; font-family: 'Press Start 2P', monospace; font-size: 12px; line-height: 1.8; text-align: center; max-width: 420px; text-shadow: 2px 2px 0 #000; }
+.evo-text b { color: #ffe066; }
+.evo-continue { position: relative; }
+@keyframes evo-spin { to { transform: rotate(360deg); } }
+@keyframes evo-flash { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes evo-pop { 0% { transform: scale(1.3); filter: brightness(3); } 100% { transform: scale(1); filter: none; } }
+@keyframes evo-spark { 0% { transform: rotate(var(--a)) translateY(-30px) scale(1); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-110px) scale(.3); opacity: 0; } }
+/* As silhuetas brancas alternam cada vez mais rápido (antiga ↔ nova). */
+@keyframes evo-swap-a {
+  0% { opacity: 1; filter: brightness(0) invert(1); transform: scale(1); }
+  20% { opacity: 1; } 25% { opacity: 0; } 35% { opacity: 1; }
+  45% { opacity: 0; } 52% { opacity: 1; } 60% { opacity: 0; } 65% { opacity: 1; }
+  70% { opacity: 0; } 74% { opacity: 1; } 78% { opacity: 0; } 81% { opacity: 1; }
+  84% { opacity: 0; } 86% { opacity: 1; } 88% { opacity: 0; } 90% { opacity: 1; }
+  92% { opacity: 0; } 94% { opacity: 1; } 96% { opacity: 0; } 98% { opacity: 1; }
+  100% { opacity: 0; filter: brightness(0) invert(1); transform: scale(1.1); }
+}
+@keyframes evo-swap-b {
+  0% { opacity: 0; filter: brightness(0) invert(1); transform: scale(1); }
+  20% { opacity: 0; } 25% { opacity: 1; } 35% { opacity: 0; }
+  45% { opacity: 1; } 52% { opacity: 0; } 60% { opacity: 1; } 65% { opacity: 0; }
+  70% { opacity: 1; } 74% { opacity: 0; } 78% { opacity: 1; } 81% { opacity: 0; }
+  84% { opacity: 1; } 86% { opacity: 0; } 88% { opacity: 1; } 90% { opacity: 0; }
+  92% { opacity: 1; } 94% { opacity: 0; } 96% { opacity: 1; } 98% { opacity: 0; }
+  100% { opacity: 1; filter: brightness(0) invert(1); transform: scale(1.1); }
+}
+.evo-scene.start .evo-old { animation: evo-glow-in .9s ease-in forwards; }
+@keyframes evo-glow-in { from { filter: none; } to { filter: brightness(0) invert(1) drop-shadow(0 0 8px #fff); } }

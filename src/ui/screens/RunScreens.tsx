@@ -10,7 +10,7 @@ import {discounted, gloryFor, rerollPrice} from '../../game/glory';
 import {EV_MAX_STAT} from '../../game/meta';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
-import {playCoins, playItem} from '../audio';
+import {playCoins, playEvolve, playItem} from '../audio';
 import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {EggInfo} from './DaycareScreen';
@@ -492,9 +492,64 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
   );
 }
 
+/** Cena de evolução: o Pokémon no centro brilha, alterna as silhuetas cada vez mais rápido, flash e revela a nova forma. */
+function EvolutionScene({mon, into, onDone}: {mon: OwnedMon; into: string; onDone: () => void}) {
+  const [phase, setPhase] = useState<'start' | 'glow' | 'flash' | 'done'>('start');
+  useEffect(() => {
+    const t = [
+      setTimeout(() => {
+        setPhase('glow');
+        playEvolve('glow');
+      }, 900),
+      setTimeout(() => setPhase('flash'), 4100),
+      setTimeout(() => {
+        setPhase('done');
+        playEvolve('done');
+      }, 4600),
+    ];
+    return () => t.forEach(clearTimeout);
+  }, []);
+  const name = mon.nickname || species(mon.species).name;
+  const skip = () => (phase === 'done' ? onDone() : setPhase('done'));
+  return (
+    <div className={`evo-scene ${phase}`} onClick={skip}>
+      <div className="evo-rays" />
+      <div className="evo-stage">
+        <Sprite name={mon.species} shiny={mon.shiny} className="evo-old" />
+        <Sprite name={into} shiny={mon.shiny} className="evo-new" />
+        <div className="evo-sparkles">
+          {Array.from({length: 10}, (_, i) => (
+            <i key={i} style={{'--a': `${i * 36}deg`, '--d': `${(i % 3) * 0.3}s`} as React.CSSProperties} />
+          ))}
+        </div>
+      </div>
+      <div className="evo-flash" />
+      <p className="evo-text">
+        {phase === 'done' ? (
+          <>
+            Parabéns! {name} evoluiu para <b>{species(into).name}</b>!
+          </>
+        ) : (
+          <>O quê? {name} está evoluindo!</>
+        )}
+      </p>
+      <button
+        className="btn evo-continue"
+        onClick={e => {
+          e.stopPropagation();
+          skip();
+        }}
+      >
+        {phase === 'done' ? 'Continuar' : 'Pular'}
+      </button>
+    </div>
+  );
+}
+
 export function PendingModal() {
   const {run, resolvePending} = useGame();
   const [info, setInfo] = useState<string | null>(null);
+  const [evolving, setEvolving] = useState<string | null>(null);
   const ev = run?.pending[0];
   const mon = ev && (run.party.find(m => m.uid === ev.uid) ?? run.box.find(m => m.uid === ev.uid));
   useEffect(() => {
@@ -502,6 +557,17 @@ export function PendingModal() {
   }, [ev, mon, resolvePending]);
   if (!run || !ev || !mon) return null;
   if (ev.kind === 'evolve') {
+    if (evolving)
+      return (
+        <EvolutionScene
+          mon={mon}
+          into={evolving}
+          onDone={() => {
+            setEvolving(null);
+            resolvePending(evolving);
+          }}
+        />
+      );
     return (
       <Modal>
         <h2>O quê? {displayName(mon)} está evoluindo!</h2>
@@ -510,7 +576,7 @@ export function PendingModal() {
           <span className="arrow"><PixelIcon name="back" size={28} /></span>
           <div className="evo-options">
             {ev.into.map(n => (
-              <button key={n} className="evo-option" onClick={() => resolvePending(n)}>
+              <button key={n} className="evo-option" onClick={() => setEvolving(n)}>
                 <Sprite name={n} shiny={mon.shiny} />
                 <span>{n}</span>
                 <Types name={n} />
