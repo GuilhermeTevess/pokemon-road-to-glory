@@ -1,7 +1,7 @@
 // Eventos entre as rondas (Parte C): em vez de ir direto para a próxima batalha,
 // às vezes aparece uma escolha. Eventos não gastam ronda.
 import {getItem, ITEMS} from '../data/items';
-import {generateEncounter, isBossWave, STAGE_LENGTH} from './encounters';
+import {generateEncounter, isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
 import {chance, pick} from './rng';
 import type {Encounter, RunEvent, RunState} from './types';
 
@@ -20,7 +20,7 @@ function calmMon(run: RunState): Encounter['mon'] {
 
 export function shouldRollEvent(run: RunState): boolean {
   const next = run.wave + 1;
-  if (run.wave < 2 || next >= STAGE_LENGTH || isBossWave(next)) return false;
+  if (run.wave < 2 || next >= SEASON_LENGTH || isBossWave(next)) return false;
   if (run.lastEventWave === run.wave) return false;
   return chance(EVENT_CHANCE);
 }
@@ -56,7 +56,7 @@ export function rollEvent(run: RunState): RunEvent {
 /** Gera os próximos selvagens antes (a Vidente mostra os tipos deles). */
 export function upcomingEncounters(run: RunState, n: number): Encounter[] {
   const out: Encounter[] = [];
-  for (let w = run.wave + 1; w <= run.wave + n && w <= STAGE_LENGTH; w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck));
+  for (let w = run.wave + 1; w <= run.wave + n && w <= SEASON_LENGTH && !isMilestoneWave(w); w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck));
   return out;
 }
 

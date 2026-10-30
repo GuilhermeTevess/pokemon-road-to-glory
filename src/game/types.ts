@@ -1,5 +1,6 @@
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
 import type {Egg} from './daycare';
+import type {Tournament} from './tournament';
 
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type StatTable = Record<StatId, number>;
@@ -42,6 +43,7 @@ export type Phase =
   | 'reward'
   | 'biomeChoice'
   | 'event'
+  | 'tournament'
   | 'gameOver'
   | 'stageClear';
 
@@ -52,6 +54,12 @@ export interface Encounter {
   boss: boolean;
   /** Nome do treinador rival (batalha de evento: não dá para capturar nem fugir). */
   trainer?: string;
+  /** Time inteiro do treinador (o primeiro é `mon`). */
+  team?: OwnedMon[];
+  /** Partida de torneio: tem narrador e não acaba a run se perder. */
+  tournament?: boolean;
+  /** Falas do narrador na entrada (dependem da fama e dos títulos). */
+  intro?: string[];
 }
 
 /** Evento entre rondas (ver game/events.ts). */
@@ -114,6 +122,10 @@ export interface RunState {
   gloryEarned?: number;
   /** Ovo levado da Creche: `left` rondas vencidas para chocar. */
   egg?: Egg & {left: number};
+  /** Torneio em andamento (fase 'tournament'). */
+  tournament?: Tournament;
+  /** Glória já ganha em torneios nesta run (para a tela final). */
+  tourGlory?: number;
   /** Selvagens já sorteados (a Vidente mostrou). */
   upcoming?: Encounter[];
   log: string[];

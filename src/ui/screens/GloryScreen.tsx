@@ -1,5 +1,5 @@
 // Parte D: melhorias gerais compradas com Glória.
-import {UPGRADES, gloryFor} from '../../game/glory';
+import {UPGRADES} from '../../game/glory';
 import {useGame} from '../../game/store';
 import {PixelIcon} from '../components';
 
@@ -18,8 +18,8 @@ export function GloryScreen() {
         </span>
       </header>
       <p className="hint">
-        Toda run dá Glória quando acaba: 1 por ronda, +5 a cada 10 rondas e +20 se terminar a etapa (uma run até a ronda 30 dá{' '}
-        {gloryFor(30, 'stageClear')}). Ela fica com o treinador para sempre e compra melhorias para todas as próximas runs.
+        Toda run dá Glória quando acaba: 1 por ronda, +5 a cada 10 rondas e +20 se completar a temporada de 120 rondas. Os torneios dão
+        Glória extra pela colocação (uma League Cup vencida dá 30). Ela fica com o treinador para sempre e compra melhorias para todas as próximas runs.
       </p>
       <div className="upgrade-list">
         {UPGRADES.map(u => {

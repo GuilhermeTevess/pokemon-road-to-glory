@@ -6,8 +6,9 @@ import {createMon, evolve, itemEvolutions, levelEvolutions, randomIvs} from './m
 import {chance, pick, randInt, weightedPick} from './rng';
 import type {Encounter, OwnedMon} from './types';
 
-/** Fim da etapa 1. Na etapa 3, toda ronda múltipla disto vira um duelo PvP. */
-export const STAGE_LENGTH = 30;
+/** Uma temporada: 120 rondas, com um torneio a cada 30 (League Cup, Regional, Internacional, Mundial). */
+export const SEASON_LENGTH = 120;
+export const TOURNAMENT_EVERY = 30;
 export const BIOME_CHANGE_EVERY = 5;
 export const HEAL_EVERY = 10;
 
@@ -15,9 +16,9 @@ export function isBossWave(wave: number): boolean {
   return wave % 10 === 0;
 }
 
-/** Ronda marco (30, 60, 90...). Hoje é um chefe lendário; na etapa 3 será o duelo contra outro jogador. */
+/** Ronda de torneio (30, 60, 90, 120). */
 export function isMilestoneWave(wave: number): boolean {
-  return wave % STAGE_LENGTH === 0;
+  return wave % TOURNAMENT_EVERY === 0;
 }
 
 function rarityWeights(wave: number, incense: boolean, luck: number): [Rarity, number][] {

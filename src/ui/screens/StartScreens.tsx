@@ -166,12 +166,15 @@ export function TitleScreen() {
           <button className="btn" onClick={() => setScreen('glory')}>
             <PixelIcon name="trophy" /> Glória · {collection.glory ?? 0}
           </button>
+          <button className="btn" onClick={() => setScreen('tournaments')}>
+            Torneios
+          </button>
           <button className="btn" onClick={() => setScreen('daycare')}>
             Creche{collection.eggs?.length ? ` · ${collection.eggs.length} ovo${collection.eggs.length > 1 ? 's' : ''}` : ''}
           </button>
         </div>
       </div>
-      <p className="hint">Escolha seu inicial e sobreviva até a ronda 30.</p>
+      <p className="hint">Uma temporada tem 120 rondas, com torneios nas rondas 30, 60, 90 e 120 (o Mundial).</p>
     </div>
   );
 }

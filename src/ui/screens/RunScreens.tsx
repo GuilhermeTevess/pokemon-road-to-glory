@@ -3,11 +3,12 @@ import {dex, species} from '../../data/dex';
 import {moveDescPt} from '../../data/movesPt';
 import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
-import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
+import {BIOME_CHANGE_EVERY, HEAL_EVERY, SEASON_LENGTH} from '../../game/encounters';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
 import {discounted, gloryFor, rerollPrice} from '../../game/glory';
 import {EV_MAX_STAT} from '../../game/meta';
+import {tourAt} from '../../game/tournament';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
 import {playCoins, playEvolve, playItem} from '../audio';
@@ -100,7 +101,7 @@ export function RewardScreen() {
   const cost = rerollPrice(run, rerollCost(run.rerolls, run.wave));
   const nextWave = run.wave + 1;
   const notes = [
-    run.wave >= STAGE_LENGTH ? (['trophy', 'Última ronda da etapa vencida!'] as const) : null,
+    run.wave >= SEASON_LENGTH ? (['trophy', 'Última ronda da temporada!'] as const) : null,
     run.wave % HEAL_EVERY === 0 ? (['heart', 'Seu time será curado no Centro Pokémon.'] as const) : null,
     run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady ? (['map', 'Você vai poder trocar de bioma.'] as const) : null,
   ].filter(n => n !== null);
@@ -182,7 +183,10 @@ export function RewardScreen() {
           </button>
         </div>
       )}
-      <p className="hint">Próxima: ronda {Math.min(nextWave, STAGE_LENGTH)}.</p>
+      <p className="hint">
+        Próxima: ronda {Math.min(nextWave, SEASON_LENGTH)}
+        {tourAt(nextWave) ? ` · ${tourAt(nextWave)!.name}!` : ''}.
+      </p>
       {choosing && choosingItem && (
         <Modal onClose={() => setChoosing(null)}>
           <h2>Usar agora?</h2>
@@ -363,7 +367,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <div className="trainer-name">{trainer?.name}</div>
           <div className="sb-money">₽ {run.money}</div>
           <div className="muted">
-            Ronda {run.wave}/{STAGE_LENGTH} · {getBiome(run.biome).name}
+            Ronda {run.wave}/{SEASON_LENGTH} · {getBiome(run.biome).name}
           </div>
         </div>
       </div>
@@ -628,10 +632,10 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
   if (!run) return null;
   return (
     <div className="screen end-screen">
-      <h1>{kind === 'stageClear' ? 'Etapa 1 concluída!' : 'Fim da run'}</h1>
+      <h1>{kind === 'stageClear' ? 'Temporada completa!' : 'Fim da run'}</h1>
       <p>
         {kind === 'stageClear'
-          ? 'Você chegou à ronda 30! Na etapa 3, é aqui que você enfrentaria seus amigos.'
+          ? `Você chegou ao fim das ${SEASON_LENGTH} rondas e disputou o Mundial!`
           : `Seu time caiu na ronda ${run.wave}.`}
       </p>
       <div className="row center wrap">
