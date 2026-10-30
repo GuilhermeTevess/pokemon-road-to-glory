@@ -212,6 +212,7 @@ só quer competir pode focar no Circuito, e quem gosta de aventura faz a Liga.
 ---
 
 ## Já feito das ideias anteriores
+- **Parte D**: Glória e 7 melhorias gerais (`src/game/glory.ts`, tela Glória no menu).
 - **Parte C, eventos**: 10% de chance entre rondas (não antes de chefe). Casa
   abandonada, árvore de frutas, comerciante, Pokémon machucado, rival e vidente
   (`src/game/events.ts`). Megas feitas (Mega Pedra genérica vira a pedra certa; mega automática no 1º golpe). Creche e ovos feitos (`src/game/daycare.ts`; gênero ignorado, sem gênero só com Ditto).

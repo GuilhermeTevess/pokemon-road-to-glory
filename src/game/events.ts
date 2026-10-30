@@ -56,7 +56,7 @@ export function rollEvent(run: RunState): RunEvent {
 /** Gera os próximos selvagens antes (a Vidente mostra os tipos deles). */
 export function upcomingEncounters(run: RunState, n: number): Encounter[] {
   const out: Encounter[] = [];
-  for (let w = run.wave + 1; w <= run.wave + n && w <= STAGE_LENGTH; w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0));
+  for (let w = run.wave + 1; w <= run.wave + n && w <= STAGE_LENGTH; w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck));
   return out;
 }
 

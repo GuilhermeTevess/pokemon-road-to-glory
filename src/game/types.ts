@@ -68,6 +68,17 @@ export type PendingEvent =
   | {kind: 'learnMove'; uid: string; move: string}
   | {kind: 'evolve'; uid: string; into: string[]};
 
+/** Melhorias gerais (Glória) congeladas no começo da run. */
+export interface RunPerks {
+  budget: number;
+  luck: number;
+  biomes: number;
+  rewards: number;
+  money: number;
+  balls: number;
+  discount: number;
+}
+
 export interface RunState {
   version: 1;
   id: string;
@@ -91,6 +102,9 @@ export interface RunState {
   /** Evento atual (fase 'event'). */
   event?: RunEvent;
   lastEventWave?: number;
+  perks?: RunPerks;
+  /** Glória ganha quando a run terminou (para a tela final). */
+  gloryEarned?: number;
   /** Ovo levado da Creche: `left` rondas vencidas para chocar. */
   egg?: Egg & {left: number};
   /** Selvagens já sorteados (a Vidente mostrou). */

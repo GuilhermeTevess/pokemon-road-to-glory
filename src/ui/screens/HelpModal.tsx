@@ -27,6 +27,7 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Corações dão mais EXP. Escolha um parceiro por time (o coração na montagem): ele ganha corações em dobro e, com eles, pode curar status sozinho, aguentar com 1 HP e acertar mais críticos.</li>
         <li>De vez em quando aparece um evento entre as rondas (casa abandonada, rival, vidente...). Ele não gasta ronda.</li>
         <li>Na Creche (menu inicial) dois Pokémon da coleção fazem ovos. Leve um ovo na run: ele choca depois de algumas rondas vencidas. O Manual do Criador explica tudo.</li>
+        <li>Toda run dá Glória quando acaba. No menu Glória você compra melhorias para todas as próximas runs (mais pontos de time, mais raros, mais biomas...).</li>
         <li>Na ficha também tem o Tutor (natures e habilidades) e os EVs: vitórias enchem um banco que você distribui.</li>
       </ol>
       <h3>Itens</h3>

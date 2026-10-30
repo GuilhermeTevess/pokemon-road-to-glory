@@ -20,8 +20,8 @@ export function isMilestoneWave(wave: number): boolean {
   return wave % STAGE_LENGTH === 0;
 }
 
-function rarityWeights(wave: number, incense: boolean): [Rarity, number][] {
-  const boost = incense ? 3 : 1;
+function rarityWeights(wave: number, incense: boolean, luck: number): [Rarity, number][] {
+  const boost = (incense ? 3 : 1) * (1 + 0.25 * luck);
   // Pokémon muito fortes (pseudo-lendários, Ultra Beasts, paradoxos, lendários) só depois de algumas rondas.
   return [
     ['common', Math.max(20, 70 - wave)],
@@ -60,19 +60,20 @@ function finalize(mon: OwnedMon): OwnedMon {
   return {...mon, moves: fresh.moves, hp: fresh.hp};
 }
 
-export function generateEncounter(wave: number, biomeId: string, incense: boolean): Encounter {
+/** `luck`: nível da melhoria Faro para raros (mais raros e mais shiny). */
+export function generateEncounter(wave: number, biomeId: string, incense: boolean, luck = 0): Encounter {
   if (isMilestoneWave(wave)) {
     const [s] = pickFromPools(biomeId, 'legendary');
-    const mon = createMon(s.name, {level: wave + 5, ivMin: 20});
+    const mon = createMon(s.name, {level: wave + 5, ivMin: 20, shinyChance: (1 + luck) / 256});
     return {mon, rarity: 'legendary', boss: true};
   }
   const boss = isBossWave(wave);
-  let rarity = weightedPick(rarityWeights(wave, incense));
+  let rarity = weightedPick(rarityWeights(wave, incense, luck));
   if (boss && ORDER.indexOf(rarity) < 2) rarity = 'rare';
   const [s, actual] = pickFromPools(biomeId, rarity);
   const base = Math.floor(wave * 0.9) + 2;
   const level = Math.max(2, boss ? base + 2 : base + randInt(-2, 1));
-  let mon = createMon(s.name, {level, ivs: boss ? undefined : randomIvs(0, 20), ivMin: 15});
+  let mon = createMon(s.name, {level, ivs: boss ? undefined : randomIvs(0, 20), ivMin: 15, shinyChance: (1 + luck) / 256});
   if (actual !== 'legendary') {
     evolveForLevel(mon);
     mon = finalize(mon);

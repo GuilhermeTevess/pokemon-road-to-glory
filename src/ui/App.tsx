@@ -10,6 +10,7 @@ import {BiomeSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
 import {CollectionScreen} from './screens/CollectionScreen';
 import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
+import {GloryScreen} from './screens/GloryScreen';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
@@ -21,6 +22,7 @@ export function App() {
   if (screen === 'title') body = <TitleScreen />;
   else if (screen === 'collection') body = <CollectionScreen />;
   else if (screen === 'daycare') body = <DaycareScreen />;
+  else if (screen === 'glory') body = <GloryScreen />;
   else if (!run || run.phase === 'starter') body = <StarterSelect />;
   else if (run.phase === 'biome') body = <BiomeSelect mode="start" />;
   else if (run.phase === 'battle') body = <BattleScreen key={run.encounter?.mon.uid} />;

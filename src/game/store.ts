@@ -7,7 +7,7 @@ import {BattleController} from './battle';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
-  HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
+  HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
   registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
@@ -16,11 +16,12 @@ import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEv
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
+import {applyPerks, buyUpgrade, discounted, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
-import type {OwnedMon, PendingEvent, RunState, StatId, StatTable} from './types';
+import type {OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
 
 export const PARTY_SIZE = 6;
 export const STARTER_LEVEL = 5;
@@ -66,7 +67,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'collection' | 'daycare';
+export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory';
 
 export interface Toast {
   id: string;
@@ -108,6 +109,7 @@ interface Store {
   buyCostCut(line: string): void;
   buyShiny(line: string): void;
   setFavorite(line: string | null): void;
+  buyUpgrade(id: keyof RunPerks): void;
   /** Compra a Mega Pedra própria da linha (ou troca qual pedra usar, se já comprou). */
   buyMegaStone(line: string, stone: string): void;
   /** Resolve o evento atual (a escolha depende do tipo do evento). */
@@ -190,7 +192,7 @@ export const useGame = create<Store>((set, get) => {
   const startWave = (run: RunState) => {
     run.wave++;
     run.event = undefined;
-    run.encounter = run.upcoming?.shift() ?? generateEncounter(run.wave, run.biome, run.incenseWaves > 0);
+    run.encounter = run.upcoming?.shift() ?? generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck);
     if (!run.upcoming?.length) run.upcoming = undefined;
     if (run.incenseWaves > 0) run.incenseWaves--;
     run.phase = 'battle';
@@ -199,7 +201,7 @@ export const useGame = create<Store>((set, get) => {
   };
 
   const goToReward = (run: RunState) => {
-    run.rewardOptions = rollRewards(run.wave);
+    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0));
     run.phase = 'reward';
   };
 
@@ -224,6 +226,9 @@ export const useGame = create<Store>((set, get) => {
   const endRun = (run: RunState, col: Collection, result: 'lost' | 'stageClear' | 'abandoned') => {
     const st = statsOf(col);
     st.runs++;
+    const glory = gloryFor(run.wave, result);
+    col.glory = (col.glory ?? 0) + glory;
+    run.gloryEarned = glory;
     st.bestWave = Math.max(st.bestWave, run.wave);
     if (result === 'stageClear') {
       st.stageClears++;
@@ -429,8 +434,9 @@ export const useGame = create<Store>((set, get) => {
     newRun(team, partner, eggId) {
       const col = structuredClone(get().collection);
       const picked = team.slice(0, PARTY_SIZE);
-      if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > TEAM_BUDGET) return;
+      if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > teamBudget(col)) return;
       const run = emptyRun();
+      applyPerks(run, perksOf(col));
       run.party = picked.map(name => {
         const mon = createMon(name, {
           level: STARTER_LEVEL,
@@ -630,6 +636,9 @@ export const useGame = create<Store>((set, get) => {
         e.megaStone = stone;
       });
     },
+    buyUpgrade(id) {
+      editCollection(col => buyUpgrade(col, id));
+    },
     setFavorite(line) {
       editCollection(col => {
         col.favorite = line ?? undefined;
@@ -807,19 +816,20 @@ export const useGame = create<Store>((set, get) => {
 
     reroll() {
       mutate(run => {
-        const cost = rerollCost(run.rerolls, run.wave);
+        const cost = discounted(run, rerollCost(run.rerolls, run.wave));
         if (run.money < cost) return;
         run.money -= cost;
         run.rerolls++;
-        run.rewardOptions = rollRewards(run.wave);
+        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0));
       });
     },
 
     buy(itemId) {
       mutate((run, col) => {
         const item = getItem(itemId);
-        if (!item.price || run.money < item.price) return;
-        run.money -= item.price;
+        const price = discounted(run, item.price);
+        if (!item.price || run.money < price) return;
+        run.money -= price;
         if (item.kind === 'breed') col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
         else run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
       });
