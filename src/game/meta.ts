@@ -36,6 +36,8 @@ export interface CollectionEntry {
   /** EVs ganhos e ainda não distribuídos, e os distribuídos (vão para o Pokémon no início). */
   evBank?: number;
   evs?: StatTable;
+  /** Gêneros já capturados desta linha (para a creche). Sem o campo = save antigo: conta os dois. */
+  genders?: ('M' | 'F')[];
   /** Mega Pedra própria comprada com doces: id da pedra escolhida para começar a run. */
   megaStone?: string;
   /** Quantas vezes o custo de time foi reduzido. */
@@ -44,7 +46,7 @@ export interface CollectionEntry {
   shinyLv?: number;
 }
 
-type Optional = 'nature' | 'ability' | 'startMove' | 'nickname' | 'megaStone';
+type Optional = 'nature' | 'ability' | 'startMove' | 'nickname' | 'megaStone' | 'genders';
 export type Entry = Required<Omit<CollectionEntry, Optional>> & Pick<CollectionEntry, Optional>;
 
 export interface RunSummary {
@@ -170,6 +172,8 @@ export function registerCatch(c: Collection, mon: OwnedMon): CatchResult {
   const fresh = !c.entries[lineRoot(mon.species)];
   const e = entryOf(c, mon.species);
   const duplicate = e.caught > 0;
+  if (!e.genders) e.genders = duplicate ? ['M', 'F'] : [];
+  if (mon.gender !== 'N' && !e.genders.includes(mon.gender)) e.genders.push(mon.gender);
   const before = {...e.bestIvs};
   if (!duplicate) {
     // Primeira captura (ou a linha só tinha sido usada como inicial).
@@ -286,6 +290,16 @@ export function baseCost(name: string): number {
 export function teamCost(c: Collection, name: string): number {
   const cut = c.entries[lineRoot(name)]?.costCut ?? 0;
   return Math.max(1, baseCost(name) - cut);
+}
+
+/** Gêneros disponíveis para a creche (espécies só macho/só fêmea já vêm resolvidas). */
+export function gendersOf(c: Collection, name: string): ('M' | 'F')[] {
+  const s = species(lineRoot(name));
+  if (s.gender === 'N') return [];
+  if (s.gender === 'M' || s.gender === 'F') return [s.gender];
+  const e = c.entries[lineRoot(name)];
+  if (!e || !e.caught) return [];
+  return e.genders ?? ['M', 'F'];
 }
 
 // ---------------------------------------------------------------- Mega Pedra própria

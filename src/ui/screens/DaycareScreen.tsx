@@ -4,7 +4,7 @@ import {dex, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, compatibility} from '../../game/daycare';
 import type {Egg} from '../../game/daycare';
-import {peekEntry} from '../../game/meta';
+import {gendersOf, peekEntry} from '../../game/meta';
 import {useGame} from '../../game/store';
 import {STAT_IDS, STAT_LABEL} from '../../game/types';
 import {ItemIcon, Modal, PixelIcon, Sprite, Types} from '../components';
@@ -47,7 +47,8 @@ export function BreederManual({onClose}: {onClose: () => void}) {
             ovo se tiverem <b>pelo menos um grupo em comum</b>. Ex.: Charmander (Monstro/Dragão) + Bulbasaur (Monstro/Planta) dá certo.
           </p>
           <p>
-            O ovo é sempre da forma básica de quem está no <b>primeiro lugar</b> (a "mãe"). Aqui na creche o gênero não importa.
+            Precisa de uma <b>fêmea (♀)</b> e um <b>macho (♂)</b>: a coleção lembra quais gêneros você já capturou de cada Pokémon.
+            O ovo é sempre da forma básica da <b>mãe</b> (a caixinha rosa).
           </p>
         </section>
         <section>
@@ -121,7 +122,7 @@ export function DaycareScreen() {
   const store = collection.items ?? {};
   const eggs = collection.eggs ?? [];
   const [a, b] = parents;
-  const comp = a && b ? compatibility(a, b) : null;
+  const comp = a && b ? compatibility(a, b, collection) : null;
   const motherEntry = a ? peekEntry(collection, a) : undefined;
   const available = (slot: 0 | 1) =>
     DAYCARE_ITEMS.filter(id => (store[id] ?? 0) - (items[slot === 0 ? 1 : 0] === id ? 1 : 0) > 0);
@@ -142,13 +143,13 @@ export function DaycareScreen() {
           <PixelIcon name="help" /> Manual do Criador
         </button>
       </header>
-      <p className="hint">Escolha dois Pokémon da sua coleção do mesmo egg group (ou um Ditto). O ovo é da espécie do primeiro.</p>
+      <p className="hint">Escolha uma fêmea (♀, a mãe) e um macho (♂, o pai) do mesmo egg group, ou um Ditto. O ovo é da espécie da mãe. Embaixo de cada Pokémon aparecem os gêneros que você já capturou.</p>
       <div className="panel daycare-pair">
         {[0, 1].map(slot => {
           const name = parents[slot];
           return (
-            <div key={slot} className="parent-slot">
-              <span className="hint">{slot === 0 ? 'Mãe (dá a espécie)' : 'Pai'}</span>
+            <div key={slot} className={`parent-slot ${slot === 0 ? 'mom' : 'dad'}`}>
+              <span className="parent-label">{slot === 0 ? '♀ Mãe (dá a espécie)' : '♂ Pai'}</span>
               {name ? (
                 <>
                   <Sprite name={name} size={80} />
@@ -221,6 +222,9 @@ export function DaycareScreen() {
             <span className="cell-name">{s.name}</span>
             <Types name={s.name} />
             <span className="cell-sub">{s.eggGroups.join(' / ')}</span>
+            <span className="cell-sub genders">
+              {s.gender === 'N' ? 'sem gênero' : gendersOf(collection, s.name).map(g => (g === 'F' ? '♀' : '♂')).join(' ') || '—'}
+            </span>
           </button>
         ))}
       </div>
