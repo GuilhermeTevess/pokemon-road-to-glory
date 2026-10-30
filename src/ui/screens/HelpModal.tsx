@@ -16,10 +16,12 @@ export function HelpModal({onClose}: {onClose: () => void}) {
       <h2>Como jogar</h2>
       <ol className="help-steps">
         <li>Escolha um inicial e um bioma. Cada ronda é uma batalha contra um Pokémon selvagem.</li>
-        <li>Vença para ganhar XP e dinheiro, ou capture com Pokébolas (até 6 no time; o resto vai para a Caixa).</li>
+        <li>Vença para ganhar XP e dinheiro, ou capture com Pokébolas (até 6 no time; o resto vai para o PC).</li>
         <li>Depois de cada ronda, escolha 1 de 3 itens. Dá para sortear de novo ou comprar na Loja.</li>
         <li>A cada 5 rondas você pode trocar de bioma. A cada 10, o time é curado. Chefes nas rondas 10 e 20, lendário na 30.</li>
-        <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo.</li>
+        <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo e o que faz.</li>
+        <li>O painel ao lado mostra seu time, a Mochila, o PC e as fraquezas do time. Toque num Pokémon para ver detalhes.</li>
+        <li>Cada treinador tem sua coleção. Na primeira run você escolhe um inicial clássico; depois, tudo que capturou vira opção.</li>
       </ol>
       <h3>Itens</h3>
       <div className="help-items">

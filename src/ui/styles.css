@@ -195,6 +195,7 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 .fx-layer { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
 .fx { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
 .fx-flash { position: absolute; inset: 0; mix-blend-mode: screen; }
+.fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 .mon-slot { position: absolute; display: flex; align-items: flex-end; justify-content: center; width: 34%; height: 40%; z-index: 2; }
 .mon-slot img.sprite { max-height: 100%; max-width: 100%; transform: scale(var(--s, 1.6)); transform-origin: bottom center; }
 .wild-slot { right: 11%; top: 13%; --s: 1.7; }
@@ -312,6 +313,83 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 
 .toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 100; width: min(92vw, 520px); }
 .toast { background: var(--panel); border: var(--px) solid var(--line); box-shadow: 4px 4px 0 rgba(59, 51, 85, .25); padding: 8px 12px; font-weight: 600; animation: fade .2s steps(3); }
+
+/* ---------- Treinadores */
+.trainer-screen { text-align: center; padding-top: 12px; }
+.logo.small .logo-main { font-size: clamp(18px, 4vw, 28px); margin: 8px 0; }
+.trainer-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 240px)); gap: 14px; justify-content: center; margin: 14px 0; }
+.trainer-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px; font: inherit; color: var(--ink); }
+.trainer-card.selected { background: var(--butter); }
+.trainer-card.new { cursor: pointer; justify-content: center; min-height: 220px; border-style: dashed; background: var(--panel-2); }
+.trainer-card .plus { font-family: 'Press Start 2P', monospace; font-size: 32px; color: var(--sky-d); }
+.trainer-stats { list-style: none; padding: 0; margin: 0; font-size: 14px; color: var(--ink-soft); }
+.trainer-avatar { image-rendering: pixelated; object-fit: contain; }
+.avatar-fallback {
+  display: inline-flex; align-items: center; justify-content: center; background: var(--lilac); border: var(--px) solid var(--line);
+  font-family: 'Press Start 2P', monospace; font-size: 22px; color: var(--ink);
+}
+.trainer-new { max-width: 720px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 600; text-align: left; }
+.field input { font: inherit; padding: 8px 10px; border: var(--px) solid var(--line); background: #fff; color: var(--ink); }
+.avatar-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.avatar-opt { background: var(--panel-2); border: var(--px) solid transparent; padding: 4px; cursor: pointer; }
+.avatar-opt.selected { border-color: var(--line); background: var(--butter); }
+.title-row { display: flex; gap: 14px; justify-content: center; align-items: stretch; flex-wrap: wrap; }
+.title-row .menu { margin: 0; }
+.trainer-badge { display: flex; gap: 12px; align-items: center; padding: 12px 16px; text-align: left; }
+.trainer-name { font-family: 'Press Start 2P', monospace; font-size: 11px; margin-bottom: 4px; }
+.btn.danger { background: var(--red); }
+.banner { background: var(--mint); border: var(--px) solid var(--line); padding: 8px 12px; font-weight: 600; margin: 8px 0; }
+.tabs.big .tab { font-size: 17px; padding: 6px 16px; }
+
+/* ---------- Painel lateral da run */
+.app.wide { max-width: 1320px; }
+.run-layout { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+@media (min-width: 1080px) { .run-layout { grid-template-columns: minmax(0, 1fr) 290px; } .run-sidebar { position: sticky; top: 8px; } .nav-bag { display: none; } }
+.run-sidebar { display: flex; flex-direction: column; gap: 10px; }
+.run-sidebar h3 { margin: 0 0 6px; }
+.sb-head { display: flex; gap: 10px; align-items: center; padding: 10px; }
+.sb-money { font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--butter-d); margin: 4px 0; }
+.sb-team { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.sb-mon { display: flex; gap: 6px; align-items: center; background: none; border: 2px solid transparent; font: inherit; color: var(--ink); padding: 2px 4px; cursor: pointer; text-align: left; }
+.sb-mon:hover { border-color: var(--line); background: var(--panel-2); }
+.sb-mon.fainted { opacity: .5; }
+.sb-mon .sprite { width: 40px; height: 40px; object-fit: contain; }
+.sb-mon-info { display: flex; flex-direction: column; flex: 1; gap: 2px; min-width: 0; }
+.sb-mon-name { font-size: 14px; font-weight: 600; display: flex; gap: 4px; align-items: center; white-space: nowrap; overflow: hidden; }
+.sb-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sb-weak { padding: 10px; }
+
+/* ---------- Fraquezas do time */
+.team-weak { text-align: left; }
+.tw-alert { background: var(--pink); border: 2px solid var(--line); padding: 4px 8px; margin: 0 0 8px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+.team-weak.compact .tw-grid { grid-template-columns: 1fr 1fr; }
+.tw-cell { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 4px; background: var(--panel-2); border: 2px solid transparent; flex-wrap: wrap; }
+.tw-cell.danger { border-color: var(--pink-d); background: #ffe3ec; }
+.tw-weak { color: #c2453f; font-weight: 600; }
+.tw-res { color: var(--mint-d); font-weight: 600; }
+.tw-zero { color: #b8b0a0; }
+
+/* ---------- Loja, recompensas e mochila */
+.reward-card { position: relative; border-top-color: var(--tier); }
+.tier-tag { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 600; background: var(--tier); border: 2px solid var(--line); padding: 0 4px; }
+.reward-money { font-family: 'Press Start 2P', monospace; font-size: 13px; color: var(--butter-d); background: #fff6d6; border: 2px solid var(--butter-d); padding: 4px 8px; }
+.shop { flex-direction: column; flex-wrap: nowrap; align-items: stretch; text-align: left; gap: 10px; }
+.wallet { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+.shelf h3 { margin: 10px 0 6px; }
+.shelf-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.shop-card { display: flex; gap: 8px; align-items: center; padding: 8px; }
+.shop-text { display: flex; flex-direction: column; flex: 1; font-size: 14px; }
+.target-picker { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.target-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.target-btn { display: flex; gap: 6px; align-items: center; font: inherit; color: var(--ink); background: var(--panel); border: var(--px) solid var(--line); padding: 4px 8px; cursor: pointer; text-align: left; }
+.target-btn:hover:not(:disabled) { background: var(--butter); }
+.target-btn:disabled { opacity: .45; cursor: not-allowed; }
+.left { text-align: left; display: flex; flex-direction: column; }
+.move-desc { font-size: 13px; color: var(--ink-soft); font-weight: normal; line-height: 1.2; }
+.small-desc { font-size: 12px; font-weight: normal; }
+.move-chip { flex-direction: column; align-items: flex-start; }
 
 @media (max-width: 600px) {
   body { font-size: 16px; }

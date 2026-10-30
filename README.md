@@ -16,8 +16,10 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 
 ## O que já tem (etapa 1)
 
+- **Treinadores**: até 3 perfis, cada um com nome, avatar, coleção e run próprios.
+  Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
 - **Os 3 iniciais de cada geração** (1 a 9) numa página só, com filtro por tipo.
-  Pokémon capturados também viram opção de inicial.
+  Pokémon capturados ficam numa aba separada e também viram opção de inicial.
 - **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
   (ou depois de usar um **Mapa**).
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
@@ -27,18 +29,25 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Batalhas reais do Showdown**: golpes, habilidades, itens de segurar, clima,
   status, tudo funcionando como no Showdown.
 - **Captura** com Poké/Great/Ultra/Master Ball (chance depende de HP, status e raridade).
-- **Itens a cada ronda** (escolha 1 de 3, sortear de novo, loja com dinheiro):
-  poções, reviver, Doce Raro, Pedra da Evolução, Disco Técnico, Incenso Raro e
-  itens de segurar (Restos, Choice Band, Life Orb...).
+- **Itens a cada ronda** (escolha 1 de 3, sortear de novo, loja por prateleiras):
+  poções, reviver, Doces Raros e de EXP, Pedra da Evolução, Disco Técnico, Mentas
+  (natureza), Cápsula de Habilidade, itens X para a batalha, Bolsa/Pepitas (o cartão
+  mostra quanto dinheiro dá), Incenso Raro e itens de segurar (Restos, Choice Band,
+  Life Orb, Carvão e os outros 17 que fortalecem um tipo...). Dá para usar ou
+  equipar o item na hora em que pega.
+- **Painel lateral** durante a run: time, Mochila, PC e fraquezas do time (com aviso
+  dos tipos que pegam metade do time sem ninguém resistir).
 - **XP, níveis, golpes novos e evolução** (por nível, e por pedra/troca/amizade via
   Pedra da Evolução).
 - **Tudo mastigado**: tipos sempre visíveis, fraquezas do selvagem na tela, painel
   completo de fraquezas/resistências e cada golpe mostrando se é super efetivo,
   pouco efetivo ou sem efeito. Na troca, mostra quem resiste ao selvagem.
 - **Visual pixel art** em cores claras, com fundos de batalha por bioma e animações
-  de golpe por tipo e formato (soco, lança-chamas, raio, chuva de pedras...).
-- **Sons**: gritos modernos de cada Pokémon e efeitos de golpe por tipo e formato
-  (botão Som).
+  de golpe em partículas pixeladas por tipo e formato (fogo que sobe e vira fumaça,
+  jato d'água, raios, gelo, folhas, terremoto...).
+- **Sons**: gritos modernos de cada Pokémon e efeitos de golpe gravados de verdade
+  (fogo, água, trovão, "zoom" de velocidade, buffs...), por tipo e formato.
+- **Golpes com nome em inglês e descrição em português.**
 - **Ajuda** dentro do jogo explicando rondas e itens.
 - **Coleção** permanente com filtro por tipo: repetidos melhoram os IVs (mostrados
   numa teia de atributos), e o inicial começa com os melhores IVs da linha.
@@ -52,6 +61,9 @@ plano das etapas 2 e 3.
 ## Créditos
 
 Fundos de batalha e sprites de efeito em `public/fx`: Pokémon Showdown client.
+Efeitos sonoros em `public/sfx`: domínio público (CC0), da coleção
+[CC0-Public-Domain-Sounds](https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds)
+(detalhes em `public/sfx/CREDITS.txt`).
 Dados e simulador: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown)
 via [`@pkmn/sim`](https://github.com/pkmn/ps). Sprites e gritos: Pokémon Showdown e
 [PokéAPI](https://github.com/PokeAPI/sprites). Pokémon é marca da Nintendo / Game

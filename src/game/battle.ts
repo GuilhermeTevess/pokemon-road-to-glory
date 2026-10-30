@@ -236,6 +236,18 @@ export class BattleController {
     return [...events, ...this.spendTurn()];
   }
 
+  /** Itens X: +2 estágios no atributo do Pokémon ativo, gastando o turno. */
+  useBoostItem(itemId: string): BattleEvent[] {
+    const item = getItem(itemId);
+    const p = this.battle.p1.active[0];
+    if (!p || p.fainted || !item.stat) return [];
+    const cur = p.boosts[item.stat];
+    if (cur >= 6) return [{text: `O atributo de ${p.name} já está no máximo.`}];
+    p.boosts[item.stat] = Math.min(6, cur + 2);
+    const label: Record<string, string> = {atk: 'Ataque', def: 'Defesa', spa: 'Ataque Especial', spd: 'Defesa Especial', spe: 'Velocidade', accuracy: 'Precisão'};
+    return [{text: `${item.name}: ${label[item.stat]} de ${p.name} subiu muito!`}, ...this.spendTurn()];
+  }
+
   /** Situação dos Pokémon do jogador dentro da batalha. */
   partyStatus(): {uid: string; species: string; level: number; hp: number; maxhp: number; status: string; active: boolean}[] {
     return [...this.uidOf.entries()].map(([p, uid]) => ({
