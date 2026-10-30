@@ -1,6 +1,7 @@
 // Itens do jogo. Os "held" são itens reais do Showdown e funcionam dentro da batalha.
+import {Dex, toID} from '@pkmn/sim';
 
-export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin';
+export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin' | 'mega';
 export type ItemTier = 'common' | 'great' | 'ultra' | 'master';
 
 export interface ItemDef {
@@ -21,6 +22,10 @@ export interface ItemDef {
   stat?: 'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy';
   /** Atributo que ganha EVs (vitaminas e itens Power). */
   evStat?: 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+  /** Mega Pedra específica: espécie que ela mega-evolui. */
+  megaFor?: string;
+  /** Só aparece como recompensa a partir desta ronda. */
+  minWave?: number;
   /** Natureza que a menta aplica. */
   nature?: string;
   /** Peso no sorteio de recompensas (padrão 1). */
@@ -47,6 +52,28 @@ const powerItem = (id: string, name: string, evStat: ItemDef['evStat'], label: s
 const vitamin = (id: string, name: string, evStat: ItemDef['evStat'], label: string, sprite: string): ItemDef => ({
   id, name, desc: `+${VITAMIN_EVS} EVs de ${label} no Pokémon e na ficha da linha dele.`, kind: 'vitamin', tier: 'great', sprite, price: 1500, evStat, weight: 0.3,
 });
+
+/** Mega Pedras específicas (Charizardite X...). Não saem como recompensa: vêm da Mega Pedra genérica. */
+function megaStones(): ItemDef[] {
+  return Dex.forGen(9)
+    .items.all()
+    .filter(i => i.megaStone)
+    .flatMap(i =>
+      Object.keys(i.megaStone!).map(base => ({
+        id: toID(i.name),
+        name: i.name,
+        desc: `Segure: ${base} mega-evolui sozinho no início de cada batalha (só 1 mega por time).`,
+        kind: 'held' as const,
+        tier: 'master' as const,
+        sprite: toID(i.name).replace(/(ite)(x|y)$/, '$1-$2'),
+        price: 0,
+        showdown: i.name,
+        megaFor: base,
+        weight: 0,
+      })),
+    )
+    .filter((it, idx, all) => all.findIndex(o => o.id === it.id) === idx);
+}
 
 export const POWER_EVS = 8;
 export const VITAMIN_EVS = 10;
@@ -133,6 +160,11 @@ export const ITEMS: ItemDef[] = [
   vitamin('zinc', 'Zinco', 'spd', 'Def. Esp.', 'zinc'),
   vitamin('carbos', 'Carbos', 'spe', 'Velocidade', 'carbos'),
 
+  {
+    id: 'megastone', name: 'Mega Pedra', kind: 'mega', tier: 'master', sprite: 'key-stone', price: 20000, minWave: 20, weight: 2,
+    desc: 'Vira a Mega Pedra do Pokémon escolhido (se ele tiver mega). Ele mega-evolui sozinho no início de cada batalha. Só 1 mega por time.',
+  },
+
   typeBoost('charcoal', 'Carvão', 'Charcoal', 'Fogo', 'charcoal'),
   typeBoost('mysticwater', 'Água Mística', 'Mystic Water', 'Água', 'mystic-water'),
   typeBoost('miracleseed', 'Semente Milagrosa', 'Miracle Seed', 'Planta', 'miracle-seed'),
@@ -152,6 +184,13 @@ export const ITEMS: ItemDef[] = [
   typeBoost('silkscarf', 'Lenço de Seda', 'Silk Scarf', 'Normal', 'silk-scarf'),
   typeBoost('fairyfeather', 'Pena de Fada', 'Fairy Feather', 'Fada', 'fairy-feather'),
 ];
+
+ITEMS.push(...megaStones());
+
+/** Mega Pedras que servem nesta espécie (Charizard tem duas). */
+export function megaStonesFor(speciesName: string): ItemDef[] {
+  return ITEMS.filter(i => i.megaFor === speciesName);
+}
 
 export function getItem(id: string): ItemDef {
   const it = ITEMS.find(i => i.id === id);
@@ -185,6 +224,7 @@ export function itemUsage(item: ItemDef): string {
     case 'mint':
     case 'ability':
     case 'vitamin':
+    case 'mega':
       return 'Use ao pegar ou depois, pela Mochila, escolhendo um Pokémon.';
     case 'battle':
       return 'Só na batalha: Mochila > item. Vale até o fim da luta.';
@@ -200,5 +240,5 @@ export function itemUsage(item: ItemDef): string {
 
 /** Itens que pedem um Pokémon como alvo fora da batalha. */
 export function needsTarget(item: ItemDef): boolean {
-  return ['heal', 'revive', 'candy', 'evolution', 'tm', 'held', 'mint', 'ability', 'vitamin'].includes(item.kind);
+  return ['heal', 'revive', 'candy', 'evolution', 'tm', 'held', 'mint', 'ability', 'vitamin', 'mega'].includes(item.kind);
 }

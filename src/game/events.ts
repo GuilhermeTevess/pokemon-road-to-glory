@@ -5,7 +5,7 @@ import {generateEncounter, isBossWave, STAGE_LENGTH} from './encounters';
 import {chance, pick} from './rng';
 import type {Encounter, RunEvent, RunState} from './types';
 
-export const EVENT_CHANCE = 0.2;
+export const EVENT_CHANCE = 0.1;
 export const RIVAL_NAMES = ['Léo', 'Bia', 'Caio', 'Duda', 'Rafa', 'Nina', 'Theo', 'Malu'];
 export const BERRIES = ['sitrusberry', 'lumberry', 'oranberry'];
 

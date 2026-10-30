@@ -16,7 +16,7 @@ export function rollRewards(wave: number, count = 3): string[] {
   const out: string[] = [];
   for (let guard = 0; out.length < count && guard < 50; guard++) {
     const tier = weightedPick(tierWeights(wave));
-    const pool = ITEMS.filter(i => i.tier === tier && !out.includes(i.id));
+    const pool = ITEMS.filter(i => i.tier === tier && !out.includes(i.id) && i.weight !== 0 && wave >= (i.minWave ?? 0));
     if (pool.length) out.push(weightedPick(pool.map(i => [i, i.weight ?? 1] as [ItemDef, number])).id);
   }
   return out;
@@ -42,6 +42,7 @@ export const SHOP: {title: string; items: string[]}[] = [
   {title: 'Para a batalha', items: ['xattack', 'xdefense', 'xspatk', 'xspdef', 'xspeed', 'xaccuracy']},
   {title: 'Treino (EVs)', items: ['hpup', 'protein', 'iron', 'calcium', 'zinc', 'carbos']},
   {title: 'Viagem', items: ['map']},
+  {title: 'Especial', items: ['megastone']},
 ];
 
 export function shopItems(): ItemDef[] {

@@ -2,7 +2,7 @@
 import {create} from 'zustand';
 import {BIOMES} from '../data/biomes';
 import {dex, species, teachableMoves} from '../data/dex';
-import {POWER_EVS, VITAMIN_EVS, getItem} from '../data/items';
+import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
 import {
@@ -328,7 +328,32 @@ export const useGame = create<Store>((set, get) => {
           } else message = `${displayName(mon)} já está no máximo de EVs aí.`;
           break;
         }
+        case 'mega': {
+          const stones = megaStonesFor(species(mon.species).name);
+          const other = [...run.party, ...run.box].find(m => m.uid !== mon.uid && m.item && getItem(m.item).megaFor);
+          if (!stones.length) message = `${displayName(mon)} não tem mega evolução.`;
+          else if (other) message = `Só 1 mega por time: ${displayName(other)} já segura uma Mega Pedra.`;
+          else {
+            const stone = pick(stones);
+            if (mon.item) run.bag[mon.item] = (run.bag[mon.item] ?? 0) + 1;
+            mon.item = stone.id;
+            used = true;
+            message = `${displayName(mon)} agora segura ${stone.name} e vai mega-evoluir nas batalhas!`;
+          }
+          break;
+        }
         case 'held':
+          if (item.megaFor) {
+            const other = [...run.party, ...run.box].find(m => m.uid !== mon.uid && m.item && getItem(m.item).megaFor);
+            if (item.megaFor !== species(mon.species).name) {
+              message = `${item.name} só serve em ${item.megaFor}.`;
+              break;
+            }
+            if (other) {
+              message = `Só 1 mega por time: ${displayName(other)} já segura uma Mega Pedra.`;
+              break;
+            }
+          }
           if (mon.item) run.bag[mon.item] = (run.bag[mon.item] ?? 0) + 1;
           mon.item = itemId;
           used = true;

@@ -42,6 +42,8 @@ export interface BattleEvent {
   /** Golpe usado (para animação e som). */
   move?: {side: Side; move: string};
   hit?: {side: Side; effect: 'normal' | 'super' | 'resisted' | 'crit'};
+  /** Mudou de forma (mega evolução). */
+  forme?: {side: Side; species: string};
 }
 
 export interface MoveOption {
@@ -313,6 +315,13 @@ export class BattleController {
   private commit(choice: string): BattleEvent[] {
     const b = this.battle;
     if (b.p2.requestState === 'move' && !b.p2.isChoiceDone()) b.choose('p2', this.wildChoice());
+    // Mega evolução automática no primeiro golpe (só 1 mega por time, controlado na loja/mochila).
+    const active = this.playerActive;
+    if (choice.startsWith('move') && active?.canMegaEvo && b.choose('p1', `${choice} mega`)) {
+      this.friendshipCure();
+      this.markParticipant();
+      return this.readLog();
+    }
     if (!b.choose('p1', choice)) {
       // Escolha inválida (ex.: golpe desabilitado): deixa o simulador decidir.
       b.choose('p1', 'default');
@@ -499,6 +508,12 @@ export class BattleController {
         return [{text: `${this.name(a).name} usou/perdeu ${b}.`}];
       case '-item':
         return [{text: `${this.name(a).name} obteve ${b}.`}];
+      case 'detailschange': {
+        const {side} = this.name(a);
+        return [{forme: {side, species: b.split(',')[0]}}];
+      }
+      case '-mega':
+        return [{text: `${this.name(a).name} mega-evoluiu!`}];
       case '-start':
         if (b === 'confusion') return [{text: `${this.name(a).name} ficou confuso!`}];
         if (b.startsWith('move: ')) return [{text: `${this.name(a).name}: ${b.slice(6)}!`}];

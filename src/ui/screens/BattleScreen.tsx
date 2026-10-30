@@ -89,6 +89,12 @@ export function BattleScreen() {
           }
           playCry(s.species);
         }
+        if (ev.forme) {
+          const f = ev.forme;
+          (f.side === 'p1' ? setPlayer : setWild)(v => (v ? {...v, species: f.species, anim: 'enter'} : v));
+          playCry(f.species);
+          await wait(700);
+        }
         if (ev.move) {
           const mv = ev.move;
           if (ev.text) setMessage(ev.text);
