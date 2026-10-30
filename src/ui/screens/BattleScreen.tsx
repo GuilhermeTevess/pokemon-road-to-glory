@@ -358,7 +358,7 @@ export function BattleScreen() {
                       act(() => ctl.useHealItem(healItem, p.uid));
                     }}
                   >
-                    <Sprite name={p.species} still size={32} /> {p.species} {p.hp}/{p.maxhp}
+                    <Sprite name={p.species} size={36} /> {p.species} {p.hp}/{p.maxhp}
                   </button>
                 ))}
               <button className="btn small back" onClick={() => setMenu('bag')}>
@@ -385,7 +385,7 @@ function SwitchMenu({ctl, onPick, onBack}: {ctl: BattleController; onPick: (uid:
         const worst = Math.max(...wildTypes.map(t => ctl.battle.dex.getEffectiveness(t, [...s.types])));
         return (
           <button key={p.uid} className={`switch-btn ${p.active ? 'active' : ''}`} disabled={p.active || p.hp <= 0} onClick={() => onPick(p.uid)}>
-            <Sprite name={p.species} still size={48} />
+            <Sprite name={p.species} size={56} />
             <span className="switch-info">
               <span>
                 {s.name} Nv.{p.level} <StatusBadge status={p.status} />

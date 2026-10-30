@@ -105,7 +105,7 @@ export function StarterSelect() {
       onClick={() => pickCell(s.name)}
       title={s.name}
     >
-      <Sprite name={s.name} still size={64} />
+      <Sprite name={s.name} size={80} />
       <span className="cell-name">{s.name}</span>
     </button>
   );
@@ -242,7 +242,7 @@ export function CollectionScreen() {
       <div className="grid">
         {entries.map(([id, e]) => (
           <div key={id} className="cell">
-            <Sprite name={id} still shiny={e.shiny} size={64} />
+            <Sprite name={id} shiny={e.shiny} size={80} />
             <span className="cell-name">{species(id).name}</span>
             <Types name={id} />
             <span className="cell-sub">
