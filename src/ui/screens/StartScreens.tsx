@@ -2,15 +2,16 @@ import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {BIOMES, getBiome} from '../../data/biomes';
 import type {Biome} from '../../data/biomes';
-import {ALL_TYPES, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
-import {lineRoot, loadCollection} from '../../game/meta';
+import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
+import {TEAM_BUDGET, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
-import {useGame} from '../../game/store';
+import {PARTY_SIZE, useGame} from '../../game/store';
 import {shuffle} from '../../game/rng';
 import {FX} from '../fx';
-import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter, Types} from '../components';
+import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter} from '../components';
 import {playCry} from '../audio';
+import {Candies, EvoViewer, Hearts, LineSheet} from './CollectionScreen';
 
 export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: string; size?: number}) {
   const [failed, setFailed] = useState(false);
@@ -27,9 +28,8 @@ export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: 
 
 function trainerStats(t: Trainer) {
   const col = loadCollection(t.id);
-  const best = col.runs.reduce((m, r) => Math.max(m, r.wave), 0);
-  const clears = col.runs.filter(r => r.result === 'stageClear').length;
-  return {species: Object.keys(col.entries).length, runs: col.runs.length, best, clears};
+  const st = statsOf(col);
+  return {species: Object.keys(col.entries).length, runs: st.runs, best: st.bestWave, clears: st.stageClears};
 }
 
 /** Escolha / criação de treinador. Cada treinador tem coleção e run próprias. */
@@ -135,7 +135,7 @@ export function TitleScreen() {
           <div>
             <div className="trainer-name">{trainer.name}</div>
             <div className="hint">
-              {Object.keys(collection.entries).length} na coleção · {collection.runs.length} runs
+              {Object.keys(collection.entries).length} na coleção · {statsOf(structuredClone(collection)).runs} runs
             </div>
             <button className="btn small" onClick={() => selectTrainer(null)}>
               Trocar treinador
@@ -191,13 +191,17 @@ export function StarterSelect() {
   const {newRun, collection, setScreen} = useGame();
   const [type, setType] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView] = useState<Species | null>(null);
+  const [team, setTeam] = useState<string[]>([]);
+  const [sheet, setSheet] = useState<string | null>(null);
   const [tab, setTab] = useState<'starters' | 'collection'>('starters');
 
   // Pokémon já capturados por ESTE treinador (primeiro estágio, não lendários) também podem ser iniciais.
   const unlocked = useMemo(
     () =>
-      Object.keys(collection.entries)
-        .map(id => species(id))
+      Object.entries(collection.entries)
+        .filter(([, e]) => e.caught > 0)
+        .map(([id]) => species(id))
         .filter(s => isPlayable(s) && isBaseStage(s) && !isLegendary(s) && !STARTER_SET.has(s.name))
         .sort((a, b) => a.num - b.num),
     [collection],
@@ -210,24 +214,36 @@ export function StarterSelect() {
     return ALL_TYPES.filter(t => set.has(t));
   }, [unlocked, tab]);
 
+  const used = team.reduce((n, s) => n + teamCost(collection, s), 0);
   const sel = selected ? species(selected) : null;
-  const owned = sel ? collection.entries[lineRoot(sel.name)] : undefined;
+  const shown = view && sel && lineRoot(view.name) === lineRoot(sel.name) ? view : sel;
+  const owned = sel ? peekEntry(collection, sel.name) : undefined;
+  const selCost = sel ? teamCost(collection, sel.name) : 0;
+  const inTeam = sel ? team.includes(sel.name) : false;
+  const canAdd = !!sel && !inTeam && team.length < PARTY_SIZE && used + selCost <= TEAM_BUDGET;
   const pickCell = (name: string) => {
     setSelected(name);
     playCry(name);
   };
+  const toggle = (name: string) => setTeam(t => (t.includes(name) ? t.filter(x => x !== name) : [...t, name]));
 
-  const cell = (s: Species) => (
-    <button
-      key={s.id}
-      className={`cell ${selected === s.name ? 'selected' : ''} ${collection.entries[lineRoot(s.name)] ? 'owned' : ''}`}
-      onClick={() => pickCell(s.name)}
-      title={s.name}
-    >
-      <Sprite name={s.name} size={80} />
-      <span className="cell-name">{s.name}</span>
-    </button>
-  );
+  const cell = (s: Species) => {
+    const cost = teamCost(collection, s.name);
+    return (
+      <button
+        key={s.id}
+        className={`cell ${selected === s.name ? 'selected' : ''} ${collection.entries[lineRoot(s.name)] ? 'owned' : ''} ${team.includes(s.name) ? 'in-team' : ''}`}
+        onClick={() => pickCell(s.name)}
+        title={s.name}
+      >
+        <span className="cost-tag" title="Custo no time">
+          {cost}
+        </span>
+        <Sprite name={s.name} size={80} />
+        <span className="cell-name">{s.name}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="screen starter-screen">
@@ -235,14 +251,39 @@ export function StarterSelect() {
         <button className="btn small" onClick={() => setScreen('title')}>
           <PixelIcon name="back" /> Voltar
         </button>
-        <h2>Escolha seu inicial</h2>
+        <h2>Monte seu time inicial</h2>
         <span />
       </header>
       {firstRun && (
         <p className="banner">
-          Primeira jornada! Escolha um dos iniciais clássicos. Tudo que você capturar vira opção de inicial nas próximas runs.
+          Primeira jornada! Cada Pokémon tem um custo (o número no canto) e você tem {TEAM_BUDGET} pontos. Dá para começar
+          com um só ou juntar alguns. Tudo que você capturar vira opção nas próximas runs.
         </p>
       )}
+      <div className="panel team-bar">
+        <div className="team-slots">
+          {team.map((n, i) => (
+            <button key={n} className="team-slot" onClick={() => toggle(n)} title="Tirar do time">
+              <Sprite name={n} size={56} />
+              <span className="cost-tag">{teamCost(collection, n)}</span>
+              {i === 0 && <span className="lead-tag">abre</span>}
+              <span className="slot-x">✕</span>
+            </button>
+          ))}
+          {!team.length && <span className="hint">Escolha Pokémon abaixo e toque em "Pôr no time".</span>}
+        </div>
+        <div className="budget">
+          <div className="budget-label">
+            Pontos <b>{used}</b>/{TEAM_BUDGET}
+          </div>
+          <div className="budget-track">
+            <div className="budget-fill" style={{width: `${(used / TEAM_BUDGET) * 100}%`}} />
+          </div>
+          <button className="btn primary" disabled={!team.length} onClick={() => newRun(team)}>
+            Começar run
+          </button>
+        </div>
+      </div>
       <div className="tabs">
         <button className={`tab ${tab === 'starters' ? 'active' : ''}`} onClick={() => setTab('starters')}>
           Iniciais por geração
@@ -257,38 +298,38 @@ export function StarterSelect() {
           {tab === 'starters' ? (
             <div className="gen-grid">
               {STARTERS.map((trio, g) => {
-                const shown = trio.map(species).filter(s => matchesType(s, type));
-                if (!shown.length) return null;
+                const list = trio.map(species).filter(s => matchesType(s, type));
+                if (!list.length) return null;
                 return (
                   <div key={g} className="gen-row panel">
                     <span className="gen-label">Gen {g + 1}</span>
-                    <div className="gen-cells">{shown.map(cell)}</div>
+                    <div className="gen-cells">{list.map(cell)}</div>
                   </div>
                 );
               })}
             </div>
           ) : (
             <div className="panel">
-              <p className="hint">Pokémon que você já capturou (forma básica). Eles começam com os melhores IVs da coleção.</p>
+              <p className="hint">Pokémon que você já capturou (forma básica). Eles começam com a ficha da coleção.</p>
               <div className="grid">{unlocked.filter(s => matchesType(s, type)).map(cell)}</div>
             </div>
           )}
         </div>
         <aside className={`detail panel ${sel ? '' : 'empty'}`}>
-          {sel ? (
+          {sel && shown ? (
             <>
-              <Sprite name={sel.name} className="big" />
+              <EvoViewer name={sel.name} shiny={false} onChange={setView} />
               <h3>
-                #{sel.num} {sel.name}
+                #{shown.num} {shown.name}
               </h3>
               <div className="row center">
-                {sel.types.map(t => (
-                  <TypeBadge key={t} type={t} />
+                {shown.types.map(t => (
+                  <TypeBadge key={t} type={t} info />
                 ))}
                 <RarityBadge rarity={rarityOf(sel)} />
               </div>
               <div className="base-stats">
-                {Object.entries(sel.baseStats).map(([k, v]) => (
+                {Object.entries(shown.baseStats).map(([k, v]) => (
                   <div key={k} className="bs">
                     <span>{k.toUpperCase()}</span>
                     <div className="bs-track">
@@ -297,19 +338,39 @@ export function StarterSelect() {
                     <span>{v}</span>
                   </div>
                 ))}
-                <div className="bs total">Total {sel.bst}</div>
+                <div className="bs total">Total {shown.bst}</div>
               </div>
-              <MatchupPanel types={sel.types} title="Fraquezas e resistências" />
-              {owned && <p className="hint">Já capturado {owned.caught}x: começa com os melhores IVs da coleção.</p>}
-              <button className="btn primary" onClick={() => newRun(sel.name)}>
-                Começar com {sel.name}
-              </button>
+              <MatchupPanel types={shown.types} title="Fraquezas e resistências" />
+              {owned && (
+                <div className="row center wrap">
+                  <Candies line={sel.name} n={owned.candies} />
+                  <Hearts entry={owned} small />
+                  {owned.startMove && <span className="chip">Começa com {dex.moves.get(owned.startMove).name}</span>}
+                  <button className="btn small" onClick={() => setSheet(sel.name)}>
+                    Ver ficha
+                  </button>
+                </div>
+              )}
+              <p className="hint">
+                Custo no time: <b>{selCost}</b>
+                {!inTeam && !canAdd && team.length < PARTY_SIZE && ' · não cabe nos pontos que sobram'}
+              </p>
+              {inTeam ? (
+                <button className="btn" onClick={() => toggle(sel.name)}>
+                  Tirar do time
+                </button>
+              ) : (
+                <button className="btn primary" disabled={!canAdd} onClick={() => toggle(sel.name)}>
+                  Pôr no time ({selCost} {selCost === 1 ? 'ponto' : 'pontos'})
+                </button>
+              )}
             </>
           ) : (
-            <p className="hint">Toque num Pokémon para ver os detalhes.</p>
+            <p className="hint">Toque num Pokémon para ver os detalhes e as evoluções.</p>
           )}
         </aside>
       </div>
+      {sheet && <LineSheet line={sheet} onClose={() => setSheet(null)} />}
     </div>
   );
 }
@@ -347,56 +408,6 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
         ))}
         {mode === 'next' && <BiomeCard biome={current} label={`Ficar: ${current.name}`} onClick={() => chooseNextBiome(null)} />}
       </div>
-    </div>
-  );
-}
-
-export function CollectionScreen() {
-  const {collection, setScreen} = useGame();
-  const [type, setType] = useState<string | null>(null);
-  const entries = Object.entries(collection.entries)
-    .filter(([id]) => matchesType(species(id), type))
-    .sort((a, b) => species(a[0]).num - species(b[0]).num);
-  return (
-    <div className="screen collection-screen">
-      <header className="bar">
-        <button className="btn small" onClick={() => setScreen('title')}>
-          <PixelIcon name="back" /> Voltar
-        </button>
-        <h2>Coleção</h2>
-        <span />
-      </header>
-      <p className="hint">
-        Coleção de {useGame.getState().trainer?.name}. Todo Pokémon capturado entra aqui e vira opção de inicial. Capturar
-        repetido melhora os IVs dele. Doces, EVs, breeding e venda chegam na etapa 2.
-      </p>
-      <TypeFilter value={type} onChange={setType} types={ALL_TYPES} />
-      {!entries.length && <p className="hint">Nenhum Pokémon aqui ainda.</p>}
-      <div className="grid">
-        {entries.map(([id, e]) => (
-          <div key={id} className="cell">
-            <Sprite name={id} shiny={e.shiny} size={80} />
-            <span className="cell-name">{species(id).name}</span>
-            <Types name={id} />
-            <span className="cell-sub">
-              x{e.caught} · IVs {Object.values(e.bestIvs).reduce((a, b) => a + b, 0)}/186
-            </span>
-          </div>
-        ))}
-      </div>
-      {collection.runs.length > 0 && (
-        <>
-          <h3 className="section-title">Últimas runs</h3>
-          <ul className="runs panel">
-            {collection.runs.map(r => (
-              <li key={r.endedAt}>
-                {new Date(r.endedAt).toLocaleDateString('pt-BR')} · {r.starter} · ronda {r.wave} ·{' '}
-                {r.result === 'stageClear' ? 'etapa concluída' : r.result === 'lost' ? 'derrota' : 'abandonada'}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   );
 }

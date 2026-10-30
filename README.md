@@ -18,8 +18,10 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 
 - **Treinadores**: até 3 perfis, cada um com nome, avatar, coleção e run próprios.
   Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
-- **Os 3 iniciais de cada geração** (1 a 9) numa página só, com filtro por tipo.
-  Pokémon capturados ficam numa aba separada e também viram opção de inicial.
+- **Time inicial com pontos**: os 3 iniciais de cada geração (1 a 9) numa página
+  só, com filtro por tipo e setinhas para ver as evoluções. Cada linha tem um custo
+  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 10 pontos, então
+  dá para começar com mais de um. Capturados ficam numa aba separada.
 - **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
   (ou depois de usar um **Mapa**).
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
@@ -49,8 +51,14 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   (fogo, água, trovão, "zoom" de velocidade, buffs...), por tipo e formato.
 - **Golpes com nome em inglês e descrição em português.**
 - **Ajuda** dentro do jogo explicando rondas e itens.
-- **Coleção** permanente com filtro por tipo: repetidos melhoram os IVs (mostrados
-  numa teia de atributos), e o inicial começa com os melhores IVs da linha.
+- **Coleção** permanente com o perfil do treinador (números e Pokémon favorito) e uma
+  **ficha por linha evolutiva**: setinhas pela evolução, teia de IVs (repetidos
+  melhoram), natures e habilidades já capturadas (escolha qual usar no início),
+  **doces** da linha (capturar, vencer, chefe, evoluir) e **corações de amizade**.
+- **Doces** compram golpe inicial (ex.: Charmander começando com Flamethrower),
+  custo menor no time e mais chance de shiny.
+- **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
+  com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).
 
 Ideias para as próximas etapas: [docs/IDEIAS.md](docs/IDEIAS.md).

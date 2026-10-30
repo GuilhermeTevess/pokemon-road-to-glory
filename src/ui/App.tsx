@@ -6,7 +6,8 @@ import {IvWeb, Modal, PixelIcon, Sprite, TypeCalc} from './components';
 import {BattleScreen} from './screens/BattleScreen';
 import {EndScreen, PartyPanel, PendingModal, RewardScreen, RunSidebar} from './screens/RunScreens';
 import type {PartyTab} from './screens/RunScreens';
-import {BiomeSelect, CollectionScreen, StarterSelect, TitleScreen} from './screens/StartScreens';
+import {BiomeSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
+import {CollectionScreen} from './screens/CollectionScreen';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();

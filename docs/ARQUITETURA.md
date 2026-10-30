@@ -16,7 +16,7 @@ src/
     battle.ts    BattleController: monta a batalha no @pkmn/sim, IA do selvagem,
                  captura, itens em batalha, tradução do log para eventos em PT-BR
     rewards.ts   recompensas, loja, dinheiro
-    meta.ts      coleção permanente entre runs (base da etapa 2)
+    meta.ts      coleção permanente: ficha por linha, doces, corações, custo de time
     trainers.ts  perfis de treinador; cada um tem coleção e run próprias no localStorage
     store.ts     estado global (zustand): todas as ações da run
   ui/          telas e componentes React, CSS
@@ -36,8 +36,11 @@ de prioridade +7 (`Ação do Treinador`), já que o Showdown não tem essas aç�
 
 ## Etapa 2 (meta-progressão) — onde encaixar
 
-- **Doces**: em `meta.ts`, adicionar `candies` à `Collection`. No fim da run
-  (`endRun` em `store.ts`), converter Doces Raros não usados em doces da coleção.
+- **Ficha da linha** (Parte A, feita): `CollectionEntry` em `meta.ts` guarda doces,
+  pontos de amizade, natures/habilidades vistas, golpes liberados e melhorias. Use
+  `entryOf()` para ler com padrões (saves antigos não têm os campos novos). Os ganhos
+  ficam em `finishBattle`/`resolvePending`/`endRun` (`store.ts`); os buffs de
+  corações são handlers `onEvent` no `BattleController` (`addFriendship`).
 - **IVs com repetidos**: já existe (`registerCatch`). Dá pra trocar a regra lá.
 - **EVs antes da run**: `OwnedMon.evs` já existe e já vai para o Showdown. Falta uma
   tela entre o inicial e o bioma para distribuir (usando doces, por exemplo).

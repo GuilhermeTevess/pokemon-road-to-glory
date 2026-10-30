@@ -87,6 +87,10 @@ export interface CatchResult {
   shakes: number;
 }
 
+/** Chances dos buffs de amizade. */
+const FRIEND_ENDURE = 0.15;
+const FRIEND_CURE = 0.2;
+
 const RARITY_CATCH: Record<string, number> = {common: 0.6, uncommon: 0.45, rare: 0.3, superRare: 0.15, legendary: 0.06};
 
 export class BattleController {
@@ -97,7 +101,8 @@ export class BattleController {
   private readonly uidOf = new Map<Pokemon, string>();
   private cursor = 0;
 
-  constructor(party: OwnedMon[], encounter: Encounter) {
+  /** `hearts`: corações de amizade de cada Pokémon do jogador (por uid). */
+  constructor(party: OwnedMon[], encounter: Encounter, hearts: Record<string, number> = {}) {
     this.encounter = encounter;
     const alive = party.filter(m => m.hp > 0);
     if (!alive.length) throw new Error('Nenhum Pokémon em condições de lutar');
@@ -106,7 +111,9 @@ export class BattleController {
     this.battle.p1.pokemon.forEach((p, i) => {
       this.uidOf.set(p, alive[i].uid);
       p.sethp(alive[i].hp);
+      p.m.hearts = hearts[alive[i].uid] ?? 0;
     });
+    this.addFriendship();
     this.battle.setPlayer('p2', {name: 'Selvagem', team: [toSet(encounter.mon)]});
     if (this.battle.p1.requestState === 'teampreview') {
       this.battle.choose('p1', 'default');
@@ -310,8 +317,36 @@ export class BattleController {
       // Escolha inválida (ex.: golpe desabilitado): deixa o simulador decidir.
       b.choose('p1', 'default');
     }
+    this.friendshipCure();
     this.markParticipant();
     return this.readLog();
+  }
+
+  /**
+   * Buffs de amizade (corações), no estilo dos jogos: aguentar com 1 HP (3+),
+   * mais crítico (4+). A cura de status (2+) roda no fim de cada turno, em commit().
+   */
+  private addFriendship(): void {
+    const b = this.battle;
+    const hearts = (p: Pokemon | null | undefined) => (p && p.side === b.p1 ? (p.m.hearts as number) || 0 : 0);
+    b.onEvent('Damage', b.format, (damage: number, target: Pokemon, _source: Pokemon, effect: {effectType?: string}) => {
+      if (effect?.effectType !== 'Move' || hearts(target) < 3 || target.m.endured) return damage;
+      if (damage >= target.hp && target.hp > 1 && chance(FRIEND_ENDURE)) {
+        target.m.endured = true;
+        b.add('-message', `${target.name} aguentou firme pela amizade com você!`);
+        return target.hp - 1;
+      }
+      return damage;
+    });
+    b.onEvent('ModifyCritRatio', b.format, (ratio: number, source: Pokemon) => (hearts(source) >= 4 ? ratio + 1 : ratio));
+  }
+
+  private friendshipCure(): void {
+    const p = this.playerActive;
+    if (this.battle.ended || !p || p.fainted || !p.status || ((p.m.hearts as number) || 0) < 2) return;
+    if (!chance(FRIEND_CURE)) return;
+    this.battle.add('-message', `${p.name} se esforçou para não deixar você preocupado!`);
+    p.cureStatus();
   }
 
   private markParticipant(): void {
