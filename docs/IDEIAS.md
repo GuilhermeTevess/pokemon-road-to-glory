@@ -212,6 +212,8 @@ só quer competir pode focar no Circuito, e quem gosta de aventura faz a Liga.
 ---
 
 ## Já feito das ideias anteriores
+- **Parte A** inteira: ficha da coleção com setinhas, doces, corações, golpe inicial,
+  custo de time, chance de shiny, nature/habilidade já capturadas para começar.
 - Teia de IVs ao capturar repetido.
 - Treinadores separados (até 3), cada um com a própria coleção.
 
