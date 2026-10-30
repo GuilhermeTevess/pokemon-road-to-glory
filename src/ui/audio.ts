@@ -520,3 +520,17 @@ export function playClick(): void {
   if (!a) return;
   tone(a, {wave: 'square', from: 1200, to: 1000, dur: 0.04, gain: 0.05});
 }
+
+/** Evolução: trinado que sobe enquanto brilha e um acorde no fim. */
+export function playEvolve(phase: 'glow' | 'done'): void {
+  const a = audio();
+  if (!a) return;
+  if (phase === 'glow') {
+    for (let i = 0; i < 12; i++) {
+      const f = 330 * Math.pow(2, i / 8);
+      tone(a, {wave: 'triangle', from: f, to: f * 1.06, dur: 0.18, gain: 0.06, at: i * 0.25});
+    }
+    return;
+  }
+  [523, 659, 784, 1047].forEach((f, i) => tone(a, {wave: 'square', from: f, to: f, dur: 0.5 - i * 0.05, gain: 0.06, at: i * 0.09}));
+}
