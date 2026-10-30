@@ -26,6 +26,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* A fonte pixel junta "fi" numa ligadura que parece "A": desliga em tudo. */
+*, *::before, *::after { font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0; }
 body {
   background-color: var(--bg);
   background-image: radial-gradient(var(--bg-dots) 1.5px, transparent 1.5px);
@@ -627,3 +629,52 @@ table.move-info td { padding: 3px 0; }
 }
 .evo-scene.start .evo-old { animation: evo-glow-in .9s ease-in forwards; }
 @keyframes evo-glow-in { from { filter: none; } to { filter: brightness(0) invert(1) drop-shadow(0 0 8px #fff); } }
+
+/* Torneios */
+.tour-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-family: 'Press Start 2P', monospace; font-size: 8px; color: #222; border: 2px solid var(--line); white-space: nowrap; }
+.tour-intro { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 560px; margin: 0 auto; text-align: center; }
+.tour-rules { text-align: left; margin: 0; padding-left: 18px; line-height: 1.6; }
+.prize-table { border-collapse: collapse; font-size: 13px; }
+.prize-table th, .prize-table td { border: 2px solid var(--line); padding: 4px 8px; text-align: center; }
+.prize-table td:first-child { font-weight: 700; }
+.draw { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px 0; }
+.draw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; }
+.draw-match { display: flex; flex-direction: column; gap: 4px; border: var(--px) solid var(--line); background: var(--panel); padding: 6px; }
+.draw-slot { font-family: 'Press Start 2P', monospace; font-size: 10px; padding: 6px; text-align: center; background: var(--bg); }
+.draw-slot.spin { color: var(--muted, #888); filter: blur(.5px); }
+.draw-slot.locked { background: var(--butter); animation: evo-pop .3s ease-out; }
+.bracket { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+.bracket-col { display: flex; flex-direction: column; min-width: 120px; }
+.bracket-col h4 { margin: 0 0 6px; font-size: 11px; text-align: center; }
+.bracket-matches { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; flex: 1; }
+.bracket-match { font: inherit; color: var(--ink); display: flex; flex-direction: column; gap: 2px; padding: 4px; border: var(--px) solid var(--line); background: var(--panel); cursor: pointer; text-align: left; }
+.bracket-match.empty { opacity: .5; cursor: default; }
+.bracket-match:not(.empty):hover { background: var(--butter); }
+.bracket-slot { display: flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bracket-slot .trainer-avatar, .bracket-slot .avatar-fallback { flex: none; font-size: 10px; }
+.bracket-slot.me { background: #ffe0ef; }
+.bracket-slot.win { font-weight: 700; }
+.bracket-slot.lose { opacity: .45; text-decoration: line-through; }
+.champ-col .bracket-champ { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: var(--px) dashed var(--line); padding: 8px; }
+.tour-next, .tour-result { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; justify-content: center; text-align: center; }
+.tour-result { flex-direction: column; }
+.team-row { display: flex; gap: 2px; flex-wrap: wrap; }
+.match-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.match-side { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: var(--px) solid var(--line); }
+.match-side.won { background: #fff6cc; }
+.win-tag { font-family: 'Press Start 2P', monospace; font-size: 8px; background: #e0a100; color: #fff; padding: 2px 4px; }
+.highlights { max-height: 240px; overflow: auto; padding-left: 22px; font-size: 13px; line-height: 1.5; }
+.tour-list { display: flex; flex-direction: column; gap: 6px; }
+.tour-item { font: inherit; color: var(--ink); display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left; }
+.tour-about { padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.career-card { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; margin-top: 6px; }
+.title-chip { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; }
+.message.narrator { color: #7a3e00; background: #fff3d6; }
+.foe-balls { display: inline-flex; gap: 3px; align-items: center; }
+.foe-balls i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid #333; background: linear-gradient(#e33 50%, #fff 50%); }
+.foe-balls i.down { background: #999; opacity: .6; }
+@media (max-width: 640px) {
+  .bracket { grid-template-columns: repeat(4, 130px); }
+  .draw-grid { grid-template-columns: 1fr 1fr; }
+  .match-sides { grid-template-columns: 1fr; }
+}

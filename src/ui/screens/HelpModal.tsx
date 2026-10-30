@@ -29,6 +29,8 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Na Creche (menu inicial) dois Pokémon da coleção fazem ovos. Leve um ovo na run: ele choca depois de algumas rondas vencidas. O Manual do Criador explica tudo.</li>
         <li>Toda run dá Glória quando acaba. No menu Glória você compra melhorias para todas as próximas runs (mais pontos de time, mais raros, mais biomas...).</li>
         <li>Na ficha também tem o Tutor (natures e habilidades) e os EVs: vitórias enchem um banco que você distribui.</li>
+        <li>A temporada tem 120 rondas. Nas rondas 30, 60, 90 e 120 tem torneio (League Cup, Regional, Internacional e Mundial): 8 treinadores, mata-mata, time curado antes de cada luta. Perder tira você do torneio, mas a run continua.</li>
+        <li>Torneios dão Glória, dinheiro, Championship Points (CP), fama e títulos. No menu Torneios você vê as chaves antigas, os times de cada um e como cada partida aconteceu.</li>
       </ol>
       <h3>Itens</h3>
       <div className="help-items">

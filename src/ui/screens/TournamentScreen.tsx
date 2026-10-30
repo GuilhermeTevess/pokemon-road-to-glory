@@ -1,0 +1,337 @@
+// Torneios: explicação, sorteio animado, chaveamento e histórico.
+import {useEffect, useState} from 'react';
+import {useGame} from '../../game/store';
+import {careerOf} from '../../game/meta';
+import {
+  FAME_TIERS, ROUND_NAMES, TOURS, fameLabel, placementLabel, playerIndex, playerMatch, prizeIndex, tourInfo,
+} from '../../game/tournament';
+import type {MatchRec, TourKind} from '../../game/tournament';
+import {Modal, PixelIcon, Sprite} from '../components';
+import {TrainerAvatar} from './StartScreens';
+
+/** Formato comum para a chave ao vivo e para o histórico. */
+interface BracketData {
+  entrants: {name: string; avatar?: string; player?: boolean; team: string[]}[];
+  rounds: MatchRec[][];
+}
+
+const KIND_COLOR: Record<TourKind, string> = {cup: '#7ab8e0', regional: '#8fd18f', international: '#e0a14a', worlds: '#e0c34a'};
+
+export function TourBadge({kind}: {kind: TourKind}) {
+  return (
+    <span className="tour-badge" style={{background: KIND_COLOR[kind]}}>
+      <PixelIcon name="trophy" size={12} /> {tourInfo(kind).name}
+    </span>
+  );
+}
+
+function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
+  if (!team.length) return <span className="muted">time escondido</span>;
+  return (
+    <span className="team-row">
+      {team.map((s, i) => (
+        <Sprite key={i} name={s} size={size} still />
+      ))}
+    </span>
+  );
+}
+
+/** Detalhe de uma partida (ou do time de alguém, se ainda não jogou). */
+function MatchDetail({data, match, onClose}: {data: BracketData; match: MatchRec; onClose: () => void}) {
+  const A = data.entrants[match.a];
+  const B = data.entrants[match.b];
+  const teams = match.teams ?? [A.team, B.team];
+  return (
+    <Modal onClose={onClose} wide>
+      <h2>
+        {A.name} vs {B.name}
+      </h2>
+      <div className="match-sides">
+        {[A, B].map((e, i) => (
+          <div key={i} className={`match-side ${match.winner === (i === 0 ? match.a : match.b) ? 'won' : ''}`}>
+            <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={56} />
+            <b>{e.name}</b>
+            {match.winner === (i === 0 ? match.a : match.b) && <span className="win-tag">Venceu</span>}
+            <TeamRow team={teams[i]} size={48} />
+          </div>
+        ))}
+      </div>
+      {match.highlights?.length ? (
+        <>
+          <h3>Como foi</h3>
+          <ol className="highlights">
+            {match.highlights.map((h, i) => (
+              <li key={i}>{h}</li>
+            ))}
+          </ol>
+        </>
+      ) : (
+        <p className="hint">Ainda não jogaram. Dá para estudar os times antes!</p>
+      )}
+    </Modal>
+  );
+}
+
+/** Chaveamento: quartas → semi → final → campeão. Toque numa partida para ver os detalhes. */
+export function Bracket({data}: {data: BracketData}) {
+  const [open, setOpen] = useState<MatchRec | null>(null);
+  const final = data.rounds[2]?.[0];
+  const champ = final?.winner !== undefined ? data.entrants[final.winner] : null;
+  // Rodadas que ainda não existem aparecem vazias.
+  const cols = [0, 1, 2].map(r => data.rounds[r] ?? Array.from({length: 4 >> r}, () => null));
+  return (
+    <div className="bracket">
+      {cols.map((round, r) => (
+        <div key={r} className="bracket-col">
+          <h4>{ROUND_NAMES[r]}</h4>
+          <div className="bracket-matches">
+            {round.map((m, i) =>
+              m ? (
+                <button key={i} className={`bracket-match ${m.winner !== undefined ? 'played' : ''}`} onClick={() => setOpen(m)}>
+                  {[m.a, m.b].map(id => {
+                    const e = data.entrants[id];
+                    const cls = [e.player ? 'me' : '', m.winner === id ? 'win' : m.winner !== undefined ? 'lose' : ''].join(' ');
+                    return (
+                      <span key={id} className={`bracket-slot ${cls}`}>
+                        <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={20} />
+                        {e.name}
+                      </span>
+                    );
+                  })}
+                </button>
+              ) : (
+                <div key={i} className="bracket-match empty">
+                  <span className="bracket-slot">?</span>
+                  <span className="bracket-slot">?</span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="bracket-col champ-col">
+        <h4>Campeão</h4>
+        <div className="bracket-champ">
+          {champ ? (
+            <>
+              <PixelIcon name="trophy" color="#e0a100" size={28} />
+              <TrainerAvatar avatar={champ.avatar ?? ''} name={champ.name} size={48} />
+              <b>{champ.name}</b>
+            </>
+          ) : (
+            <span className="muted">?</span>
+          )}
+        </div>
+      </div>
+      {open && <MatchDetail data={data} match={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+/** Sorteio: os nomes giram em cada vaga e vão travando um por um. */
+function DrawAnimation({names, onDone}: {names: string[]; onDone: () => void}) {
+  const [tick, setTick] = useState(0);
+  const locked = Math.floor(tick / 5);
+  useEffect(() => {
+    if (locked > names.length) return;
+    const t = setTimeout(() => setTick(x => x + 1), 70);
+    return () => clearTimeout(t);
+  }, [tick, locked, names.length]);
+  const done = locked >= names.length;
+  return (
+    <div className="draw">
+      <div className="draw-grid">
+        {[0, 2, 4, 6].map(i => (
+          <div key={i} className="draw-match">
+            {[i, i + 1].map(j => (
+              <span key={j} className={`draw-slot ${j < locked ? 'locked' : 'spin'}`}>
+                {j < locked ? names[j] : names[(j * 3 + tick) % names.length]}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <button className="btn primary" onClick={done ? onDone : () => setTick(names.length * 5)}>
+        {done ? 'Ver chaveamento' : 'Pular sorteio'}
+      </button>
+    </div>
+  );
+}
+
+/** Tela do torneio dentro da run. */
+export function TournamentScreen() {
+  const {run, trainer, tourStage, tourFight, tourFinish} = useGame();
+  const t = run?.tournament;
+  if (!run || !t) return null;
+  const info = tourInfo(t.kind);
+  const me = playerIndex(t);
+  const data: BracketData = {
+    entrants: t.entrants.map(e => ({...e, team: e.player ? run.party.map(m => m.species) : e.team.map(m => m.species)})),
+    rounds: t.rounds,
+  };
+  const next = playerMatch(t);
+  const foe = next ? t.entrants[next.a === me ? next.b : next.a] : null;
+  return (
+    <div className="screen tour-screen">
+      <header className="bar">
+        <TourBadge kind={t.kind} />
+        <h2>{info.name}</h2>
+        <span className="muted">Ronda {t.wave}</span>
+      </header>
+      {t.stage === 'intro' && (
+        <div className="panel tour-intro">
+          <PixelIcon name="trophy" color="#e0a100" size={40} />
+          <p>{info.about}</p>
+          <ul className="tour-rules">
+            <li>8 treinadores, mata-mata: perdeu, saiu do torneio.</li>
+            <li>Uma partida por rodada: quartas, semifinal e final.</li>
+            <li>Seu time é curado antes de cada luta.</li>
+            <li>Os adversários usam {info.teamSize} Pokémon.</li>
+            <li>Perder aqui não acaba a run: a temporada segue depois do torneio.</li>
+          </ul>
+          <table className="prize-table">
+            <thead>
+              <tr>
+                <th />
+                <th>Campeão</th>
+                <th>Vice</th>
+                <th>Top 4</th>
+                <th>Top 8</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Glória</td>
+                {info.glory.map((g, i) => <td key={i}>{g}</td>)}
+              </tr>
+              <tr>
+                <td>₽</td>
+                {info.money.map((g, i) => <td key={i}>{g}</td>)}
+              </tr>
+              {info.cp[0] > 0 && (
+                <tr>
+                  <td>CP</td>
+                  {info.cp.map((g, i) => <td key={i}>{g}</td>)}
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <button className="btn primary" onClick={() => tourStage('draw')}>
+            Ir para o sorteio
+          </button>
+        </div>
+      )}
+      {t.stage === 'draw' && <DrawAnimation names={t.entrants.map(e => e.name)} onDone={() => tourStage('bracket')} />}
+      {(t.stage === 'bracket' || t.stage === 'done') && (
+        <>
+          <Bracket data={data} />
+          {t.stage === 'bracket' && next && foe && (
+            <div className="panel tour-next">
+              <TrainerAvatar avatar={foe.avatar ?? ''} name={foe.name} size={56} />
+              <div>
+                <b>
+                  {ROUND_NAMES[t.rounds.length - 1]}: {trainer?.name ?? 'Você'} vs {foe.name}
+                </b>
+                <TeamRow team={foe.team.map(m => m.species)} />
+              </div>
+              <button className="btn primary" onClick={tourFight}>
+                Lutar!
+              </button>
+            </div>
+          )}
+          {t.stage === 'done' && (
+            <div className="panel tour-result">
+              <h3>
+                <PixelIcon name="trophy" color={t.placement === 1 ? '#e0a100' : '#999'} size={24} /> {placementLabel(t.placement ?? 5)}
+              </h3>
+              <p>
+                +{info.glory[prizeIndex(t.placement ?? 5)]} Glória · +₽ {info.money[prizeIndex(t.placement ?? 5)]}
+                {info.cp[0] > 0 && ` · +${info.cp[prizeIndex(t.placement ?? 5)]} CP`}
+              </p>
+              <button className="btn primary" onClick={tourFinish}>
+                Seguir a temporada
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Perfil de torneios: CP, fama, títulos e o histórico com as chaves. */
+export function TourHistoryScreen() {
+  const {collection, setScreen} = useGame();
+  const c = careerOf(structuredClone(collection));
+  const [open, setOpen] = useState<number | null>(null);
+  const rec = open !== null ? c.history[open] : null;
+  const next = FAME_TIERS.find(([min]) => min > c.fame);
+  return (
+    <div className="screen tour-history">
+      <header className="bar">
+        <button className="btn small" onClick={() => (rec ? setOpen(null) : setScreen('title'))}>
+          <PixelIcon name="back" /> Voltar
+        </button>
+        <h2>{rec ? `${tourInfo(rec.kind).name} · ${placementLabel(rec.placement)}` : 'Torneios'}</h2>
+        <span />
+      </header>
+      {rec ? (
+        <Bracket data={rec} />
+      ) : (
+        <>
+          <CareerCard />
+          <p className="hint">
+            Fama: {fameLabel(c.fame)} ({c.fame}){next ? `, próxima: ${next[1]} com ${next[0]}` : ''}. Toque num torneio para ver a chave, os
+            times e como cada partida aconteceu.
+          </p>
+          {c.history.length ? (
+            <div className="tour-list">
+              {c.history.map((h, i) => (
+                <button key={i} className="panel tour-item" onClick={() => setOpen(i)}>
+                  <TourBadge kind={h.kind} />
+                  <b>{placementLabel(h.placement)}</b>
+                  <span className="muted">{new Date(h.at).toLocaleDateString('pt-BR')}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Nenhum torneio ainda. O primeiro é a League Cup, na ronda 30.</p>
+          )}
+          <h3>O circuito</h3>
+          <ul className="tour-about">
+            {TOURS.map(x => (
+              <li key={x.kind}>
+                <TourBadge kind={x.kind} /> ronda {x.wave}: {x.about}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Resumo da carreira (perfil). */
+export function CareerCard() {
+  const c = careerOf(structuredClone(useGame(s => s.collection)));
+  const titles = TOURS.filter(x => c.titles[x.kind]);
+  return (
+    <div className="panel career-card">
+      <span>
+        <b>{c.cp}</b> CP
+      </span>
+      <span>
+        Fama: <b>{fameLabel(c.fame)}</b>
+      </span>
+      <span>
+        Títulos:{' '}
+        {titles.length ? titles.map(x => (
+          <span key={x.kind} className="title-chip">
+            <TourBadge kind={x.kind} /> ×{c.titles[x.kind]}
+          </span>
+        )) : <span className="muted">nenhum ainda</span>}
+      </span>
+      {c.runnerUps > 0 && <span className="muted">Vice {c.runnerUps}×</span>}
+    </div>
+  );
+}

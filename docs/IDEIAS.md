@@ -212,6 +212,19 @@ só quer competir pode focar no Circuito, e quem gosta de aventura faz a Liga.
 ---
 
 ## Já feito das ideias anteriores
+- **Temporada e torneios (offline)**: 120 rondas; League Cup (30), Regional (60),
+  International (90) e Mundial (120), cada um com chave de 8, mata-mata, time curado
+  antes de cada luta, bots com 3/4/5/6 Pokémon. Partidas entre bots simuladas de verdade
+  no Showdown (dá para estudar times e lances no histórico). Narrador nos torneios
+  (`src/game/narration.ts`). Carreira na coleção: CP, fama, títulos, vices e quem defende
+  o título (`src/game/tournament.ts`). Animação de evolução.
+- **Próximo**: ginásios (líderes de tipo nas rondas 10/20/40/50/70/80/100/110, com
+  insígnias que dão bônus pequenos e não são obrigatórias), vida de treinador (rivais
+  recorrentes, amizades, notícias, entrevistas curtas e opcionais), editor de avatar.
+- **Online (decidido)**: cada jogador escolhe a região de origem (biomas iniciais e onde
+  joga o Regional). Regional junta quem é da mesma região; International e Mundial
+  juntam todo mundo; o sorteio tende a pôr jogadores de verdade na mesma chave; amistoso
+  entre amigos a qualquer momento. Rivalidade entre jogadores.
 - **Parte D**: Glória e 7 melhorias gerais (`src/game/glory.ts`, tela Glória no menu).
 - **Parte C, eventos**: 10% de chance entre rondas (não antes de chefe). Casa
   abandonada, árvore de frutas, comerciante, Pokémon machucado, rival e vidente

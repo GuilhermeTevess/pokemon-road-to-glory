@@ -18,6 +18,8 @@ src/
     rewards.ts   recompensas, loja, dinheiro
     meta.ts      coleção permanente: ficha por linha, doces, corações, custo de time
     trainers.ts  perfis de treinador; cada um tem coleção e run próprias no localStorage
+    tournament.ts torneios da temporada (chave de 8, bots, simulação bot x bot, carreira)
+    narration.ts falas do narrador dos torneios
     store.ts     estado global (zustand): todas as ações da run
   ui/          telas e componentes React, CSS
     audio.ts     gritos + sons de golpe (amostras CC0 em public/sfx, sintetizador de reserva)

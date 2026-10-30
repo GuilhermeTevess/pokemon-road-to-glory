@@ -15,6 +15,7 @@ import type {StatId} from '../../game/types';
 import {IvWeb, ItemIcon, Modal, MoveInfo, PixelIcon, Sprite, TypeBadge, TypeFilter, Types} from '../components';
 import {playCry} from '../audio';
 import {TrainerAvatar} from './StartScreens';
+import {CareerCard} from './TournamentScreen';
 
 const candyColor = (line: string) => TYPE_COLORS[species(line).types[0]] ?? '#e0b43a';
 
@@ -445,12 +446,13 @@ function TrainerHeader() {
             Melhor ronda <b>{st.bestWave}</b>
           </span>
           <span>
-            <b>{st.stageClears}</b> etapas vencidas
+            <b>{st.stageClears}</b> temporadas completas
           </span>
           <span>
             ₽ <b>{st.moneyEarned}</b> ganhos
           </span>
         </div>
+        <CareerCard />
       </div>
       {fav && (
         <div className="th-fav">
@@ -510,7 +512,7 @@ export function CollectionScreen() {
             {collection.runs.map(r => (
               <li key={r.endedAt}>
                 {new Date(r.endedAt).toLocaleDateString('pt-BR')} · {r.starter} · ronda {r.wave} ·{' '}
-                {r.result === 'stageClear' ? 'etapa concluída' : r.result === 'lost' ? 'derrota' : 'abandonada'}
+                {r.result === 'stageClear' ? 'temporada completa' : r.result === 'lost' ? 'derrota' : 'abandonada'}
               </li>
             ))}
           </ul>

@@ -75,6 +75,11 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   mochila cheia e descontos na loja.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
+- **Temporada de 120 rondas** com torneios oficiais nas rondas 30/60/90/120: League
+  Cup, Regional, International e World Championship. Explicação de cada um, sorteio
+  animado, chaveamento, narrador (que conhece sua fama, seus títulos e suas finais
+  perdidas) e histórico com os times e lances de cada partida.
+- **Animação de evolução** no centro da tela.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).
 
 Ideias para as próximas etapas: [docs/IDEIAS.md](docs/IDEIAS.md).

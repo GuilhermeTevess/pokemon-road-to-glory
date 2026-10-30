@@ -4,8 +4,9 @@ import {TYPE_COLORS, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
-import {isBossWave, isMilestoneWave, STAGE_LENGTH} from '../../game/encounters';
+import {isBossWave, isMilestoneWave, SEASON_LENGTH} from '../../game/encounters';
 import {getBattle, useGame} from '../../game/store';
+import {ROUND_NAMES, tourInfo} from '../../game/tournament';
 import {
   HpBar,
   ItemIcon,
@@ -86,7 +87,7 @@ export function BattleScreen() {
               level: mon?.level ?? 1, hp: s.hp, maxhp: s.maxhp, shiny: !!mon?.shiny, anim: 'enter',
             });
           } else {
-            setWild({species: s.species, level: enc.mon.level, hp: s.hp, maxhp: s.maxhp, shiny: enc.mon.shiny, anim: 'enter'});
+            setWild({species: s.species, level: s.level ?? enc.mon.level, hp: s.hp, maxhp: s.maxhp, shiny: s.shiny ?? enc.mon.shiny, anim: 'enter'});
           }
           playCry(s.species);
         }
@@ -211,13 +212,16 @@ export function BattleScreen() {
     await play(events.slice(1));
   };
 
-  const header = enc.trainer
+  const tour = run.tournament;
+  const header = enc.tournament && tour
+    ? `${tourInfo(tour.kind).name} · ${ROUND_NAMES[tour.rounds.length - 1]} · contra ${enc.trainer}`
+    : enc.trainer
     ? `Desafio do rival ${enc.trainer}`
     : isMilestoneWave(run.wave)
     ? `Ronda ${run.wave} · Desafio final da etapa`
     : isBossWave(run.wave)
       ? `Ronda ${run.wave} · Chefe`
-      : `Ronda ${run.wave}/${STAGE_LENGTH}`;
+      : `Ronda ${run.wave}/${SEASON_LENGTH}`;
 
   return (
     <div className="screen battle-screen">
@@ -250,7 +254,15 @@ export function BattleScreen() {
               </div>
               <div className="row">
                 <Types name={wild.species} />
-                <RarityBadge rarity={enc.rarity} />
+                {enc.team ? (
+                  <span className="foe-balls" title="Pokémon do treinador ainda de pé">
+                    {ctl.foeStatus().map((up, i) => (
+                      <i key={i} className={up ? 'up' : 'down'} />
+                    ))}
+                  </span>
+                ) : (
+                  <RarityBadge rarity={enc.rarity} />
+                )}
                 <StatusBadge status={wild.status} />
               </div>
               <HpBar hp={wild.hp} maxhp={wild.maxhp} />
@@ -307,7 +319,7 @@ export function BattleScreen() {
       </div>
 
       <div className="battle-bottom">
-        <div className="message">{message}</div>
+        <div className={`message ${message.startsWith('🎙️') ? 'narrator' : ''}`}>{message}</div>
         <div className="actions">
           {busy ? null : menu === 'main' && !ctl.ended ? (
             <div className="main-actions">

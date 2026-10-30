@@ -4,12 +4,12 @@ import {BIOMES} from '../data/biomes';
 import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
-import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
+import {BIOME_CHANGE_EVERY, HEAL_EVERY, SEASON_LENGTH, generateEncounter} from './encounters';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
   HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
-  registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
+  careerOf, registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
 import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
@@ -18,6 +18,12 @@ import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
 import {START_LEVELS, applyPerks, buyUpgrade, discounted, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
+import {
+  applyToCareer, createTournament, currentRound, highlightsFromLog, placementLabel, playerIndex, playerMatch,
+  prizeIndex, recordPlayerResult, tourAt, tourInfo,
+} from './tournament';
+import type {Tournament} from './tournament';
+import {introLines} from './narration';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
@@ -67,7 +73,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory';
+export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory' | 'tournaments';
 
 export interface Toast {
   id: string;
@@ -135,6 +141,12 @@ interface Store {
   swapWithBox(boxUid: string, partyUid: string | null): void;
   /** Consome um item da mochila (usado pela batalha). */
   consume(itemId: string): boolean;
+  /** Torneio: avança a tela (explicação → sorteio → chave). */
+  tourStage(stage: Tournament['stage']): void;
+  /** Torneio: começa a partida do jogador (time curado). */
+  tourFight(): void;
+  /** Torneio acabou: prêmios, carreira e segue a run. */
+  tourFinish(): void;
   /** Atualiza o run atual após mexer no controlador de batalha. */
   touch(): void;
 }
@@ -189,9 +201,24 @@ export const useGame = create<Store>((set, get) => {
   const findMon = (run: RunState, monUid: string): OwnedMon | undefined =>
     run.party.find(m => m.uid === monUid) ?? run.box.find(m => m.uid === monUid);
 
+  const healAll = (run: RunState) => {
+    for (const m of run.party) m.hp = maxHp(m);
+  };
+
   const startWave = (run: RunState) => {
     run.wave++;
     run.event = undefined;
+    const info = tourAt(run.wave);
+    if (info) {
+      const t = get().trainer;
+      const c = careerOf(get().collection);
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame});
+      run.encounter = undefined;
+      run.upcoming = undefined;
+      run.phase = 'tournament';
+      battle = null;
+      return;
+    }
     run.encounter = run.upcoming?.shift() ?? generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck);
     if (!run.upcoming?.length) run.upcoming = undefined;
     if (run.incenseWaves > 0) run.incenseWaves--;
@@ -206,7 +233,7 @@ export const useGame = create<Store>((set, get) => {
   };
 
   const afterReward = (run: RunState) => {
-    if (run.wave >= STAGE_LENGTH) {
+    if (run.wave >= SEASON_LENGTH) {
       run.phase = 'stageClear';
       return;
     }
@@ -228,7 +255,7 @@ export const useGame = create<Store>((set, get) => {
     st.runs++;
     const glory = gloryFor(run.wave, result);
     col.glory = (col.glory ?? 0) + glory;
-    run.gloryEarned = glory;
+    run.gloryEarned = glory + (run.tourGlory ?? 0);
     st.bestWave = Math.max(st.bestWave, run.wave);
     if (result === 'stageClear') {
       st.stageClears++;
@@ -257,7 +284,9 @@ export const useGame = create<Store>((set, get) => {
 
   const flushPending = (run: RunState) => {
     if (run.pending.length) return;
-    if (run.phase === 'postBattle') goToReward(run);
+    if (run.phase !== 'postBattle') return;
+    if (run.tournament) run.phase = 'tournament';
+    else goToReward(run);
   };
 
   /** Usa um item da mochila (fora da batalha). Devolve a mensagem para o jogador. */
@@ -670,7 +699,21 @@ export const useGame = create<Store>((set, get) => {
         ctl?.syncParty(run.party);
         battle = null;
         const events: PendingEvent[] = [];
-        if (outcome === 'lost') {
+        if (enc.tournament && run.tournament && ctl) {
+          // Partida de torneio: perder não acaba a run, só tira você do torneio.
+          const t = run.tournament;
+          const won = outcome === 'won';
+          const me = get().trainer?.name ?? 'Você';
+          const foe = enc.trainer ?? '?';
+          const left = won ? ctl.battle.p1.pokemon.filter(p => !p.fainted).length : ctl.battle.p2.pokemon.filter(p => !p.fainted).length;
+          recordPlayerResult(t, won, run.party.map(m => m.species), highlightsFromLog(ctl.battle.log, me, foe, won ? me : foe, left), left);
+          if (!won) {
+            healAll(run);
+            run.phase = 'tournament';
+            get().toast(`${foe} venceu. Fim do torneio para você, mas a temporada continua!`);
+            return;
+          }
+        } else if (outcome === 'lost') {
           run.phase = 'gameOver';
           endRun(run, col, 'lost');
           return;
@@ -742,7 +785,7 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
           }
         }
-        const money = moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
+        const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
         statsOf(col).moneyEarned += money;
         if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
@@ -761,9 +804,60 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`O ovo chocou! Nasceu um ${baby.species}${baby.shiny ? ' shiny' : ''}! (+${reg.candies} doces)`);
           }
         }
+        if (enc.tournament) healAll(run);
         run.pending.push(...events);
         run.phase = 'postBattle';
         flushPending(run);
+      });
+    },
+
+    tourStage(stage) {
+      mutate(run => {
+        if (run.tournament) run.tournament.stage = stage;
+      });
+    },
+
+    tourFight() {
+      mutate((run, col) => {
+        const t = run.tournament;
+        const m = t && playerMatch(t);
+        if (!t || !m) return;
+        healAll(run);
+        const me = t.entrants[playerIndex(t)];
+        const foe = t.entrants[m.a === playerIndex(t) ? m.b : m.a];
+        const c = careerOf(col);
+        const info = tourInfo(t.kind);
+        run.encounter = {
+          mon: foe.team[0],
+          team: foe.team,
+          rarity: 'rare',
+          boss: true,
+          trainer: foe.name,
+          tournament: true,
+          intro: introLines({...me, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, foe, info.name, currentRound(t), !!c.defending[t.kind]),
+        };
+        run.phase = 'battle';
+        battle = null;
+      });
+    },
+
+    tourFinish() {
+      mutate((run, col) => {
+        const t = run.tournament;
+        if (!t || t.stage !== 'done') return;
+        const info = tourInfo(t.kind);
+        const i = prizeIndex(t.placement ?? 5);
+        applyToCareer(careerOf(col), t);
+        col.glory = (col.glory ?? 0) + info.glory[i];
+        run.tourGlory = (run.tourGlory ?? 0) + info.glory[i];
+        run.money += info.money[i];
+        statsOf(col).moneyEarned += info.money[i];
+        if (t.placement === 1) for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+        get().toast(`${info.name}: ${placementLabel(t.placement ?? 5)}! +₽ ${info.money[i]} · +${info.glory[i]} Glória${info.cp[i] ? ` · +${info.cp[i]} CP` : ''}`);
+        run.tournament = undefined;
+        run.encounter = undefined;
+        healAll(run);
+        goToReward(run);
       });
     },
 

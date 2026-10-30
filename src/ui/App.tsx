@@ -11,6 +11,7 @@ import {CollectionScreen} from './screens/CollectionScreen';
 import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
+import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
@@ -23,11 +24,13 @@ export function App() {
   else if (screen === 'collection') body = <CollectionScreen />;
   else if (screen === 'daycare') body = <DaycareScreen />;
   else if (screen === 'glory') body = <GloryScreen />;
+  else if (screen === 'tournaments') body = <TourHistoryScreen />;
   else if (!run || run.phase === 'starter') body = <StarterSelect />;
   else if (run.phase === 'biome') body = <BiomeSelect mode="start" />;
   else if (run.phase === 'battle') body = <BattleScreen key={run.encounter?.mon.uid} />;
   else if (run.phase === 'biomeChoice') body = <BiomeSelect mode="next" />;
   else if (run.phase === 'event') body = <EventScreen />;
+  else if (run.phase === 'tournament') body = <TournamentScreen />;
   else if (run.phase === 'reward' || run.phase === 'postBattle') body = <RewardScreen />;
   else body = <EndScreen kind={run.phase === 'stageClear' ? 'stageClear' : 'gameOver'} />;
 

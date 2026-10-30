@@ -11,6 +11,8 @@ import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
 import type {OwnedMon, StatId, StatTable} from './types';
 import type {Egg} from './daycare';
+import {emptyCareer} from './tournament';
+import type {Career} from './tournament';
 
 export interface CollectionEntry {
   /** Quantas vezes foi capturado (0 = só foi usado como inicial). */
@@ -80,6 +82,8 @@ export interface Collection {
   eggs?: Egg[];
   /** Linha favorita escolhida pelo jogador (senão, a com mais corações). */
   favorite?: string;
+  /** Carreira nos torneios: CP, fama, títulos e histórico. */
+  career?: Career;
 }
 
 export function lineRoot(name: string): string {
@@ -127,6 +131,10 @@ export function saveCollection(trainerId: string | null, c: Collection): void {
   } catch {
     /* ignora */
   }
+}
+
+export function careerOf(c: Collection): Career {
+  return (c.career ??= emptyCareer());
 }
 
 export function statsOf(c: Collection): TrainerStats {
