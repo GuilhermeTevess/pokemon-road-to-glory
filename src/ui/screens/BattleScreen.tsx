@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getBiome} from '../../data/biomes';
-import {TYPE_COLORS, defensiveMatchups, species} from '../../data/dex';
+import {TYPE_COLORS, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
@@ -10,6 +10,7 @@ import {
   HpBar,
   ItemIcon,
   MatchupPanel,
+  MoveInfo,
   PixelIcon,
   RarityBadge,
   Sprite,
@@ -51,6 +52,7 @@ export function BattleScreen() {
   const [, force] = useState(0);
   const started = useRef(false);
   const fxRef = useRef<HTMLDivElement>(null);
+  const [moveInfo, setMoveInfo] = useState<string | null>(null);
   const arenaRef = useRef<HTMLDivElement>(null);
   const caughtRef = useRef(false);
 
@@ -199,6 +201,7 @@ export function BattleScreen() {
 
   return (
     <div className="screen battle-screen">
+      {moveInfo && <MoveInfo move={moveInfo} onClose={() => setMoveInfo(null)} />}
       <div className="battle-top">
         <span>{header}</span>
         <span>
@@ -211,7 +214,7 @@ export function BattleScreen() {
         <div className="fx-layer" ref={fxRef} />
         {wild && (
           <>
-            <div className="info-box wild-box" onClick={() => setShowInfo(showInfo === 'wild' ? null : 'wild')}>
+            <div className="info-box wild-box">
               <div className="info-name">
                 {wild.shiny && <PixelIcon name="star" color="#e0a100" />}
                 {species(wild.species).name} <span className="lv">Nv. {wild.level}</span>
@@ -222,8 +225,15 @@ export function BattleScreen() {
                 <StatusBadge status={wild.status} />
               </div>
               <HpBar hp={wild.hp} maxhp={wild.maxhp} />
-              <WeakLine types={wildTypes} />
-              <div className="info-hint">toque para ver todas as fraquezas</div>
+              <button className={`weak-btn ${showInfo === 'wild' ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === 'wild' ? null : 'wild')}>
+                Fraquezas {showInfo === 'wild' ? '▴' : '▾'}
+              </button>
+              {showInfo === 'wild' && (
+                <div className="weak-pop below">
+                  <MatchupPanel types={wildTypes} />
+                  <p className="weak-pop-hint">Toque num tipo para ver o que vence ele.</p>
+                </div>
+              )}
             </div>
             <div className={`mon-slot wild-slot ${wild.anim ?? ''} ${enc.boss ? 'boss' : ''}`}>
               {ballAnim !== null ? (
@@ -243,7 +253,13 @@ export function BattleScreen() {
             <div className={`mon-slot player-slot ${player.anim ?? ''}`}>
               <Sprite name={player.species} back shiny={player.shiny} />
             </div>
-            <div className="info-box player-box" onClick={() => setShowInfo(showInfo === 'player' ? null : 'player')}>
+            <div className="info-box player-box">
+              {showInfo === 'player' && playerActive && (
+                <div className="weak-pop above">
+                  <MatchupPanel types={playerActive.getTypes()} />
+                  <p className="weak-pop-hint">Toque num tipo para ver o que vence ele.</p>
+                </div>
+              )}
               <div className="info-name">
                 {player.shiny && <PixelIcon name="star" color="#e0a100" />}
                 {species(player.species).name} <span className="lv">Nv. {player.level}</span>
@@ -253,17 +269,11 @@ export function BattleScreen() {
                 <StatusBadge status={player.status} />
               </div>
               <HpBar hp={player.hp} maxhp={player.maxhp} showNumbers />
+              <button className={`weak-btn ${showInfo === 'player' ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === 'player' ? null : 'player')}>
+                Fraquezas {showInfo === 'player' ? '▴' : '▾'}
+              </button>
             </div>
           </>
-        )}
-        {showInfo && (
-          <div className="info-pop" onClick={() => setShowInfo(null)}>
-            {showInfo === 'wild' ? (
-              <MatchupPanel types={wildTypes} title={`Fraquezas de ${ctl.wildActive.name}`} />
-            ) : playerActive ? (
-              <MatchupPanel types={playerActive.getTypes()} title={`Fraquezas de ${playerActive.name}`} />
-            ) : null}
-          </div>
         )}
       </div>
 
@@ -300,7 +310,20 @@ export function BattleScreen() {
                     style={{['--mc' as string]: TYPE_COLORS[m.type]}}
                     onClick={() => act(() => ctl.chooseMove(m.index))}
                   >
-                    <span className="move-name">{m.name}</span>
+                    <span className="move-name">
+                      {m.name}
+                      <span
+                        className="move-info-btn"
+                        role="button"
+                        title="Detalhes do golpe"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setMoveInfo(m.name);
+                        }}
+                      >
+                        ?
+                      </span>
+                    </span>
                     <span className="move-meta">
                       <TypeBadge type={m.type} small />
                       <span className="cat">{m.category === 'Physical' ? 'Físico' : m.category === 'Special' ? 'Especial' : 'Status'}</span>
@@ -419,21 +442,3 @@ function SwitchMenu({ctl, onPick, onBack}: {ctl: BattleController; onPick: (uid:
 }
 
 /** Linha compacta com as fraquezas do selvagem, sempre visível. */
-function WeakLine({types}: {types: readonly string[]}) {
-  const m = defensiveMatchups(types);
-  if (!m.x4.length && !m.x2.length) return null;
-  return (
-    <div className="weak-line">
-      Fraco a:
-      {m.x4.map(t => (
-        <span key={t} className="row">
-          <TypeBadge type={t} small />
-          <b>4x</b>
-        </span>
-      ))}
-      {m.x2.map(t => (
-        <TypeBadge key={t} type={t} small />
-      ))}
-    </div>
-  );
-}

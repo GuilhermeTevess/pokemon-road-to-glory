@@ -222,8 +222,23 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 .info-name { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .info-hint { font-size: 11px; color: var(--ink-soft); }
 .weak-line { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; font-size: 12px; font-weight: 600; color: #d64545; }
-.info-pop { position: absolute; z-index: 5; top: 8%; left: 14%; right: 14%; max-height: 84%; overflow: auto; }
-.info-pop .matchups { background: var(--panel); border: var(--px) solid var(--line); box-shadow: 4px 4px 0 rgba(59, 51, 85, .25); }
+.info-box { cursor: default; }
+.info-box:has(.weak-pop) { z-index: 6; }
+.weak-btn {
+  align-self: flex-start; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink);
+  background: var(--panel-2); border: 2px solid var(--line); padding: 0 8px;
+}
+.weak-btn.open { background: var(--sky); }
+.weak-pop {
+  position: absolute; left: 0; width: max(100%, 260px); background: var(--panel); border: var(--px) solid var(--line);
+  box-shadow: 4px 4px 0 rgba(59, 51, 85, .25); padding: 4px; max-height: 240px; overflow: auto; animation: fade .15s steps(3);
+}
+.weak-pop.below { top: calc(100% + 4px); }
+.weak-pop.above { bottom: calc(100% + 4px); left: auto; right: 0; }
+.weak-pop .matchups { box-shadow: none; border: none; padding: 2px; }
+.weak-pop-hint { font-size: 11px; color: var(--ink-soft); margin: 2px 4px; }
+button.type-badge.info { cursor: pointer; font-family: inherit; line-height: inherit; }
+button.type-badge.info:hover { filter: brightness(1.1); outline: 2px solid var(--line); }
 
 .battle-bottom { border-top: none; padding: 10px; box-shadow: 4px 4px 0 rgba(59, 51, 85, .18); }
 .message { min-height: 50px; font-size: 19px; font-weight: 600; padding: 8px 12px; background: var(--panel-2); border: var(--px) solid var(--line); margin-bottom: 10px; }
@@ -389,7 +404,28 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 .left { text-align: left; display: flex; flex-direction: column; }
 .move-desc { font-size: 13px; color: var(--ink-soft); font-weight: normal; line-height: 1.2; }
 .small-desc { font-size: 12px; font-weight: normal; }
-.move-chip { flex-direction: column; align-items: flex-start; }
+.move-chip { flex-direction: column; align-items: flex-start; font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
+.move-chip:hover { background: var(--butter); }
+.move-info-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px;
+  font-family: 'Press Start 2P', monospace; font-size: 9px; background: var(--sky); border: 2px solid var(--line); cursor: pointer; vertical-align: middle;
+}
+.move-info-btn:hover { background: var(--butter); }
+.cat-badge { font-size: 13px; font-weight: 600; padding: 0 6px; border: 2px solid var(--line); }
+.cat-Physical { background: var(--peach); } .cat-Special { background: var(--lilac); } .cat-Status { background: var(--panel-2); }
+.move-info-desc { font-size: 17px; font-weight: 600; margin: 10px 0; }
+table.move-info { margin: 0 auto 10px; border-collapse: collapse; text-align: left; }
+table.move-info th { padding: 3px 12px 3px 0; color: var(--ink-soft); font-weight: 600; }
+table.move-info td { padding: 3px 0; }
+.move-effects { text-align: left; display: inline-block; margin: 0; }
+.calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+.calc-box { border: var(--px) solid var(--line); padding: 8px 10px; background: var(--panel); }
+.calc-box.good { background: #eafbef; }
+.calc-box.bad { background: #fff0f0; }
+.calc-box h3 { margin: 0 0 6px; }
+.calc-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; font-size: 14px; }
+.calc-row > span:first-child { font-weight: 600; margin-right: 4px; }
+.calc-row.best { background: var(--butter); padding: 2px 4px; }
 
 @media (max-width: 600px) {
   body { font-size: 16px; }
@@ -397,7 +433,7 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
   .arena { aspect-ratio: 4 / 3; }
   .info-box { width: 50%; padding: 3px 6px; }
   .info-name { font-size: 14px; }
-  .info-hint, .weak-line { display: none; }
+  .weak-pop { width: max(100%, 220px); max-height: 180px; }
   .move-grid { grid-template-columns: 1fr 1fr; }
   .move-name { font-size: 15px; }
   .moves-list { grid-template-columns: 1fr; }

@@ -9,7 +9,7 @@ import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
 import {playCoins, playItem} from '../audio';
-import {HpBar, ItemIcon, MatchupPanel, Modal, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
+import {HpBar, ItemIcon, MatchupPanel, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
 /** Lista de Pokémon para escolher em quem usar um item. */
@@ -412,6 +412,7 @@ function MonRow({mon, lead, selected, onClick}: {mon: OwnedMon; lead: boolean; s
 }
 
 export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactNode}) {
+  const [info, setInfo] = useState<string | null>(null);
   const s = species(mon.species);
   const next = expForLevel(mon.level + 1);
   const cur = expForLevel(mon.level);
@@ -438,16 +439,19 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
         {mon.moves.map(m => {
           const mv = dex.moves.get(m);
           return (
-            <div key={m} className="move-chip">
+            <button key={m} className="move-chip" onClick={() => setInfo(m)} title="Ver detalhes do golpe">
               <span className="row">
                 <TypeBadge type={mv.type} small /> {mv.name}
+                <span className="muted"> · {mv.category === 'Physical' ? 'Físico' : mv.category === 'Special' ? 'Especial' : 'Status'}</span>
                 {mv.basePower > 0 && <span className="muted"> · Poder {mv.basePower}</span>}
+                <span className="move-info-btn">?</span>
               </span>
               <span className="move-desc">{moveDescPt(m)}</span>
-            </div>
+            </button>
           );
         })}
       </div>
+      {info && <MoveInfo move={info} onClose={() => setInfo(null)} />}
       <div className="row wrap top">
         <StatsTable mon={mon} />
         <MatchupPanel types={s.types} title="Fraquezas e resistências" />
@@ -458,6 +462,7 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
 
 export function PendingModal() {
   const {run, resolvePending} = useGame();
+  const [info, setInfo] = useState<string | null>(null);
   const ev = run?.pending[0];
   const mon = ev && (run.party.find(m => m.uid === ev.uid) ?? run.box.find(m => m.uid === ev.uid));
   useEffect(() => {
@@ -493,9 +498,13 @@ export function PendingModal() {
       <h2>
         {mon.species} quer aprender {newMove.name}!
       </h2>
-      <div className="move-chip big">
-        <TypeBadge type={newMove.type} /> {newMove.name} · {newMove.basePower || '—'} poder · {newMove.category}
-      </div>
+      <button className="move-chip big" onClick={() => setInfo(newMove.name)}>
+        <span className="row">
+          <TypeBadge type={newMove.type} /> {newMove.name} · Poder {newMove.basePower || '—'} ·{' '}
+          {newMove.category === 'Physical' ? 'Físico' : newMove.category === 'Special' ? 'Especial' : 'Status'}
+          <span className="move-info-btn">?</span>
+        </span>
+      </button>
       <p className="muted">{moveDescPt(newMove.name)}</p>
       <p>Qual golpe esquecer?</p>
       <div className="list-actions">
@@ -511,6 +520,7 @@ export function PendingModal() {
           Não aprender
         </button>
       </div>
+      {info && <MoveInfo move={info} onClose={() => setInfo(null)} />}
     </Modal>
   );
 }

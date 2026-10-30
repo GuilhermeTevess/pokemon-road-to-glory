@@ -75,6 +75,9 @@ interface Store {
   /** Último repetido capturado: IVs antes/depois (teia de IVs). */
   ivGain: {species: string; before: StatTable; after: StatTable} | null;
   clearIvGain(): void;
+  /** Calculadora de tipos aberta (tipos selecionados) ou null. */
+  typeCalc: string[] | null;
+  openTypeCalc(types: string[] | null): void;
   setScreen(s: Screen): void;
   toast(text: string): void;
   newRun(starter: string): void;
@@ -306,6 +309,8 @@ export const useGame = create<Store>((set, get) => {
     toasts: [],
     ivGain: null,
     clearIvGain: () => set({ivGain: null}),
+    typeCalc: null,
+    openTypeCalc: types => set({typeCalc: types}),
 
     setScreen: screen => set({screen}),
 
