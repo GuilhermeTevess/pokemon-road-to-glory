@@ -7,7 +7,7 @@ import {dex, evolutionLine, isLegendary, levelUpMoves, species, teachableMoves, 
 import {zeroStats} from './mon';
 import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
-import type {OwnedMon, StatTable} from './types';
+import type {OwnedMon, StatId, StatTable} from './types';
 
 export interface CollectionEntry {
   /** Quantas vezes foi capturado (0 = só foi usado como inicial). */
@@ -30,6 +30,9 @@ export interface CollectionEntry {
   startMove?: string;
   /** Apelido usado quando a linha começa a run. */
   nickname?: string;
+  /** EVs ganhos e ainda não distribuídos, e os distribuídos (vão para o Pokémon no início). */
+  evBank?: number;
+  evs?: StatTable;
   /** Quantas vezes o custo de time foi reduzido. */
   costCut?: number;
   /** Nível do bônus de shiny (0 a 3). */
@@ -126,6 +129,8 @@ export function entryOf(c: Collection, name: string): Entry {
   e.natures ??= [];
   e.abilities ??= [];
   e.moves ??= [];
+  e.evBank ??= 0;
+  e.evs ??= zeroStats();
   e.costCut ??= 0;
   e.shinyLv ??= 0;
   return e as Entry;
@@ -231,9 +236,9 @@ export function addHeartPts(c: Collection, name: string, n: number): number {
 /** Buffs de amizade, do 1º ao 5º coração. */
 export const HEART_PERKS = [
   '+5% de EXP',
-  'Às vezes se cura de um status sozinho no fim do turno',
-  'Às vezes aguenta com 1 HP um golpe que derrubaria',
-  'Mais chance de acerto crítico',
+  'Parceiro: às vezes se cura de um status sozinho no fim do turno',
+  'Parceiro: às vezes aguenta com 1 HP um golpe que derrubaria',
+  'Parceiro: mais chance de acerto crítico',
   '+10% de EXP e enfeite de favorito',
 ];
 
@@ -309,6 +314,7 @@ export function applyEntry(c: Collection, mon: OwnedMon): void {
   const e = c.entries[lineRoot(mon.species)];
   if (!e) return;
   if (e.nickname) mon.nickname = e.nickname;
+  if (e.evs) mon.evs = {...e.evs};
   if (e.nature && e.natures?.includes(e.nature)) mon.nature = e.nature;
   const s = species(mon.species);
   if (e.ability && e.abilities?.includes(e.ability) && Object.values(s.abilities).includes(e.ability)) mon.ability = e.ability;
@@ -316,4 +322,110 @@ export function applyEntry(c: Collection, mon: OwnedMon): void {
     if (mon.moves.length < 4) mon.moves.push(e.startMove);
     else mon.moves[0] = e.startMove;
   }
+}
+
+// ---------------------------------------------------------------- EVs
+
+export const EV_MAX_STAT = 252;
+export const EV_MAX_TOTAL = 510;
+/** Multiplicador sobre o EV "de verdade" (1 a 3 por derrota), para não virar grind. */
+export const EV_MULT = 4;
+export const EV_RESET_PRICE = 5;
+
+export const EV_PRESETS: {name: string; desc: string; evs: Partial<StatTable>}[] = [
+  {name: 'Rápido e forte', desc: '252 Ataque / 252 Velocidade', evs: {atk: 252, spe: 252, hp: 6}},
+  {name: 'Rápido e especial', desc: '252 Atq. Esp. / 252 Velocidade', evs: {spa: 252, spe: 252, hp: 6}},
+  {name: 'Parede física', desc: '252 HP / 252 Defesa', evs: {hp: 252, def: 252, spd: 6}},
+  {name: 'Parede especial', desc: '252 HP / 252 Def. Esp.', evs: {hp: 252, spd: 252, def: 6}},
+  {name: 'Forte e resistente', desc: '252 HP / 252 Ataque', evs: {hp: 252, atk: 252, spe: 6}},
+];
+
+export const evTotal = (t: StatTable) => STAT_IDS.reduce((n, s) => n + t[s], 0);
+
+/** EVs que um Pokémon derrotado dá, no estilo dos jogos: 1 no 1º estágio, 2 no meio, 3 na forma final. */
+export function evYield(name: string): {stat: StatId; amount: number} {
+  const s = species(name);
+  const stat = STAT_IDS.reduce((best, k) => (s.baseStats[k] > s.baseStats[best] ? k : best), 'hp' as StatId);
+  const stage = !s.prevo ? (s.evos.length ? 1 : 3) : s.evos.length ? 2 : 3;
+  return {stat, amount: stage};
+}
+
+/** Põe EVs no banco da linha, sem passar do total que dá para usar. */
+export function bankEvs(c: Collection, name: string, n: number): number {
+  const e = entryOf(c, name);
+  const room = Math.max(0, EV_MAX_TOTAL - evTotal(e.evs) - e.evBank);
+  const add = Math.min(room, n);
+  e.evBank += add;
+  return add;
+}
+
+/** EVs direto num atributo da ficha (vitaminas e itens Power). */
+export function addStatEvs(c: Collection, name: string, stat: StatId, n: number): number {
+  const e = entryOf(c, name);
+  const add = Math.max(0, Math.min(n, EV_MAX_STAT - e.evs[stat], EV_MAX_TOTAL - evTotal(e.evs)));
+  e.evs[stat] += add;
+  // O banco nunca deixa o total passar de 510.
+  e.evBank = Math.min(e.evBank, EV_MAX_TOTAL - evTotal(e.evs));
+  return add;
+}
+
+/** Tira EVs do banco para um atributo. */
+export function allocateEvs(e: Entry, stat: StatId, n: number): void {
+  const add = Math.max(0, Math.min(n, e.evBank, EV_MAX_STAT - e.evs[stat]));
+  e.evs[stat] += add;
+  e.evBank -= add;
+}
+
+/** Devolve todos os EVs distribuídos para o banco. */
+export function resetEvs(e: Entry): void {
+  e.evBank += evTotal(e.evs);
+  e.evs = zeroStats();
+}
+
+// ---------------------------------------------------------------- Tutor
+
+export const TUTOR_PLANS = [
+  {id: 'basic', name: 'Básico', price: 10, chance: 0.35},
+  {id: 'advanced', name: 'Avançado', price: 25, chance: 0.65},
+  {id: 'sure', name: 'Garantido', price: 50, chance: 1},
+] as const;
+export type TutorPlan = (typeof TUTOR_PLANS)[number]['id'];
+/** Habilidade oculta: só no plano garantido, e mais cara. */
+export const HIDDEN_PRICE = 80;
+
+export const ALL_NATURES = dex.natures.all().map(n => n.name);
+
+/** Habilidades da linha (comuns e oculta), pela forma básica. */
+export function lineAbilities(name: string): {name: string; hidden: boolean}[] {
+  const s = species(lineRoot(name));
+  return Object.entries(s.abilities)
+    .filter(([slot]) => slot !== 'S')
+    .map(([slot, a]) => ({name: a as string, hidden: slot === 'H'}));
+}
+
+export function tutorPrice(name: string, kind: 'nature' | 'ability', target: string, plan: TutorPlan): number | null {
+  const p = TUTOR_PLANS.find(x => x.id === plan)!;
+  if (kind === 'ability' && lineAbilities(name).find(a => a.name === target)?.hidden) return plan === 'sure' ? HIDDEN_PRICE : null;
+  return p.price;
+}
+
+/**
+ * Aula do Tutor: tenta a escolhida com a chance do plano. Se não sair, ensina outra
+ * que ainda não foi desbloqueada (nunca repete). Devolve o que foi desbloqueado.
+ */
+export function tutorRoll(c: Collection, name: string, kind: 'nature' | 'ability', target: string, plan: TutorPlan, roll = Math.random()): {got: string; wanted: boolean} | null {
+  const e = entryOf(c, name);
+  const have = kind === 'nature' ? e.natures : e.abilities;
+  const pool = kind === 'nature' ? ALL_NATURES : lineAbilities(name).filter(a => !a.hidden).map(a => a.name);
+  if (have.includes(target)) return null;
+  const price = tutorPrice(name, kind, target, plan);
+  if (price === null || e.candies < price) return null;
+  e.candies -= price;
+  const chance = TUTOR_PLANS.find(p => p.id === plan)!.chance;
+  const others = pool.filter(x => x !== target && !have.includes(x));
+  const got = roll < chance || !others.length ? target : others[Math.floor(Math.random() * others.length)];
+  have.push(got);
+  if (kind === 'nature') e.nature = got;
+  else e.ability = got;
+  return {got, wanted: got === target};
 }

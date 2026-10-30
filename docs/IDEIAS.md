@@ -212,6 +212,11 @@ só quer competir pode focar no Circuito, e quem gosta de aventura faz a Liga.
 ---
 
 ## Já feito das ideias anteriores
+- **Parte B**: Tutor (planos 10/25/50 doces, 35/65/100%, nunca repete; oculta só no
+  Garantido por 80), banco de EVs por linha (vitória = EV do derrotado x4), itens Power
+  (+8 por vitória, sem deixar lento), vitaminas (+10) e sugestões de distribuição.
+- **Parceiro** (um por time, corações em dobro, só ele tem os buffs de batalha dos
+  corações) e **apelidos**. Orçamento inicial do time: 6 pontos.
 - **Parte A** inteira: ficha da coleção com setinhas, doces, corações, golpe inicial,
   custo de time, chance de shiny, nature/habilidade já capturadas para começar.
 - Teia de IVs ao capturar repetido.

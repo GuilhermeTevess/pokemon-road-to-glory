@@ -74,3 +74,37 @@ describe('amizade na batalha', () => {
     expect(endured).toBeLessThan(30);
   });
 });
+
+describe('Parte B', () => {
+  it('Tutor nunca repete e o garantido sempre acerta', async () => {
+    const {tutorRoll} = await import('../src/game/meta');
+    const c = empty();
+    const e = entryOf(c, 'Charmander');
+    e.candies = 1000;
+    e.natures = ['Timid'];
+    const r1 = tutorRoll(c, 'Charmander', 'nature', 'Adamant', 'sure', 0.99);
+    expect(r1).toEqual({got: 'Adamant', wanted: true});
+    const r2 = tutorRoll(c, 'Charmander', 'nature', 'Jolly', 'basic', 0.99);
+    expect(r2?.wanted).toBe(false);
+    expect(['Timid', 'Adamant', 'Jolly']).not.toContain(r2?.got);
+    expect(new Set(e.natures).size).toBe(e.natures.length);
+    expect(tutorRoll(c, 'Charmander', 'ability', 'Solar Power', 'basic')).toBeNull();
+    expect(tutorRoll(c, 'Charmander', 'ability', 'Solar Power', 'sure')?.got).toBe('Solar Power');
+  });
+  it('EVs: banco respeita 510 e 252 por atributo', async () => {
+    const {bankEvs, allocateEvs, addStatEvs, evTotal} = await import('../src/game/meta');
+    const c = empty();
+    expect(bankEvs(c, 'Pidgey', 600)).toBe(510);
+    const e = entryOf(c, 'Pidgey');
+    allocateEvs(e, 'spe', 300);
+    expect(e.evs.spe).toBe(252);
+    allocateEvs(e, 'atk', 300);
+    expect(evTotal(e.evs)).toBe(504);
+    expect(e.evBank).toBe(6);
+    expect(addStatEvs(c, 'Pidgey', 'hp', 10)).toBe(6);
+    expect(e.evBank).toBe(0);
+    const mon = createMon('Pidgey', {level: 5});
+    applyEntry(c, mon);
+    expect(mon.evs.spe).toBe(252);
+  });
+});

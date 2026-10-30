@@ -4,13 +4,13 @@ import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {ALL_TYPES, TYPE_COLORS, dex, species} from '../../data/dex';
 import {
-  COST_CUT_PRICE, HEART_PERKS, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
+  ALL_NATURES, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_PRESETS, EV_RESET_PRICE, HEART_PERKS, TUTOR_PLANS, evTotal, lineAbilities, tutorPrice, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
   baseCost, favoriteOf, heartProgress, heartsOf, lineRoot, lineSpecies, movePrice, peekEntry, startMoveOptions, statsOf, teamCost,
 } from '../../game/meta';
-import type {CollectionEntry} from '../../game/meta';
+import type {CollectionEntry, Entry} from '../../game/meta';
 import {NICK_MAX} from '../../game/mon';
 import {useGame} from '../../game/store';
-import {STAT_LABEL} from '../../game/types';
+import {STAT_IDS, STAT_LABEL} from '../../game/types';
 import type {StatId} from '../../game/types';
 import {IvWeb, Modal, MoveInfo, PixelIcon, Sprite, TypeBadge, TypeFilter, Types} from '../components';
 import {playCry} from '../audio';
@@ -83,6 +83,130 @@ function natureLabel(n: string): string {
   if (!nat.plus || !nat.minus) return `${n} (neutra)`;
   const short = (s: string) => STAT_LABEL[s as StatId].replace('Velocidade', 'Vel.');
   return `${n} (+${short(nat.plus)} −${short(nat.minus)})`;
+}
+
+function TutorBox({root, e}: {root: string; e: Entry}) {
+  const tutor = useGame(g => g.tutor);
+  const [kind, setKind] = useState<'nature' | 'ability'>('nature');
+  const [target, setTarget] = useState<string | null>(null);
+  const [result, setResult] = useState('');
+  const options =
+    kind === 'nature'
+      ? ALL_NATURES.filter(n => !e.natures.includes(n)).map(n => ({name: n, label: natureLabel(n), hidden: false}))
+      : lineAbilities(root)
+          .filter(a => !e.abilities.includes(a.name))
+          .map(a => ({name: a.name, label: a.hidden ? `${a.name} (oculta)` : a.name, hidden: a.hidden}));
+  const chosen = options.find(o => o.name === target);
+  return (
+    <section className="tutor">
+      <h3>Tutor</h3>
+      <p className="hint">
+        Escolha a {kind === 'nature' ? 'nature' : 'habilidade'} que você quer e um plano. Se não sair a escolhida, você ganha outra que
+        ainda não tem: nunca repete.
+      </p>
+      <div className="tabs">
+        <button className={`tab ${kind === 'nature' ? 'active' : ''}`} onClick={() => (setKind('nature'), setTarget(null))}>
+          Nature
+        </button>
+        <button className={`tab ${kind === 'ability' ? 'active' : ''}`} onClick={() => (setKind('ability'), setTarget(null))}>
+          Habilidade
+        </button>
+      </div>
+      {options.length ? (
+        <div className="chips">
+          {options.map(o => (
+            <button
+              key={o.name}
+              className={`chip ${target === o.name ? 'active' : ''}`}
+              onClick={() => setTarget(o.name)}
+              title={kind === 'ability' ? dex.abilities.get(o.name).shortDesc : undefined}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="hint">Você já tem todas!</p>
+      )}
+      {chosen && (
+        <div className="tutor-plans">
+          {TUTOR_PLANS.map(p => {
+            const price = tutorPrice(root, kind, chosen.name, p.id);
+            if (price === null) return null;
+            return (
+              <button
+                key={p.id}
+                className="btn small"
+                disabled={e.candies < price}
+                onClick={() => {
+                  setResult(tutor(root, kind, chosen.name, p.id));
+                  setTarget(null);
+                }}
+              >
+                {p.name} · {Math.round(p.chance * 100)}% · <Candies line={root} n={price} />
+              </button>
+            );
+          })}
+          {chosen.hidden && <span className="hint">Habilidade oculta: só no plano Garantido.</span>}
+        </div>
+      )}
+      {result && <p className="tutor-result">{result}</p>}
+    </section>
+  );
+}
+
+function EvBox({root, e}: {root: string; e: Entry}) {
+  const {allocateEv, resetLineEvs, presetEvs} = useGame();
+  const total = evTotal(e.evs);
+  return (
+    <section className="ev-box">
+      <h3>EVs</h3>
+      <p className="hint">
+        Cada vitória desta linha guarda EVs no banco (vitaminas e itens Power também ajudam). Distribua aqui: até {EV_MAX_STAT} por
+        atributo e {EV_MAX_TOTAL} no total. O Pokémon começa a run já treinado.
+      </p>
+      <div className="ev-bank">
+        Banco: <b>{e.evBank}</b> · Distribuídos: {total}/{EV_MAX_TOTAL}
+      </div>
+      <div className="ev-rows">
+        {STAT_IDS.map(st => (
+          <div key={st} className="ev-row">
+            <span className="ev-label">{STAT_LABEL[st]}</span>
+            <div className="bs-track">
+              <div className={`bs-fill bs-${st}`} style={{width: `${(e.evs[st] / EV_MAX_STAT) * 100}%`}} />
+            </div>
+            <span className="ev-val">{e.evs[st]}</span>
+            <button className="btn small" disabled={!e.evBank || e.evs[st] >= EV_MAX_STAT} onClick={() => allocateEv(root, st, 4)}>
+              +4
+            </button>
+            <button className="btn small" disabled={!e.evBank || e.evs[st] >= EV_MAX_STAT} onClick={() => allocateEv(root, st, EV_MAX_STAT)}>
+              Máx
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="chips">
+        {EV_PRESETS.map((p, i) => (
+          <button
+            key={p.name}
+            className="chip"
+            title={p.desc}
+            disabled={total > 0 ? e.candies < EV_RESET_PRICE : !e.evBank}
+            onClick={() => presetEvs(root, i)}
+          >
+            {p.name}
+            <small className="species-sub">{p.desc}</small>
+          </button>
+        ))}
+      </div>
+      <div className="row center">
+        <button className="btn small" disabled={!total || e.candies < EV_RESET_PRICE} onClick={() => resetLineEvs(root)}>
+          Redistribuir (volta tudo pro banco) · <Candies line={root} n={EV_RESET_PRICE} />
+        </button>
+      </div>
+      {total > 0 && <p className="hint">Usar uma sugestão quando já tem EVs distribuídos também custa {EV_RESET_PRICE} doces.</p>}
+    </section>
+  );
 }
 
 /** Ficha da linha evolutiva. */
@@ -183,6 +307,8 @@ export function LineSheet({line, onClose}: {line: string; onClose: () => void}) 
               <p className="hint">Habilidades vistas em capturas ficam liberadas aqui.</p>
             )}
           </section>
+          <TutorBox root={root} e={e} />
+          <EvBox root={root} e={e} />
           <section>
             <h3>Golpe inicial</h3>
             <p className="hint">Libere com doces um golpe que {species(root).name} aprende. Ele começa a run já sabendo.</p>
