@@ -1,0 +1,76 @@
+// Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
+
+export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+export type StatTable = Record<StatId, number>;
+
+export const STAT_IDS: StatId[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+export const STAT_LABEL: Record<StatId, string> = {hp: 'HP', atk: 'Ataque', def: 'Defesa', spa: 'At. Esp.', spd: 'Def. Esp.', spe: 'Velocidade'};
+
+export interface OwnedMon {
+  uid: string;
+  species: string;
+  level: number;
+  /** Experiência total acumulada (curva "médio-rápida": nível³). */
+  exp: number;
+  moves: string[];
+  ability: string;
+  nature: string;
+  gender: 'M' | 'F' | 'N';
+  shiny: boolean;
+  ivs: StatTable;
+  /** EVs: na etapa 2 o jogador vai poder distribuir antes da run. */
+  evs: StatTable;
+  /** Id do item de segurar (ver data/items.ts). */
+  item?: string;
+  /** HP atual (absoluto). 0 = desmaiado. */
+  hp: number;
+  /** Onde foi capturado (para estatísticas e para a etapa 2). */
+  metWave?: number;
+  metBiome?: string;
+}
+
+export type Phase =
+  | 'starter'
+  | 'biome'
+  | 'battle'
+  | 'postBattle'
+  | 'reward'
+  | 'biomeChoice'
+  | 'gameOver'
+  | 'stageClear';
+
+/** Encontro da ronda atual. */
+export interface Encounter {
+  mon: OwnedMon;
+  rarity: string;
+  boss: boolean;
+}
+
+/** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
+export type PendingEvent =
+  | {kind: 'learnMove'; uid: string; move: string}
+  | {kind: 'evolve'; uid: string; into: string[]};
+
+export interface RunState {
+  version: 1;
+  id: string;
+  startedAt: number;
+  wave: number;
+  biome: string;
+  phase: Phase;
+  party: OwnedMon[];
+  /** Pokémon capturados com o time cheio. */
+  box: OwnedMon[];
+  bag: Record<string, number>;
+  money: number;
+  /** Trocar de bioma está liberado após a próxima vitória (Mapa). */
+  mapReady: boolean;
+  incenseWaves: number;
+  encounter?: Encounter;
+  pending: PendingEvent[];
+  /** Opções de recompensa da ronda (ids de itens). */
+  rewardOptions: string[];
+  rerolls: number;
+  log: string[];
+  stats: {defeated: number; caught: number; fled: number};
+}
