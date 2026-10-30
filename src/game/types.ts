@@ -40,6 +40,7 @@ export type Phase =
   | 'postBattle'
   | 'reward'
   | 'biomeChoice'
+  | 'event'
   | 'gameOver'
   | 'stageClear';
 
@@ -48,7 +49,18 @@ export interface Encounter {
   mon: OwnedMon;
   rarity: string;
   boss: boolean;
+  /** Nome do treinador rival (batalha de evento: não dá para capturar nem fugir). */
+  trainer?: string;
 }
+
+/** Evento entre rondas (ver game/events.ts). */
+export type RunEvent =
+  | {kind: 'house'; mon: OwnedMon}
+  | {kind: 'hurt'; mon: OwnedMon}
+  | {kind: 'berries'; options: string[]}
+  | {kind: 'merchant'; give: string; get: string}
+  | {kind: 'rival'; name: string}
+  | {kind: 'seer'; upcoming: Encounter[]};
 
 /** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
 export type PendingEvent =
@@ -75,6 +87,11 @@ export interface RunState {
   /** Opções de recompensa da ronda (ids de itens). */
   rewardOptions: string[];
   rerolls: number;
+  /** Evento atual (fase 'event'). */
+  event?: RunEvent;
+  lastEventWave?: number;
+  /** Selvagens já sorteados (a Vidente mostrou). */
+  upcoming?: Encounter[];
   log: string[];
   stats: {defeated: number; caught: number; fled: number};
 }

@@ -7,7 +7,7 @@ import {BattleController} from './battle';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
-  addStatEvs, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
+  HEART_STEPS, addStatEvs, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
   registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
@@ -15,6 +15,7 @@ import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
+import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
@@ -103,6 +104,8 @@ interface Store {
   buyCostCut(line: string): void;
   buyShiny(line: string): void;
   setFavorite(line: string | null): void;
+  /** Resolve o evento atual (a escolha depende do tipo do evento). */
+  resolveEvent(choice: string | null): void;
   /** Aula do Tutor; devolve a mensagem do resultado. */
   tutor(line: string, kind: 'nature' | 'ability', target: string, plan: TutorPlan): string;
   allocateEv(line: string, stat: StatId, n: number): void;
@@ -180,7 +183,9 @@ export const useGame = create<Store>((set, get) => {
 
   const startWave = (run: RunState) => {
     run.wave++;
-    run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0);
+    run.event = undefined;
+    run.encounter = run.upcoming?.shift() ?? generateEncounter(run.wave, run.biome, run.incenseWaves > 0);
+    if (!run.upcoming?.length) run.upcoming = undefined;
     if (run.incenseWaves > 0) run.incenseWaves--;
     run.phase = 'battle';
     run.rerolls = 0;
@@ -202,7 +207,12 @@ export const useGame = create<Store>((set, get) => {
       run.log.push('Centro Pokémon: seu time foi curado!');
     }
     if (run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady) run.phase = 'biomeChoice';
-    else startWave(run);
+    else if (shouldRollEvent(run)) {
+      run.event = rollEvent(run);
+      run.lastEventWave = run.wave;
+      if (run.event.kind === 'seer') run.upcoming = run.event.upcoming;
+      run.phase = 'event';
+    } else startWave(run);
   };
 
   const endRun = (run: RunState, col: Collection, result: 'lost' | 'stageClear' | 'abandoned') => {
@@ -490,6 +500,75 @@ export const useGame = create<Store>((set, get) => {
         for (const [k, v] of Object.entries(p.evs)) allocateEvs(e, k as StatId, v);
       });
     },
+    resolveEvent(choice) {
+      let message = '';
+      mutate((run, col) => {
+        const ev = run.event;
+        if (run.phase !== 'event' || !ev) return;
+        const join = (mon: OwnedMon, hearts: number) => {
+          mon.uid = uid();
+          mon.metWave = run.wave;
+          mon.metBiome = run.biome;
+          run.stats.caught++;
+          const reg = registerCatch(col, mon);
+          addHeartPts(col, mon.species, hearts);
+          if (run.party.length < PARTY_SIZE) run.party.push(mon);
+          else run.box.push(mon);
+          message = `${species(mon.species).name} entrou no seu time! (+${reg.candies} doces)`;
+        };
+        switch (ev.kind) {
+          case 'house':
+            if (choice === 'care') {
+              ev.mon.hp = maxHp(ev.mon);
+              join(ev.mon, HEART_STEPS[1]);
+            } else {
+              const gift = rollRewards(run.wave, 1).find(id => getItem(id).kind !== 'money') ?? 'potion';
+              run.bag[gift] = (run.bag[gift] ?? 0) + 1;
+              message = `${species(ev.mon.species).name} deixou um presente: ${getItem(gift).name}.`;
+            }
+            break;
+          case 'hurt':
+            if (choice === 'heal') {
+              const heal = cheapestHeal(run);
+              if (!heal) return;
+              run.bag[heal]--;
+              if (!run.bag[heal]) delete run.bag[heal];
+              ev.mon.hp = maxHp(ev.mon);
+              join(ev.mon, HEART_STEPS[0]);
+            }
+            break;
+          case 'berries':
+            if (choice && ev.options.includes(choice)) {
+              run.bag[choice] = (run.bag[choice] ?? 0) + 1;
+              message = `Você pegou ${getItem(choice).name}.`;
+            }
+            break;
+          case 'merchant':
+            if (choice === 'trade' && run.bag[ev.give]) {
+              run.bag[ev.give]--;
+              if (!run.bag[ev.give]) delete run.bag[ev.give];
+              run.bag[ev.get] = (run.bag[ev.get] ?? 0) + 1;
+              message = `Troca feita: você ganhou ${getItem(ev.get).name}!`;
+            }
+            break;
+          case 'rival':
+            if (choice === 'fight') {
+              run.encounter = rivalEncounter(run, ev.name);
+              run.event = undefined;
+              run.phase = 'battle';
+              battle = null;
+              return;
+            }
+            break;
+          case 'seer':
+            break;
+        }
+        run.event = undefined;
+        startWave(run);
+      });
+      if (message) get().toast(message);
+    },
+
     setFavorite(line) {
       editCollection(col => {
         col.favorite = line ?? undefined;
@@ -548,13 +627,14 @@ export const useGame = create<Store>((set, get) => {
         if (outcome === 'won') {
           run.stats.defeated++;
           statsOf(col).defeated++;
-          const exp = expYield(enc.mon, enc.boss);
+          const exp = expYield(enc.mon, enc.boss || !!enc.trainer);
           for (const m of run.party) {
             if (m.hp <= 0) continue;
             const fought = ctl?.participants.has(m.uid);
             if (fought) {
-              candy(m.species, enc.boss ? CANDY.boss : CANDY.defeat);
-              bankEvs(col, m.species, evYield(enc.mon.species).amount * EV_MULT * (enc.boss ? 2 : 1));
+              const big = enc.boss || !!enc.trainer;
+              candy(m.species, big ? CANDY.boss : CANDY.defeat);
+              bankEvs(col, m.species, evYield(enc.mon.species).amount * EV_MULT * (big ? 2 : 1));
             }
             const power = m.item ? getItem(m.item).evStat : undefined;
             if (power) {
@@ -590,7 +670,7 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
           }
         }
-        const money = moneyReward(run.wave, enc.boss);
+        const money = moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
         statsOf(col).moneyEarned += money;
         if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
@@ -668,7 +748,10 @@ export const useGame = create<Store>((set, get) => {
 
     chooseNextBiome(id) {
       mutate(run => {
-        if (id) run.biome = id;
+        if (id && id !== run.biome) {
+          run.biome = id;
+          run.upcoming = undefined;
+        }
         run.mapReady = false;
         startWave(run);
       });

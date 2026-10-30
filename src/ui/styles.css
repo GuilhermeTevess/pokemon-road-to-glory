@@ -522,3 +522,19 @@ table.move-info td { padding: 3px 0; }
 .ev-val { text-align: right; font-weight: 600; }
 .chip .species-sub { display: block; }
 .chip:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Eventos entre rondas */
+.event-screen { display: flex; justify-content: center; }
+.event-card { max-width: 560px; width: 100%; padding: 16px; text-align: center; position: relative; display: flex; flex-direction: column; gap: 8px; }
+.event-tag { position: absolute; top: -12px; left: 12px; background: var(--lilac); border: var(--px) solid var(--line); padding: 0 8px; font-weight: 700; font-size: 14px; }
+.event-art { min-height: 110px; display: flex; align-items: center; justify-content: center; }
+.event-art .sprite { max-height: 120px; }
+.event-art .hurt { filter: grayscale(.6) brightness(.9); transform: rotate(-12deg); }
+.event-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.event-item { display: flex; gap: 10px; align-items: center; text-align: left; }
+.event-item small { display: block; color: var(--ink-soft); }
+.trade-arrow { font-size: 28px; margin: 0 10px; }
+.seer-ball { font-size: 64px; }
+.seer-list { display: flex; flex-direction: column; gap: 4px; }
+.seer-row { display: flex; justify-content: space-between; align-items: center; background: var(--panel-2); padding: 4px 8px; }
+.partner-corner .hearts { margin-left: 4px; }
