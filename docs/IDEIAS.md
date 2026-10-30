@@ -212,9 +212,9 @@ só quer competir pode focar no Circuito, e quem gosta de aventura faz a Liga.
 ---
 
 ## Já feito das ideias anteriores
-- **Parte C, eventos**: 20% de chance entre rondas (não antes de chefe). Casa
+- **Parte C, eventos**: 10% de chance entre rondas (não antes de chefe). Casa
   abandonada, árvore de frutas, comerciante, Pokémon machucado, rival e vidente
-  (`src/game/events.ts`). Faltam breeding/ovos e megas.
+  (`src/game/events.ts`). Megas feitas (Mega Pedra genérica vira a pedra certa; mega automática no 1º golpe). Falta breeding/ovos.
 - **Parte B**: Tutor (planos 10/25/50 doces, 35/65/100%, nunca repete; oculta só no
   Garantido por 80), banco de EVs por linha (vitória = EV do derrotado x4), itens Power
   (+8 por vitória, sem deixar lento), vitaminas (+10) e sugestões de distribuição.

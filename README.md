@@ -64,6 +64,8 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Parceiro** (um por time) e **apelidos**.
 - **Eventos entre rondas** (às vezes, sem gastar ronda): casa abandonada, árvore de
   frutas, comerciante misterioso, Pokémon machucado, treinador rival e vidente.
+- **Mega evolução**: a Mega Pedra (rara, a partir da ronda 20, ou bem cara na loja) vira
+  a pedra do Pokémon escolhido, que mega-evolui sozinho no início da batalha. 1 por time.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).

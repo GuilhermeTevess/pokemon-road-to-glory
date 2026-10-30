@@ -30,3 +30,18 @@ describe('eventos', () => {
     expect(enc.boss).toBe(false);
   });
 });
+
+describe('mega', () => {
+  it('Charizard com Charizardite mega-evolui sozinho', async () => {
+    const {BattleController} = await import('../src/game/battle');
+    const {megaStonesFor} = await import('../src/data/items');
+    expect(megaStonesFor('Charizard').map(i => i.id).sort()).toEqual(['charizarditex', 'charizarditey']);
+    const me = createMon('Charizard', {level: 50});
+    me.item = 'charizarditey';
+    const wild = createMon('Pidgey', {level: 5});
+    const ctl = new BattleController([me], {mon: wild, rarity: 'common', boss: false});
+    ctl.initialEvents();
+    const evs = ctl.chooseMove(1);
+    expect(evs.some(e => e.forme?.species === 'Charizard-Mega-Y')).toBe(true);
+  });
+});
