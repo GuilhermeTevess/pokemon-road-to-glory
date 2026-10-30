@@ -174,7 +174,7 @@ function MonRow({mon, lead, selected, onClick}: {mon: OwnedMon; lead: boolean; s
   const max = calcStats(mon).hp;
   return (
     <button className={`mon-row ${selected ? 'selected' : ''} ${mon.hp <= 0 ? 'fainted' : ''}`} onClick={onClick}>
-      <Sprite name={mon.species} still shiny={mon.shiny} size={48} />
+      <Sprite name={mon.species} shiny={mon.shiny} size={56} />
       <span className="mon-row-info">
         <span>
           {lead && <PixelIcon name="star" color="#e0a100" />} 
