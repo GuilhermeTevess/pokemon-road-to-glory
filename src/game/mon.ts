@@ -73,6 +73,18 @@ export function calcStats(mon: OwnedMon): StatTable {
   return out;
 }
 
+/** Nome para mostrar: o apelido, se tiver. */
+export function displayName(mon: {species: string; nickname?: string}): string {
+  return mon.nickname || species(mon.species).name;
+}
+
+export const NICK_MAX = 12;
+
+export function cleanNickname(name: string): string | undefined {
+  const n = name.replace(/[|,\n]/g, '').trim().slice(0, NICK_MAX);
+  return n || undefined;
+}
+
 export function maxHp(mon: OwnedMon): number {
   return calcStats(mon).hp;
 }
@@ -84,7 +96,7 @@ export function isFainted(mon: OwnedMon): boolean {
 /** Converte para o formato de time do Showdown. */
 export function toSet(mon: OwnedMon): PokemonSet {
   return {
-    name: mon.species,
+    name: mon.nickname || mon.species,
     species: mon.species,
     item: mon.item ? getItem(mon.item).showdown ?? '' : '',
     ability: mon.ability,

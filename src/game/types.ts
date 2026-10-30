@@ -20,6 +20,10 @@ export interface OwnedMon {
   ivs: StatTable;
   /** EVs: na etapa 2 o jogador vai poder distribuir antes da run. */
   evs: StatTable;
+  /** Apelido dado pelo jogador (até 12 letras). */
+  nickname?: string;
+  /** Parceiro do treinador nesta run (só um por time): corações em dobro. */
+  partner?: boolean;
   /** Id do item de segurar (ver data/items.ts). */
   item?: string;
   /** HP atual (absoluto). 0 = desmaiado. */

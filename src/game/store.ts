@@ -11,7 +11,7 @@ import {
   registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
 import type {Collection} from './meta';
-import {createMon, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
+import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
@@ -88,7 +88,10 @@ interface Store {
   setScreen(s: Screen): void;
   toast(text: string): void;
   /** Começa a run com o time escolhido (o primeiro é quem abre). */
-  newRun(team: string[]): void;
+  newRun(team: string[], partner?: string): void;
+  /** Apelido de um Pokémon da run (também vira o apelido da linha na coleção). */
+  renameMon(monUid: string, name: string): void;
+  setNickname(line: string, name: string): void;
   /** Ações da ficha da coleção (gastam doces). */
   unlockMove(line: string, move: string): void;
   equipMove(line: string, move: string | null): void;
@@ -200,7 +203,7 @@ export const useGame = create<Store>((set, get) => {
     st.bestWave = Math.max(st.bestWave, run.wave);
     if (result === 'stageClear') {
       st.stageClears++;
-      for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear);
+      for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
     }
     col.runs.unshift({
       endedAt: Date.now(),
@@ -351,7 +354,7 @@ export const useGame = create<Store>((set, get) => {
       setTimeout(() => set({toasts: get().toasts.filter(x => x.id !== t.id)}), 3500);
     },
 
-    newRun(team) {
+    newRun(team, partner) {
       const col = structuredClone(get().collection);
       const picked = team.slice(0, PARTY_SIZE);
       if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > TEAM_BUDGET) return;
@@ -366,6 +369,10 @@ export const useGame = create<Store>((set, get) => {
         });
         applyEntry(col, mon);
         mon.metWave = 0;
+        if (name === (partner ?? picked[0])) {
+          mon.partner = true;
+          col.favorite = lineRoot(name);
+        }
         // Garante a ficha da linha para ela ganhar doces e corações nesta run.
         entryOf(col, name);
         return mon;
@@ -375,6 +382,20 @@ export const useGame = create<Store>((set, get) => {
       saveRun(tid(), run);
       saveCollection(tid(), col);
       set({run, collection: col, screen: 'run'});
+    },
+
+    renameMon(monUid, name) {
+      mutate((run, col) => {
+        const mon = findMon(run, monUid);
+        if (!mon) return;
+        mon.nickname = cleanNickname(name);
+        entryOf(col, mon.species).nickname = mon.nickname;
+      });
+    },
+    setNickname(line, name) {
+      editCollection(col => {
+        entryOf(col, line).nickname = cleanNickname(name);
+      });
     },
 
     unlockMove(line, move) {
@@ -469,8 +490,8 @@ export const useGame = create<Store>((set, get) => {
         const newHearts: string[] = [];
         for (const m of run.party) {
           if (m.hp <= 0) continue;
-          const pts = ctl?.participants.has(m.uid) ? HEART_PTS.win : HEART_PTS.inParty;
-          if (addHeartPts(col, m.species, pts) > 0) newHearts.push(m.species);
+          const pts = (ctl?.participants.has(m.uid) ? HEART_PTS.win : HEART_PTS.inParty) * (m.partner ? 2 : 1);
+          if (addHeartPts(col, m.species, pts) > 0) newHearts.push(displayName(m));
         }
         if (outcome === 'won') {
           run.stats.defeated++;

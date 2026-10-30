@@ -27,6 +27,28 @@ export function Sprite(props: {name: string; back?: boolean; shiny?: boolean; st
   );
 }
 
+/** Nome do Pokémon: apelido grande com a espécie pequena embaixo; coração no parceiro. */
+export function MonName({mon}: {mon: {species: string; nickname?: string; partner?: boolean}}) {
+  const sp = species(mon.species).name;
+  return (
+    <span className="mon-name">
+      {mon.partner && (
+        <span className="partner-mark" title="Parceiro">
+          <PixelIcon name="heart" size={12} color="var(--pink-d)" />
+        </span>
+      )}
+      {mon.nickname ? (
+        <span className="nick">
+          {mon.nickname}
+          <small className="species-sub">{sp}</small>
+        </span>
+      ) : (
+        sp
+      )}
+    </span>
+  );
+}
+
 export function ItemIcon({id, size = 28}: {id: string; size?: number}) {
   const item = getItem(id);
   return <img className="item-icon" src={itemSpriteUrl(item.sprite)} alt={item.name} width={size} height={size} />;

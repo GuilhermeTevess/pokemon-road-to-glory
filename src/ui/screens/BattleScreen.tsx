@@ -10,6 +10,7 @@ import {
   HpBar,
   ItemIcon,
   MatchupPanel,
+  MonName,
   MoveInfo,
   PixelIcon,
   RarityBadge,
@@ -21,6 +22,9 @@ import {
 } from '../components';
 import {playBall, playCry, playHit, playJingle, playMove, playShake} from '../audio';
 import {FX, playMoveFx, throwBallFx} from '../fx';
+import {lineRoot} from '../../game/meta';
+import type {OwnedMon} from '../../game/types';
+import {Hearts} from './CollectionScreen';
 import {itemSpriteUrl} from '../../data/dex';
 
 interface SideView {
@@ -30,6 +34,8 @@ interface SideView {
   maxhp: number;
   status?: string;
   shiny: boolean;
+  nickname?: string;
+  partner?: boolean;
   anim?: string;
 }
 
@@ -58,6 +64,8 @@ export function BattleScreen() {
 
   const biome = getBiome(run.biome);
   const enc = run.encounter!;
+  const collection = useGame(s => s.collection);
+  const partner = run.party.find(m => m.partner);
 
   const lookupPlayer = useCallback(
     (uid?: string) => run.party.find(m => m.uid === uid) ?? run.party.find(m => m.uid === ctl?.activeUid()),
@@ -72,7 +80,10 @@ export function BattleScreen() {
           const s = ev.switchIn;
           if (s.side === 'p1') {
             const mon = lookupPlayer(s.uid);
-            setPlayer({species: s.species, level: mon?.level ?? 1, hp: s.hp, maxhp: s.maxhp, shiny: !!mon?.shiny, anim: 'enter'});
+            setPlayer({
+              species: mon?.species ?? s.species, nickname: mon?.nickname, partner: mon?.partner,
+              level: mon?.level ?? 1, hp: s.hp, maxhp: s.maxhp, shiny: !!mon?.shiny, anim: 'enter',
+            });
           } else {
             setWild({species: s.species, level: enc.mon.level, hp: s.hp, maxhp: s.maxhp, shiny: enc.mon.shiny, anim: 'enter'});
           }
@@ -209,6 +220,15 @@ export function BattleScreen() {
         </span>
         <span>₽ {run.money}</span>
       </div>
+      {partner && (
+        <div className="partner-corner" title="Seu parceiro nesta run">
+          <Sprite name={partner.species} shiny={partner.shiny} size={36} still />
+          <span>
+            <MonName mon={partner} />
+            <Hearts entry={collection.entries[lineRoot(partner.species)]} small />
+          </span>
+        </div>
+      )}
       <div className="arena" ref={arenaRef} style={{backgroundColor: biome.color}}>
         <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         <div className="fx-layer" ref={fxRef} />
@@ -262,7 +282,7 @@ export function BattleScreen() {
               )}
               <div className="info-name">
                 {player.shiny && <PixelIcon name="star" color="#e0a100" />}
-                {species(player.species).name} <span className="lv">Nv. {player.level}</span>
+                <MonName mon={player} /> <span className="lv">Nv. {player.level}</span>
               </div>
               <div className="row">
                 <Types name={player.species} />
@@ -397,7 +417,7 @@ export function BattleScreen() {
               </button>
             </div>
           ) : menu === 'switch' ? (
-            <SwitchMenu ctl={ctl} onPick={uid => act(() => ctl.chooseSwitch(uid))} onBack={ctl.mustSwitch ? undefined : () => setMenu('main')} />
+            <SwitchMenu ctl={ctl} party={run.party} onPick={uid => act(() => ctl.chooseSwitch(uid))} onBack={ctl.mustSwitch ? undefined : () => setMenu('main')} />
           ) : null}
         </div>
       </div>
@@ -405,7 +425,7 @@ export function BattleScreen() {
   );
 }
 
-function SwitchMenu({ctl, onPick, onBack}: {ctl: BattleController; onPick: (uid: string) => void; onBack?: () => void}) {
+function SwitchMenu({ctl, party: owned, onPick, onBack}: {ctl: BattleController; party: OwnedMon[]; onPick: (uid: string) => void; onBack?: () => void}) {
   const party = ctl.partyStatus();
   const wildTypes = ctl.wildActive.getTypes();
   return (
@@ -419,7 +439,7 @@ function SwitchMenu({ctl, onPick, onBack}: {ctl: BattleController; onPick: (uid:
             <Sprite name={p.species} size={56} />
             <span className="switch-info">
               <span>
-                {s.name} Nv.{p.level} <StatusBadge status={p.status} />
+                <MonName mon={owned.find(m => m.uid === p.uid) ?? p} /> Nv.{p.level} <StatusBadge status={p.status} />
               </span>
               <Types name={p.species} />
               <HpBar hp={p.hp} maxhp={p.maxhp} showNumbers />

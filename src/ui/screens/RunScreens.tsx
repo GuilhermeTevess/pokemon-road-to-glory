@@ -4,12 +4,12 @@ import {moveDescPt} from '../../data/movesPt';
 import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
-import {calcStats, expForLevel, itemEvolutions} from '../../game/mon';
+import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
 import {playCoins, playItem} from '../audio';
-import {HpBar, ItemIcon, MatchupPanel, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
+import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
 /** Lista de Pokémon para escolher em quem usar um item. */
@@ -58,7 +58,7 @@ function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: O
             <Sprite name={m.species} shiny={m.shiny} size={48} />
             <span className="left">
               <span>
-                {m.species} Nv.{m.level}
+                <MonName mon={m} /> Nv.{m.level}
               </span>
               <span className="muted">{note(m)}</span>
             </span>
@@ -368,7 +368,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
             <Sprite name={m.species} shiny={m.shiny} size={40} still />
             <span className="sb-mon-info">
               <span className="sb-mon-name">
-                {i === 0 && <PixelIcon name="star" color="#e0a100" size={10} />} {m.species} <span className="muted">Nv.{m.level}</span>
+                {i === 0 && <PixelIcon name="star" color="#e0a100" size={10} />} <MonName mon={m} /> <span className="muted">Nv.{m.level}</span>
                 {m.item && <ItemIcon id={m.item} size={18} />}
               </span>
               <HpBar hp={m.hp} maxhp={calcStats(m).hp} />
@@ -403,7 +403,7 @@ function MonRow({mon, lead, selected, onClick}: {mon: OwnedMon; lead: boolean; s
       <span className="mon-row-info">
         <span>
           {lead && <PixelIcon name="star" color="#e0a100" />} 
-          {mon.species} Nv.{mon.level} {mon.item && <ItemIcon id={mon.item} size={18} />}
+          <MonName mon={mon} /> Nv.{mon.level} {mon.item && <ItemIcon id={mon.item} size={18} />}
         </span>
         <HpBar hp={mon.hp} maxhp={max} showNumbers />
       </span>
@@ -413,6 +413,8 @@ function MonRow({mon, lead, selected, onClick}: {mon: OwnedMon; lead: boolean; s
 
 export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactNode}) {
   const [info, setInfo] = useState<string | null>(null);
+  const [rename, setRename] = useState<string | null>(null);
+  const renameMon = useGame(g => g.renameMon);
   const s = species(mon.species);
   const next = expForLevel(mon.level + 1);
   const cur = expForLevel(mon.level);
@@ -423,8 +425,27 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
         <div>
           <h3>
             {mon.shiny && <span className="shiny"><PixelIcon name="star" color="#e0a100" /> </span>}
-            {s.name} <span className="lv">Nv. {mon.level}</span>
+            <MonName mon={mon} /> <span className="lv">Nv. {mon.level}</span>
           </h3>
+          {rename !== null ? (
+            <form
+              className="rename"
+              onSubmit={e => {
+                e.preventDefault();
+                renameMon(mon.uid, rename);
+                setRename(null);
+              }}
+            >
+              <input value={rename} maxLength={NICK_MAX} onChange={e => setRename(e.target.value)} placeholder={s.name} autoFocus />
+              <button className="btn small" type="submit">
+                Salvar
+              </button>
+            </form>
+          ) : (
+            <button className="btn small ghost" onClick={() => setRename(mon.nickname ?? '')}>
+              ✎ {mon.nickname ? 'Trocar apelido' : 'Dar apelido'}
+            </button>
+          )}
           <Types name={mon.species} />
           <div className="muted">
             {mon.ability} · {mon.nature} · {mon.gender === 'N' ? '—' : mon.gender === 'M' ? '♂' : '♀'}
@@ -472,7 +493,7 @@ export function PendingModal() {
   if (ev.kind === 'evolve') {
     return (
       <Modal>
-        <h2>O quê? {mon.species} está evoluindo!</h2>
+        <h2>O quê? {displayName(mon)} está evoluindo!</h2>
         <div className="evo">
           <Sprite name={mon.species} shiny={mon.shiny} className="evo-from" />
           <span className="arrow"><PixelIcon name="back" size={28} /></span>
@@ -496,7 +517,7 @@ export function PendingModal() {
   return (
     <Modal>
       <h2>
-        {mon.species} quer aprender {newMove.name}!
+        {displayName(mon)} quer aprender {newMove.name}!
       </h2>
       <button className="move-chip big" onClick={() => setInfo(newMove.name)}>
         <span className="row">
@@ -541,7 +562,7 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
           <div key={m.uid} className="cell">
             <Sprite name={m.species} shiny={m.shiny} />
             <span>
-              {m.species} Nv.{m.level}
+              <MonName mon={m} /> Nv.{m.level}
             </span>
           </div>
         ))}
