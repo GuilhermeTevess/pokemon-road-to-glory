@@ -8,6 +8,7 @@ import {zeroStats} from './mon';
 import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
 import type {OwnedMon, StatId, StatTable} from './types';
+import type {Egg} from './daycare';
 
 export interface CollectionEntry {
   /** Quantas vezes foi capturado (0 = só foi usado como inicial). */
@@ -65,6 +66,9 @@ export interface Collection {
   entries: Record<string, CollectionEntry>;
   runs: RunSummary[];
   stats?: TrainerStats;
+  /** Itens guardados para a Creche e ovos esperando para ir numa run. */
+  items?: Record<string, number>;
+  eggs?: Egg[];
   /** Linha favorita escolhida pelo jogador (senão, a com mais corações). */
   favorite?: string;
 }

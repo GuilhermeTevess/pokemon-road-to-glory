@@ -16,6 +16,7 @@ import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEv
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
 import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
+import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
@@ -65,7 +66,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'collection';
+export type Screen = 'title' | 'run' | 'collection' | 'daycare';
 
 export interface Toast {
   id: string;
@@ -92,7 +93,10 @@ interface Store {
   setScreen(s: Screen): void;
   toast(text: string): void;
   /** Começa a run com o time escolhido (o primeiro é quem abre). */
-  newRun(team: string[], partner?: string): void;
+  newRun(team: string[], partner?: string, eggId?: string): void;
+  /** Creche: faz um ovo com dois Pokémon da coleção. Devolve a mensagem. */
+  breed(mother: string, father: string, items: [string | null, string | null]): string;
+  discardEgg(id: string): void;
   /** Apelido de um Pokémon da run (também vira o apelido da linha na coleção). */
   renameMon(monUid: string, name: string): void;
   setNickname(line: string, name: string): void;
@@ -222,6 +226,17 @@ export const useGame = create<Store>((set, get) => {
     if (result === 'stageClear') {
       st.stageClears++;
       for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+    }
+    // O que sobrou para a creche volta para a coleção: itens Power e o ovo que não chocou.
+    for (const m of [...run.party, ...run.box]) {
+      if (m.item && DAYCARE_ITEMS.includes(m.item)) col.items = {...col.items, [m.item]: (col.items?.[m.item] ?? 0) + 1};
+    }
+    for (const [id, n] of Object.entries(run.bag)) {
+      if (n > 0 && DAYCARE_ITEMS.includes(id)) col.items = {...col.items, [id]: (col.items?.[id] ?? 0) + n};
+    }
+    if (run.egg && (col.eggs?.length ?? 0) < MAX_EGGS) {
+      const {left: _left, ...egg} = run.egg;
+      col.eggs = [...(col.eggs ?? []), egg];
     }
     col.runs.unshift({
       endedAt: Date.now(),
@@ -409,7 +424,7 @@ export const useGame = create<Store>((set, get) => {
       setTimeout(() => set({toasts: get().toasts.filter(x => x.id !== t.id)}), 3500);
     },
 
-    newRun(team, partner) {
+    newRun(team, partner, eggId) {
       const col = structuredClone(get().collection);
       const picked = team.slice(0, PARTY_SIZE);
       if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > TEAM_BUDGET) return;
@@ -432,6 +447,11 @@ export const useGame = create<Store>((set, get) => {
         entryOf(col, name);
         return mon;
       });
+      const egg = eggId ? col.eggs?.find(e => e.id === eggId) : undefined;
+      if (egg) {
+        run.egg = {...egg, left: egg.waves};
+        col.eggs = col.eggs!.filter(e => e.id !== egg.id);
+      }
       run.phase = 'biome';
       battle = null;
       saveRun(tid(), run);
@@ -700,6 +720,20 @@ export const useGame = create<Store>((set, get) => {
         statsOf(col).moneyEarned += money;
         if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
         for (const n of newHearts) get().toast(`❤ ${n} ganhou um coração de amizade!`);
+        if (run.egg && (outcome === 'won' || outcome === 'caught')) {
+          run.egg.left--;
+          if (run.egg.left <= 0) {
+            const baby = hatch(run.egg, Math.max(5, Math.floor(run.wave * 0.9)));
+            baby.metWave = run.wave;
+            baby.metBiome = run.biome;
+            run.egg = undefined;
+            const reg = registerCatch(col, baby);
+            addHeartPts(col, baby.species, HEART_STEPS[0]);
+            if (run.party.length < PARTY_SIZE) run.party.push(baby);
+            else run.box.push(baby);
+            get().toast(`O ovo chocou! Nasceu um ${baby.species}${baby.shiny ? ' shiny' : ''}! (+${reg.candies} doces)`);
+          }
+        }
         run.pending.push(...events);
         run.phase = 'postBattle';
         flushPending(run);
@@ -735,6 +769,9 @@ export const useGame = create<Store>((set, get) => {
           run.money += v;
           statsOf(col).moneyEarned += v;
           message = `+₽ ${v}`;
+        } else if (item.kind === 'breed') {
+          col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
+          message = `${item.name} foi guardado na Creche.`;
         } else {
           run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
           if (target !== undefined) message = applyItem(run, col, itemId, target);
@@ -763,11 +800,37 @@ export const useGame = create<Store>((set, get) => {
     },
 
     buy(itemId) {
-      mutate(run => {
+      mutate((run, col) => {
         const item = getItem(itemId);
         if (!item.price || run.money < item.price) return;
         run.money -= item.price;
-        run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
+        if (item.kind === 'breed') col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
+        else run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
+      });
+    },
+
+    breed(mother, father, items) {
+      let msg = '';
+      editCollection(col => {
+        if ((col.eggs?.length ?? 0) >= MAX_EGGS) return false;
+        const store = {...col.items};
+        for (const it of items) {
+          if (!it) continue;
+          if (!store[it]) return false;
+          store[it]--;
+        }
+        if (!spendCandies(col, mother, EGG_PRICE)) return false;
+        const egg = makeEgg(col, mother, father, items);
+        if (!egg) return false;
+        col.items = store;
+        col.eggs = [...(col.eggs ?? []), egg];
+        msg = `Um ovo de ${egg.species} apareceu! Ele choca depois de ${egg.waves} rondas vencidas numa run.`;
+      });
+      return msg;
+    },
+    discardEgg(id) {
+      editCollection(col => {
+        col.eggs = col.eggs?.filter(e => e.id !== id);
       });
     },
 

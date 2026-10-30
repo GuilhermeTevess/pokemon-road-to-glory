@@ -137,6 +137,18 @@ export function teachableMoves(s: Species): string[] {
     .map(([m]) => m);
 }
 
+/** Golpes de ovo (só passam por breeding). */
+export function eggMoves(s: Species): string[] {
+  return Object.entries(learnsetFor(s))
+    .filter(([m, srcs]) => isUsableMove(m) && srcs.some(x => /^\dE$/.test(x)))
+    .map(([m]) => m);
+}
+
+/** Todos os golpes que a espécie aprende de algum jeito. */
+export function allLearnable(s: Species): Set<string> {
+  return new Set(Object.keys(learnsetFor(s)).filter(isUsableMove));
+}
+
 // ---------------------------------------------------------------- Tipos
 
 /** Multiplicador de dano de um tipo atacante contra os tipos do defensor. */

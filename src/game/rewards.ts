@@ -42,7 +42,7 @@ export const SHOP: {title: string; items: string[]}[] = [
   {title: 'Para a batalha', items: ['xattack', 'xdefense', 'xspatk', 'xspdef', 'xspeed', 'xaccuracy']},
   {title: 'Treino (EVs)', items: ['hpup', 'protein', 'iron', 'calcium', 'zinc', 'carbos']},
   {title: 'Viagem', items: ['map']},
-  {title: 'Especial', items: ['megastone']},
+  {title: 'Especial', items: ['megastone', 'everstone', 'destinyknot']},
 ];
 
 export function shopItems(): ItemDef[] {

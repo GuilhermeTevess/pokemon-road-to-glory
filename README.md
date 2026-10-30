@@ -66,6 +66,9 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   frutas, comerciante misterioso, Pokémon machucado, treinador rival e vidente.
 - **Mega evolução**: a Mega Pedra (rara, a partir da ronda 20, ou bem cara na loja) vira
   a pedra do Pokémon escolhido, que mega-evolui sozinho no início da batalha. 1 por time.
+- **Creche**: dois Pokémon da coleção do mesmo egg group (ou Ditto) fazem um ovo, com
+  Pedra Eterna (nature), Laço do Destino (5 IVs) e itens Power (IV garantido). O ovo vai
+  numa run e choca depois de 5/10/15 rondas vencidas. Tem o **Manual do Criador**.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).

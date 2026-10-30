@@ -1,7 +1,7 @@
 // Itens do jogo. Os "held" são itens reais do Showdown e funcionam dentro da batalha.
 import {Dex, toID} from '@pkmn/sim';
 
-export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin' | 'mega';
+export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin' | 'mega' | 'breed';
 export type ItemTier = 'common' | 'great' | 'ultra' | 'master';
 
 export interface ItemDef {
@@ -160,6 +160,10 @@ export const ITEMS: ItemDef[] = [
   vitamin('zinc', 'Zinco', 'spd', 'Def. Esp.', 'zinc'),
   vitamin('carbos', 'Carbos', 'spe', 'Velocidade', 'carbos'),
 
+  {id: 'everstone', name: 'Pedra Eterna', kind: 'breed', tier: 'great', sprite: 'everstone', price: 3000, weight: 0.4,
+    desc: 'Vai para a Creche. Na creche, o filhote herda a nature de quem segura.'},
+  {id: 'destinyknot', name: 'Laço do Destino', kind: 'breed', tier: 'ultra', sprite: 'destiny-knot', price: 8000, weight: 0.4,
+    desc: 'Vai para a Creche. Na creche, o filhote herda 5 IVs dos pais em vez de 3.'},
   {
     id: 'megastone', name: 'Mega Pedra', kind: 'mega', tier: 'master', sprite: 'key-stone', price: 20000, minWave: 20, weight: 2,
     desc: 'Vira a Mega Pedra do Pokémon escolhido (se ele tiver mega). Ele mega-evolui sozinho no início de cada batalha. Só 1 mega por time.',
@@ -235,6 +239,8 @@ export function itemUsage(item: ItemDef): string {
       return 'Use ao pegar ou depois, pela Mochila.';
     case 'money':
       return 'Vira dinheiro na hora.';
+    case 'breed':
+      return 'Vai direto para a Creche (no menu inicial). Serve para fazer ovos.';
   }
 }
 

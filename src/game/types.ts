@@ -1,4 +1,5 @@
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
+import type {Egg} from './daycare';
 
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type StatTable = Record<StatId, number>;
@@ -90,6 +91,8 @@ export interface RunState {
   /** Evento atual (fase 'event'). */
   event?: RunEvent;
   lastEventWave?: number;
+  /** Ovo levado da Creche: `left` rondas vencidas para chocar. */
+  egg?: Egg & {left: number};
   /** Selvagens já sorteados (a Vidente mostrou). */
   upcoming?: Encounter[];
   log: string[];
