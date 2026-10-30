@@ -4,6 +4,8 @@
 // continuam aleatórios e só alimentam a ficha quando capturados.
 import type {Species} from '@pkmn/sim';
 import {dex, evolutionLine, isLegendary, levelUpMoves, species, teachableMoves, toID} from '../data/dex';
+import {megaStonesFor} from '../data/items';
+import type {ItemDef} from '../data/items';
 import {zeroStats} from './mon';
 import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
@@ -34,13 +36,15 @@ export interface CollectionEntry {
   /** EVs ganhos e ainda não distribuídos, e os distribuídos (vão para o Pokémon no início). */
   evBank?: number;
   evs?: StatTable;
+  /** Mega Pedra própria comprada com doces: id da pedra escolhida para começar a run. */
+  megaStone?: string;
   /** Quantas vezes o custo de time foi reduzido. */
   costCut?: number;
   /** Nível do bônus de shiny (0 a 3). */
   shinyLv?: number;
 }
 
-type Optional = 'nature' | 'ability' | 'startMove' | 'nickname';
+type Optional = 'nature' | 'ability' | 'startMove' | 'nickname' | 'megaStone';
 export type Entry = Required<Omit<CollectionEntry, Optional>> & Pick<CollectionEntry, Optional>;
 
 export interface RunSummary {
@@ -282,6 +286,15 @@ export function baseCost(name: string): number {
 export function teamCost(c: Collection, name: string): number {
   const cut = c.entries[lineRoot(name)]?.costCut ?? 0;
   return Math.max(1, baseCost(name) - cut);
+}
+
+// ---------------------------------------------------------------- Mega Pedra própria
+
+export const MEGA_STONE_PRICE = 100;
+
+/** Mega Pedras de qualquer forma da linha (Charizard tem X e Y). */
+export function lineMegaStones(name: string): ItemDef[] {
+  return lineSpecies(name).flatMap(s => megaStonesFor(s.name));
 }
 
 // ---------------------------------------------------------------- Shiny

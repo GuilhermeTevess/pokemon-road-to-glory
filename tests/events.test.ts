@@ -41,7 +41,16 @@ describe('mega', () => {
     const wild = createMon('Pidgey', {level: 5});
     const ctl = new BattleController([me], {mon: wild, rarity: 'common', boss: false});
     ctl.initialEvents();
-    const evs = ctl.chooseMove(1);
+    const evs = ctl.chooseMove(1, true);
     expect(evs.some(e => e.forme?.species === 'Charizard-Mega-Y')).toBe(true);
+  });
+});
+
+describe('mega própria', () => {
+  it('linha do Charmander tem as duas pedras', async () => {
+    const {lineMegaStones} = await import('../src/game/meta');
+    expect(lineMegaStones('Charmander').map(i => i.id).sort()).toEqual(['charizarditex', 'charizarditey']);
+    expect(lineMegaStones('Pidgey').map(i => i.id)).toEqual(['pidgeotite']);
+    expect(lineMegaStones('Rattata')).toEqual([]);
   });
 });

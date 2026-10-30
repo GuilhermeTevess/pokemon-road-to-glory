@@ -59,6 +59,7 @@ export function BattleScreen() {
   const started = useRef(false);
   const fxRef = useRef<HTMLDivElement>(null);
   const [moveInfo, setMoveInfo] = useState<string | null>(null);
+  const [megaOn, setMegaOn] = useState(false);
   const arenaRef = useRef<HTMLDivElement>(null);
   const caughtRef = useRef(false);
 
@@ -328,6 +329,11 @@ export function BattleScreen() {
             </div>
           ) : menu === 'fight' ? (
             <div className="move-grid">
+              {ctl.canMega() && (
+                <button className={`mega-toggle ${megaOn ? 'on' : ''}`} onClick={() => setMegaOn(v => !v)}>
+                  <span className="mega-box">{megaOn ? '✓' : ''}</span> Mega evoluir → <MonName mon={{species: ctl.canMega()!}} />
+                </button>
+              )}
               {moves.map(m => {
                 const eff = effectivenessLabel(m.effectiveness);
                 return (
@@ -336,7 +342,7 @@ export function BattleScreen() {
                     className="move-btn"
                     disabled={m.disabled || m.pp <= 0}
                     style={{['--mc' as string]: TYPE_COLORS[m.type]}}
-                    onClick={() => act(() => ctl.chooseMove(m.index))}
+                    onClick={() => act(() => ctl.chooseMove(m.index, megaOn))}
                   >
                     <span className="move-name">
                       {m.name}

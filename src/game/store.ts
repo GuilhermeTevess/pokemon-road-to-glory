@@ -7,7 +7,7 @@ import {BattleController} from './battle';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH, generateEncounter} from './encounters';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
-  HEART_STEPS, addStatEvs, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
+  HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE, TEAM_BUDGET,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
   registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
@@ -108,6 +108,8 @@ interface Store {
   buyCostCut(line: string): void;
   buyShiny(line: string): void;
   setFavorite(line: string | null): void;
+  /** Compra a Mega Pedra própria da linha (ou troca qual pedra usar, se já comprou). */
+  buyMegaStone(line: string, stone: string): void;
   /** Resolve o evento atual (a escolha depende do tipo do evento). */
   resolveEvent(choice: string | null): void;
   /** Aula do Tutor; devolve a mensagem do resultado. */
@@ -447,6 +449,12 @@ export const useGame = create<Store>((set, get) => {
         entryOf(col, name);
         return mon;
       });
+      // Mega Pedra própria: só 1 por time, no primeiro da ordem que tiver.
+      const megaMon = run.party.find(m => col.entries[lineRoot(m.species)]?.megaStone);
+      if (megaMon) {
+        if (megaMon.item) run.bag[megaMon.item] = (run.bag[megaMon.item] ?? 0) + 1;
+        megaMon.item = col.entries[lineRoot(megaMon.species)]!.megaStone;
+      }
       const egg = eggId ? col.eggs?.find(e => e.id === eggId) : undefined;
       if (egg) {
         run.egg = {...egg, left: egg.waves};
@@ -614,6 +622,14 @@ export const useGame = create<Store>((set, get) => {
       if (message) get().toast(message);
     },
 
+    buyMegaStone(line, stone) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (!lineMegaStones(line).some(i => i.id === stone)) return false;
+        if (!e.megaStone && !spendCandies(col, line, MEGA_STONE_PRICE)) return false;
+        e.megaStone = stone;
+      });
+    },
     setFavorite(line) {
       editCollection(col => {
         col.favorite = line ?? undefined;
