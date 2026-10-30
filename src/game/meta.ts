@@ -28,14 +28,16 @@ export interface CollectionEntry {
   /** Golpes liberados com doces e o que está equipado para o início. */
   moves?: string[];
   startMove?: string;
+  /** Apelido usado quando a linha começa a run. */
+  nickname?: string;
   /** Quantas vezes o custo de time foi reduzido. */
   costCut?: number;
   /** Nível do bônus de shiny (0 a 3). */
   shinyLv?: number;
 }
 
-export type Entry = Required<Omit<CollectionEntry, 'nature' | 'ability' | 'startMove'>> &
-  Pick<CollectionEntry, 'nature' | 'ability' | 'startMove'>;
+type Optional = 'nature' | 'ability' | 'startMove' | 'nickname';
+export type Entry = Required<Omit<CollectionEntry, Optional>> & Pick<CollectionEntry, Optional>;
 
 export interface RunSummary {
   endedAt: number;
@@ -255,7 +257,7 @@ export function favoriteOf(c: Collection): string | null {
 
 // ---------------------------------------------------------------- Custo de time
 
-export const TEAM_BUDGET = 10;
+export const TEAM_BUDGET = 6;
 export const MAX_COST_CUT = 2;
 export const COST_CUT_PRICE = [15, 30];
 
@@ -306,6 +308,7 @@ export function startMoveOptions(name: string): {id: string; how: 'level' | 'tm'
 export function applyEntry(c: Collection, mon: OwnedMon): void {
   const e = c.entries[lineRoot(mon.species)];
   if (!e) return;
+  if (e.nickname) mon.nickname = e.nickname;
   if (e.nature && e.natures?.includes(e.nature)) mon.nature = e.nature;
   const s = species(mon.species);
   if (e.ability && e.abilities?.includes(e.ability) && Object.values(s.abilities).includes(e.ability)) mon.ability = e.ability;

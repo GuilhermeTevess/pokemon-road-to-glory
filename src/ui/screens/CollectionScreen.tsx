@@ -8,6 +8,7 @@ import {
   baseCost, favoriteOf, heartProgress, heartsOf, lineRoot, lineSpecies, movePrice, peekEntry, startMoveOptions, statsOf, teamCost,
 } from '../../game/meta';
 import type {CollectionEntry} from '../../game/meta';
+import {NICK_MAX} from '../../game/mon';
 import {useGame} from '../../game/store';
 import {STAT_LABEL} from '../../game/types';
 import type {StatId} from '../../game/types';
@@ -86,12 +87,13 @@ function natureLabel(n: string): string {
 
 /** Ficha da linha evolutiva. */
 export function LineSheet({line, onClose}: {line: string; onClose: () => void}) {
-  const {collection, unlockMove, equipMove, equipNature, equipAbility, buyCostCut, buyShiny, setFavorite} = useGame();
+  const {collection, setNickname, unlockMove, equipMove, equipNature, equipAbility, buyCostCut, buyShiny, setFavorite} = useGame();
   const root = lineRoot(line);
   const e = peekEntry(collection, root);
   const [view, setView] = useState<Species>(species(root));
   const [moveFilter, setMoveFilter] = useState<'type' | 'all'>('type');
   const [info, setInfo] = useState<string | null>(null);
+  const [nick, setNick] = useState(collection.entries[root]?.nickname ?? '');
   const options = useMemo(() => startMoveOptions(root), [root]);
   if (!e) return null;
   const types = species(root).types as string[];
@@ -108,6 +110,18 @@ export function LineSheet({line, onClose}: {line: string; onClose: () => void}) 
               <TypeBadge key={t} type={t} info />
             ))}
           </div>
+          <form
+            className="rename"
+            onSubmit={ev => {
+              ev.preventDefault();
+              setNickname(root, nick);
+            }}
+          >
+            <input value={nick} maxLength={NICK_MAX} onChange={ev => setNick(ev.target.value)} placeholder="Apelido" />
+            <button className="btn small" type="submit" disabled={(e.nickname ?? '') === nick.trim()}>
+              Salvar
+            </button>
+          </form>
           <div className="sheet-numbers">
             <Candies line={root} n={e.candies} />
             <span>{e.caught ? `Capturado ${e.caught}x` : 'Parceiro inicial'}</span>

@@ -492,7 +492,7 @@ table.move-info td { padding: 3px 0; }
   background: var(--panel-2); border: var(--px) solid var(--line); padding: 0;
 }
 .team-slot .lead-tag { position: absolute; bottom: 1px; left: 2px; font-size: 11px; font-weight: 700; background: var(--sky); padding: 0 3px; }
-.team-slot .slot-x { position: absolute; top: 0; right: 3px; font-size: 13px; opacity: 0; }
+.team-slot .slot-x { position: absolute; top: 0; right: 3px; font-size: 13px; opacity: .55; }
 .team-slot:hover .slot-x { opacity: 1; }
 .budget { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
 .budget-track { height: 12px; border: var(--px) solid var(--line); background: var(--panel-2); }
@@ -500,3 +500,16 @@ table.move-info td { padding: 3px 0; }
 .hearts:not(.small) { flex-wrap: wrap; justify-content: center; }
 .heart-next { order: 9; width: 100%; font-size: 13px; color: var(--ink-soft); }
 .btn.fav-on { background: var(--butter); }
+.mon-name { display: inline-flex; align-items: center; gap: 3px; }
+.nick { display: inline-flex; flex-direction: column; line-height: 1.05; }
+.species-sub { font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+.rename { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.rename input { font: inherit; width: 140px; padding: 3px 6px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }
+.team-slot.is-partner { border-color: var(--pink-d); }
+.team-slot .slot-partner { position: absolute; bottom: 1px; right: 1px; background: none; border: none; padding: 0; cursor: pointer; }
+.team-slot .slot-x { background: none; border: none; cursor: pointer; color: var(--ink); }
+.partner-hint { width: 100%; display: inline-flex; gap: 4px; align-items: center; }
+.partner-corner {
+  display: flex; align-items: center; gap: 6px; padding: 2px 8px; margin: 4px 0; width: max-content; font-size: 14px;
+  background: var(--panel); border: var(--px) solid var(--pink-d);
+}

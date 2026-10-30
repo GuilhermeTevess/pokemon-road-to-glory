@@ -193,6 +193,8 @@ export function StarterSelect() {
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<Species | null>(null);
   const [team, setTeam] = useState<string[]>([]);
+  const [partnerPick, setPartner] = useState<string | null>(null);
+  const partner = partnerPick && team.includes(partnerPick) ? partnerPick : team[0];
   const [sheet, setSheet] = useState<string | null>(null);
   const [tab, setTab] = useState<'starters' | 'collection'>('starters');
 
@@ -263,14 +265,25 @@ export function StarterSelect() {
       <div className="panel team-bar">
         <div className="team-slots">
           {team.map((n, i) => (
-            <button key={n} className="team-slot" onClick={() => toggle(n)} title="Tirar do time">
+            <div key={n} className={`team-slot ${partner === n ? 'is-partner' : ''}`}>
               <Sprite name={n} size={56} />
               <span className="cost-tag">{teamCost(collection, n)}</span>
               {i === 0 && <span className="lead-tag">abre</span>}
-              <span className="slot-x">✕</span>
-            </button>
+              <button className="slot-x" onClick={() => toggle(n)} title="Tirar do time">
+                ✕
+              </button>
+              <button className="slot-partner" onClick={() => setPartner(n)} title="Escolher como parceiro">
+                <PixelIcon name="heart" size={14} color={partner === n ? 'var(--pink-d)' : '#cfc6dd'} />
+              </button>
+            </div>
           ))}
           {!team.length && <span className="hint">Escolha Pokémon abaixo e toque em "Pôr no time".</span>}
+          {team.length > 0 && (
+            <span className="hint partner-hint">
+              <PixelIcon name="heart" size={12} color="var(--pink-d)" /> Parceiro: {peekEntry(collection, partner!)?.nickname ?? species(partner!).name}. Toque no
+              coração de outro para trocar. O parceiro ganha corações em dobro.
+            </span>
+          )}
         </div>
         <div className="budget">
           <div className="budget-label">
@@ -279,7 +292,7 @@ export function StarterSelect() {
           <div className="budget-track">
             <div className="budget-fill" style={{width: `${(used / TEAM_BUDGET) * 100}%`}} />
           </div>
-          <button className="btn primary" disabled={!team.length} onClick={() => newRun(team)}>
+          <button className="btn primary" disabled={!team.length} onClick={() => newRun(team, partner)}>
             Começar run
           </button>
         </div>
