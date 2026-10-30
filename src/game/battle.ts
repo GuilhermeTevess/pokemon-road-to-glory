@@ -270,7 +270,7 @@ export class BattleController {
 
   /** Fugir funciona sempre, exceto contra chefes. */
   canFlee(): boolean {
-    return !this.encounter.boss;
+    return !this.encounter.boss && !this.encounter.trainer;
   }
 
   /** Copia HP de volta para o time (fora da batalha). */
@@ -383,7 +383,9 @@ export class BattleController {
   private name(ident: string): {side: Side; name: string} {
     const side = ident.slice(0, 2) as Side;
     const raw = ident.replace(/^p\d[a-z]?: /, '');
-    return {side, name: side === 'p2' ? `${raw} ${this.encounter.boss ? 'chefe' : 'selvagem'}` : raw};
+    if (side !== 'p2') return {side, name: raw};
+    if (this.encounter.trainer) return {side, name: `${raw} de ${this.encounter.trainer}`};
+    return {side, name: `${raw} ${this.encounter.boss ? 'chefe' : 'selvagem'}`};
   }
 
   private readLog(): BattleEvent[] {
@@ -422,7 +424,11 @@ export class BattleController {
         return [
           {
             switchIn: {side, species: speciesName, hp: hp.hp, maxhp: hp.maxhp, uid: poke ? this.uidOf.get(poke) : undefined},
-            text: side === 'p1' ? `Vai, ${name}!` : this.encounter.boss ? `Um ${name} poderoso apareceu!` : `Um ${name} apareceu!`,
+            text: side === 'p1'
+              ? `Vai, ${name}!`
+              : this.encounter.trainer
+                ? `${this.encounter.trainer} mandou ${speciesName}!`
+                : this.encounter.boss ? `Um ${name} poderoso apareceu!` : `Um ${name} apareceu!`,
           },
         ];
       }

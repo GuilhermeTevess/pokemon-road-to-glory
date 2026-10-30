@@ -62,6 +62,8 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **EVs** por linha: vitórias enchem um banco que você distribui na ficha, com
   sugestões prontas. Vitaminas e itens Power ajudam.
 - **Parceiro** (um por time) e **apelidos**.
+- **Eventos entre rondas** (às vezes, sem gastar ronda): casa abandonada, árvore de
+  frutas, comerciante misterioso, Pokémon machucado, treinador rival e vidente.
 - **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
   com 1 HP, mais crítico e +10% de EXP.
 - Run salva automaticamente no navegador (dá pra fechar e continuar).

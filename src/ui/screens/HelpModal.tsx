@@ -25,6 +25,7 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Cada treinador tem sua coleção. Monte o time inicial com 6 pontos: cada Pokémon tem um custo (o número no canto). Tudo que você capturar vira opção.</li>
         <li>Cada linha evolutiva ganha doces (capturar, vencer, evoluir) e corações de amizade (lutar no time). Na ficha da coleção, gaste doces em golpe inicial, custo menor e chance de shiny.</li>
         <li>Corações dão mais EXP. Escolha um parceiro por time (o coração na montagem): ele ganha corações em dobro e, com eles, pode curar status sozinho, aguentar com 1 HP e acertar mais críticos.</li>
+        <li>De vez em quando aparece um evento entre as rondas (casa abandonada, rival, vidente...). Ele não gasta ronda.</li>
         <li>Na ficha também tem o Tutor (natures e habilidades) e os EVs: vitórias enchem um banco que você distribui.</li>
       </ol>
       <h3>Itens</h3>

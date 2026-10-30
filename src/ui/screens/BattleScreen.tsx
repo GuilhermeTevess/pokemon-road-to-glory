@@ -204,7 +204,9 @@ export function BattleScreen() {
     await play(events.slice(1));
   };
 
-  const header = isMilestoneWave(run.wave)
+  const header = enc.trainer
+    ? `Desafio do rival ${enc.trainer}`
+    : isMilestoneWave(run.wave)
     ? `Ronda ${run.wave} · Desafio final da etapa`
     : isBossWave(run.wave)
       ? `Ronda ${run.wave} · Chefe`
@@ -305,7 +307,7 @@ export function BattleScreen() {
               <button className="btn act fight" onClick={() => setMenu('fight')}>
                 <img className="act-icon" src={FX('fist.png')} alt="" /> Lutar
               </button>
-              <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length}>
+              <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length || !!enc.trainer} title={enc.trainer ? 'Não dá para capturar o Pokémon de um treinador' : undefined}>
                 <img className="act-icon" src={itemSpriteUrl('poke-ball')} alt="" /> Pokébola
               </button>
               <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length}>

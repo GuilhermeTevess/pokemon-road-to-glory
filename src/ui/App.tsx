@@ -8,6 +8,7 @@ import {EndScreen, PartyPanel, PendingModal, RewardScreen, RunSidebar} from './s
 import type {PartyTab} from './screens/RunScreens';
 import {BiomeSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
 import {CollectionScreen} from './screens/CollectionScreen';
+import {EventScreen} from './screens/EventScreen';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
@@ -22,6 +23,7 @@ export function App() {
   else if (run.phase === 'biome') body = <BiomeSelect mode="start" />;
   else if (run.phase === 'battle') body = <BattleScreen key={run.encounter?.mon.uid} />;
   else if (run.phase === 'biomeChoice') body = <BiomeSelect mode="next" />;
+  else if (run.phase === 'event') body = <EventScreen />;
   else if (run.phase === 'reward' || run.phase === 'postBattle') body = <RewardScreen />;
   else body = <EndScreen kind={run.phase === 'stageClear' ? 'stageClear' : 'gameOver'} />;
 
