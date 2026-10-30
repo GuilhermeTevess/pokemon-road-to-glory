@@ -2,14 +2,14 @@ import {useState} from 'react';
 import {useGame} from '../game/store';
 import {setSoundEnabled, soundEnabled} from './audio';
 import {HelpModal} from './screens/HelpModal';
-import {IvWeb, Modal, PixelIcon, Sprite} from './components';
+import {IvWeb, Modal, PixelIcon, Sprite, TypeCalc} from './components';
 import {BattleScreen} from './screens/BattleScreen';
 import {EndScreen, PartyPanel, PendingModal, RewardScreen, RunSidebar} from './screens/RunScreens';
 import type {PartyTab} from './screens/RunScreens';
 import {BiomeSelect, CollectionScreen, StarterSelect, TitleScreen} from './screens/StartScreens';
 
 export function App() {
-  const {screen, run, toasts, setScreen, ivGain, clearIvGain} = useGame();
+  const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
   const [sound, setSound] = useState(soundEnabled());
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
@@ -37,6 +37,9 @@ export function App() {
             <img className="nav-icon" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/explorer-kit.png" alt="" /> Time, mochila e PC
           </button>
         )}
+        <button className="btn small ghost" onClick={() => openTypeCalc([])} title="Calculadora de tipos">
+          <PixelIcon name="dice" /> Tipos
+        </button>
         <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
           <PixelIcon name="help" /> Ajuda
         </button>
@@ -62,6 +65,7 @@ export function App() {
       {partyOpen && <PartyPanel key={`${partyOpen.tab}-${partyOpen.mon}`} initialTab={partyOpen.tab} initialMon={partyOpen.mon} onClose={() => setPartyOpen(null)} />}
       {screen === 'run' && <PendingModal />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+      {typeCalc && <TypeCalc initial={typeCalc} onClose={() => openTypeCalc(null)} />}
       {ivGain && (
         <Modal onClose={clearIvGain}>
           <h2>{ivGain.species} repetido!</h2>

@@ -1,10 +1,12 @@
 import {useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
-import {ALL_TYPES, RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, itemSpriteUrl, species, spriteUrls, typeMultiplier} from '../data/dex';
+import {ALL_TYPES, RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, dex, itemSpriteUrl, species, spriteUrls, typeMultiplier} from '../data/dex';
 import type {Rarity} from '../data/dex';
 import {getItem} from '../data/items';
+import {moveDescPt} from '../data/movesPt';
 import {STATUS_PT} from '../game/battle';
 import {calcStats} from '../game/mon';
+import {useGame} from '../game/store';
 import {STAT_IDS, STAT_LABEL} from '../game/types';
 import type {OwnedMon} from '../game/types';
 
@@ -30,9 +32,26 @@ export function ItemIcon({id, size = 28}: {id: string; size?: number}) {
   return <img className="item-icon" src={itemSpriteUrl(item.sprite)} alt={item.name} width={size} height={size} />;
 }
 
-export function TypeBadge({type, small}: {type: string; small?: boolean}) {
+/** Selo de tipo. Com `info`, tocar abre a calculadora de tipos naquele tipo. */
+export function TypeBadge({type, small, info}: {type: string; small?: boolean; info?: boolean}) {
+  const style = {background: TYPE_COLORS[type] ?? '#777'};
+  if (info) {
+    return (
+      <button
+        className={`type-badge info ${small ? 'small' : ''}`}
+        style={style}
+        title={`Ver o que vence ${TYPE_PT[type] ?? type}`}
+        onClick={e => {
+          e.stopPropagation();
+          useGame.getState().openTypeCalc([type]);
+        }}
+      >
+        {TYPE_PT[type] ?? type}
+      </button>
+    );
+  }
   return (
-    <span className={`type-badge ${small ? 'small' : ''}`} style={{background: TYPE_COLORS[type] ?? '#777'}}>
+    <span className={`type-badge ${small ? 'small' : ''}`} style={style}>
       {TYPE_PT[type] ?? type}
     </span>
   );
@@ -84,7 +103,7 @@ export function MatchupPanel({types, title}: {types: readonly string[]; title?: 
         <span className="mu-label">{label}</span>
         <span className="mu-types">
           {list.map(t => (
-            <TypeBadge key={t} type={t} small />
+            <TypeBadge key={t} type={t} small info />
           ))}
         </span>
       </div>
@@ -257,14 +276,14 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
         <p className="tw-alert">
           Cuidado com:{' '}
           {danger.map(r => (
-            <TypeBadge key={r.type} type={r.type} small />
+            <TypeBadge key={r.type} type={r.type} small info />
           ))}
         </p>
       )}
       <div className="tw-grid">
         {shown.map(r => (
           <div key={r.type} className={`tw-cell ${r.danger ? 'danger' : ''}`}>
-            <TypeBadge type={r.type} small />
+            <TypeBadge type={r.type} small info />
             <span className={r.weak ? 'tw-weak' : 'tw-zero'} title="Fracos a esse tipo">
               {r.weak} fraco{r.weak === 1 ? '' : 's'}
             </span>
@@ -277,5 +296,206 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * Calculadora de tipos: escolha 1 ou 2 tipos e veja o que vence, o que aguenta
+ * os golpes dele e o que os golpes dele vencem. Abre ao tocar em qualquer tipo
+ * das fraquezas ou pelo botão "Tipos".
+ */
+export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => void}) {
+  const [sel, setSel] = useState<string[]>(initial.slice(0, 2));
+  const toggle = (t: string) =>
+    setSel(cur => (cur.includes(t) ? cur.filter(x => x !== t) : cur.length >= 2 ? [cur[1], t] : [...cur, t]));
+  const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
+  const m = sel.length ? defensiveMatchups(sel) : null;
+  // Tipos que aguentam todos os golpes "do tipo" (STAB) do alvo.
+  const walls = sel.length ? ALL_TYPES.filter(d => sel.every(a => typeMultiplier(a, [d]) < 1)) : [];
+  // Melhores escolhas: aguentam os golpes dele E batem super efetivo nele.
+  const best = m ? walls.filter(t => [...m.x4, ...m.x2].includes(t)) : [];
+  const badges = (list: string[]) =>
+    list.length ? list.map(t => <TypeBadge key={t} type={t} small />) : <span className="muted">nenhum</span>;
+  return (
+    <Modal onClose={onClose} wide>
+      <h2>Calculadora de tipos</h2>
+      <p className="hint">Escolha 1 ou 2 tipos (o tipo do Pokémon inimigo, por exemplo).</p>
+      <div className="type-filter">
+        {ALL_TYPES.map(t => (
+          <button
+            key={t}
+            className={`chip type-chip ${sel.includes(t) ? 'active' : ''}`}
+            style={{['--tc' as string]: TYPE_COLORS[t]}}
+            onClick={() => toggle(t)}
+          >
+            {TYPE_PT[t] ?? t}
+          </button>
+        ))}
+      </div>
+      {m && (
+        <div className="calc-grid">
+          <section className="calc-box good">
+            <h3>Para vencer {name}</h3>
+            <div className="calc-row">
+              <span>Use golpes de:</span>
+              {m.x4.map(t => (
+                <span key={t} className="row">
+                  <TypeBadge type={t} small /> <b>4x</b>
+                </span>
+              ))}
+              {badges(m.x2)}
+            </div>
+            <div className="calc-row">
+              <span>Pokémon que aguentam os golpes de {name}:</span>
+              {badges(walls)}
+            </div>
+            {best.length > 0 && (
+              <div className="calc-row best">
+                <span>Melhor escolha (aguenta e bate forte):</span>
+                {badges(best)}
+              </div>
+            )}
+          </section>
+          <section className="calc-box bad">
+            <h3>Evite contra {name}</h3>
+            <div className="calc-row">
+              <span>Golpes que quase não machucam:</span>
+              {badges([...m.half, ...m.quarter])}
+            </div>
+            <div className="calc-row">
+              <span>Golpes que não fazem nada:</span>
+              {badges(m.immune)}
+            </div>
+          </section>
+          {sel.map(a => {
+            const strong = ALL_TYPES.filter(d => typeMultiplier(a, [d]) > 1);
+            const weak = ALL_TYPES.filter(d => {
+              const x = typeMultiplier(a, [d]);
+              return x > 0 && x < 1;
+            });
+            const none = ALL_TYPES.filter(d => typeMultiplier(a, [d]) === 0);
+            return (
+              <section key={a} className="calc-box">
+                <h3>Golpes de {TYPE_PT[a] ?? a}</h3>
+                <div className="calc-row">
+                  <span>Super efetivos contra:</span>
+                  {badges(strong)}
+                </div>
+                <div className="calc-row">
+                  <span>Pouco efetivos contra:</span>
+                  {badges(weak)}
+                </div>
+                {none.length > 0 && (
+                  <div className="calc-row">
+                    <span>Não afetam:</span>
+                    {badges(none)}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+const CATEGORY_PT: Record<string, {name: string; hint: string}> = {
+  Physical: {name: 'Físico', hint: 'Dano calculado com o Ataque de quem usa contra a Defesa do alvo.'},
+  Special: {name: 'Especial', hint: 'Dano calculado com o Ataque Especial de quem usa contra a Defesa Especial do alvo.'},
+  Status: {name: 'Status', hint: 'Não causa dano: aumenta ou baixa atributos, causa status, cura, prepara o campo...'},
+};
+
+const TARGET_PT: Record<string, string> = {
+  normal: 'Um alvo',
+  self: 'Quem usa',
+  adjacentFoe: 'Um inimigo',
+  allAdjacentFoes: 'Todos os inimigos',
+  allAdjacent: 'Todos ao redor (inclusive aliados)',
+  any: 'Qualquer um',
+  randomNormal: 'Um inimigo aleatório',
+  allySide: 'O próprio lado do campo',
+  foeSide: 'O lado inimigo do campo',
+  all: 'O campo inteiro',
+  allies: 'Todo o time',
+  adjacentAlly: 'Um aliado',
+  adjacentAllyOrSelf: 'Quem usa ou um aliado',
+  allyTeam: 'Todo o time',
+  scripted: 'Quem atacou por último',
+};
+
+const BOOST_PT: Record<string, string> = {atk: 'Ataque', def: 'Defesa', spa: 'Atq. Esp.', spd: 'Def. Esp.', spe: 'Velocidade', accuracy: 'Precisão', evasion: 'Evasão'};
+
+/** Ficha completa de um golpe: o que é, quanto bate, se erra, o que faz. */
+export function MoveInfo({move, onClose}: {move: string; onClose: () => void}) {
+  const m = dex.moves.get(move);
+  const cat = CATEGORY_PT[m.category];
+  const boosts = (b: Partial<Record<string, number>> | null | undefined, who: string) =>
+    b
+      ? Object.entries(b).map(([k, v]) => (
+          <li key={who + k}>
+            {who}: {BOOST_PT[k] ?? k} {v! > 0 ? `+${v}` : v}
+          </li>
+        ))
+      : null;
+  const effects: ReactNode[] = [];
+  if (m.boosts) effects.push(boosts(m.boosts, m.target === 'self' ? 'Quem usa' : 'Alvo'));
+  if (m.self?.boosts) effects.push(boosts(m.self.boosts, 'Quem usa'));
+  if (m.secondary?.boosts) effects.push(boosts(m.secondary.boosts, `${m.secondary.chance ?? 100}% de chance, alvo`));
+  if (m.secondary?.self?.boosts) effects.push(boosts(m.secondary.self.boosts, `${m.secondary.chance ?? 100}% de chance, quem usa`));
+  if (m.drain) effects.push(<li key="drain">Recupera {Math.round((m.drain[0] / m.drain[1]) * 100)}% do dano causado</li>);
+  if (m.recoil) effects.push(<li key="recoil">Quem usa sofre {Math.round((m.recoil[0] / m.recoil[1]) * 100)}% do dano causado</li>);
+  if (m.heal) effects.push(<li key="heal">Cura {Math.round((m.heal[0] / m.heal[1]) * 100)}% do HP máximo</li>);
+  if (m.multihit) effects.push(<li key="multi">Acerta {Array.isArray(m.multihit) ? `${m.multihit[0]} a ${m.multihit[1]}` : m.multihit} vezes</li>);
+  if (m.critRatio && m.critRatio > 1) effects.push(<li key="crit">Chance alta de acerto crítico</li>);
+  return (
+    <Modal onClose={onClose}>
+      <h2>{m.name}</h2>
+      <div className="row center wrap">
+        <TypeBadge type={m.type} />
+        <span className={`cat-badge cat-${m.category}`}>{cat.name}</span>
+      </div>
+      <p className="move-info-desc">{moveDescPt(m.name)}</p>
+      <table className="move-info">
+        <tbody>
+          <tr>
+            <th>Poder</th>
+            <td>{m.basePower ? m.basePower : m.category === 'Status' ? '— (não causa dano)' : 'Varia'}</td>
+          </tr>
+          <tr>
+            <th>Precisão</th>
+            <td>{m.accuracy === true ? 'Nunca erra' : `${m.accuracy}%`}</td>
+          </tr>
+          <tr>
+            <th>PP</th>
+            <td>{m.pp} usos</td>
+          </tr>
+          <tr>
+            <th>Prioridade</th>
+            <td>
+              {m.priority > 0 ? `+${m.priority} (age antes dos outros)` : m.priority < 0 ? `${m.priority} (age depois dos outros)` : 'Normal (o mais rápido age primeiro)'}
+            </td>
+          </tr>
+          <tr>
+            <th>Alvo</th>
+            <td>{TARGET_PT[m.target] ?? m.target}</td>
+          </tr>
+          <tr>
+            <th>Contato</th>
+            <td>{m.flags.contact ? 'Sim (encosta no alvo)' : 'Não'}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="hint">
+        <b>{cat.name}:</b> {cat.hint}
+        {m.category !== 'Status' && ' Se o golpe tem o mesmo tipo de quem usa, bate 1,5x mais forte.'}
+      </p>
+      {effects.length > 0 && (
+        <>
+          <h3>Efeitos</h3>
+          <ul className="move-effects">{effects}</ul>
+        </>
+      )}
+    </Modal>
   );
 }

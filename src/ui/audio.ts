@@ -208,8 +208,12 @@ const VOICES: Record<string, (a: A, at: number, dur: number, k: number) => void>
     }
   },
   Grass: (a, at, dur, k) => {
-    noise(a, {filter: 'highpass', from: 2500, to: 6500, dur, gain: 0.28 * k, at, attack: 0.05});
-    tone(a, {wave: 'triangle', from: 500, to: 800, dur: dur * 0.6, gain: 0.08 * k, at});
+    // Folhas farfalhando: vários "chiados" curtos e um estalo de chicote.
+    for (let i = 0; i < Math.ceil(dur * 16); i++) {
+      const f = 2500 + Math.random() * 4000;
+      noise(a, {filter: 'bandpass', from: f, to: f * 0.8, dur: 0.04, gain: 0.3 * k, at: at + Math.random() * dur, q: 3});
+    }
+    tone(a, {wave: 'triangle', from: 400, to: 1400, dur: 0.12, gain: 0.1 * k, at});
   },
   Ice: (a, at, dur, k) => {
     noise(a, {filter: 'highpass', from: 6000, to: 9000, dur, gain: 0.18 * k, at});
@@ -281,6 +285,8 @@ const SFX = [
   'rock3', 'quake', 'steel1', 'steel2', 'hit1', 'hit2', 'hit3', 'thunk', 'whoosh1', 'whoosh2', 'twirl',
   'slash', 'psychic1', 'psychic2', 'ghost1', 'poison1', 'poison2', 'dragon1', 'dragon2', 'dark1', 'fairy1',
   'fairy2', 'explosion', 'explosion2', 'buff1', 'buff2', 'buff3', 'debuff', 'coins', 'item',
+  'grass3', 'bug1', 'bug2', 'bug3', 'ghost2', 'ghost3', 'psychic3', 'psychic4', 'electric2', 'electric3',
+  'fairy3', 'fairy4', 'poison3', 'poison4', 'dark2', 'ice4', 'dragon3', 'fight1', 'fight2',
 ] as const;
 type Sfx = (typeof SFX)[number];
 
@@ -321,45 +327,61 @@ function sample(a: A, name: Sfx, o: {at?: number; gain?: number; rate?: number; 
 
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 
-/** Amostras de cada tipo: golpe curto (hit) e jato longo (stream). */
+/**
+ * Amostras de cada tipo: golpe curto (hit) e jato longo (stream). Folhas são papel
+ * amassado, inseto é zumbido de bicho, fada são sininhos, gelo é vidro...
+ */
 const TYPE_SFX: Record<string, {hit: Sfx[]; stream?: Sfx}> = {
   Fire: {hit: ['fire1', 'fire2', 'fire3'], stream: 'fire-stream'},
   Water: {hit: ['water1', 'water2', 'bubble1'], stream: 'water-stream'},
-  Electric: {hit: ['electric1'], stream: 'electric-stream'},
-  Ice: {hit: ['ice1', 'ice2', 'ice3']},
-  Grass: {hit: ['grass1', 'grass2']},
+  Electric: {hit: ['electric1', 'electric2'], stream: 'electric3'},
+  Ice: {hit: ['ice1', 'ice2', 'ice3', 'ice4']},
+  Grass: {hit: ['grass1', 'grass2', 'grass3']},
   Rock: {hit: ['rock1', 'rock2', 'rock3']},
   Ground: {hit: ['rock3', 'thunk']},
   Steel: {hit: ['steel1', 'steel2']},
-  Fighting: {hit: ['hit2', 'hit3']},
+  Fighting: {hit: ['fight1', 'fight2', 'hit3']},
   Flying: {hit: ['whoosh1', 'whoosh2']},
-  Psychic: {hit: ['psychic1', 'psychic2']},
-  Ghost: {hit: ['ghost1']},
-  Poison: {hit: ['poison1', 'poison2']},
-  Dragon: {hit: ['dragon1', 'dragon2']},
-  Dark: {hit: ['dark1', 'slash']},
-  Fairy: {hit: ['fairy1', 'fairy2']},
-  Bug: {hit: ['grass2']},
+  Psychic: {hit: ['psychic1', 'psychic2', 'psychic3', 'psychic4']},
+  Ghost: {hit: ['ghost1', 'ghost2', 'ghost3']},
+  Poison: {hit: ['poison1', 'poison2', 'poison3', 'poison4']},
+  Dragon: {hit: ['dragon1', 'dragon2', 'dragon3']},
+  Dark: {hit: ['dark1', 'dark2', 'slash']},
+  Fairy: {hit: ['fairy1', 'fairy2', 'fairy3', 'fairy4']},
+  Bug: {hit: ['bug1', 'bug2', 'bug3']},
   Normal: {hit: ['hit1', 'thunk']},
 };
 
-/** Som "do tipo": amostra se houver, sintetizador se não. */
+/**
+ * Som "do tipo": a amostra gravada mais o timbre sintetizado do tipo por baixo
+ * (estalos no Elétrico, vibrato no Psíquico, zumbido no Inseto...). As duas
+ * camadas juntas é que deixam cada tipo reconhecível.
+ */
 function typeHit(a: A, type: string, at: number, k: number, dur = 0.3): void {
   const set = TYPE_SFX[type] ?? TYPE_SFX.Normal;
-  if (!sample(a, pick(set.hit), {at, gain: k})) (VOICES[type] ?? VOICES.Normal)(a, at, dur, k);
-  if (type === 'Bug') VOICES.Bug(a, at, dur, 0.6 * k);
+  const voice = VOICES[type] ?? VOICES.Normal;
+  if (sample(a, pick(set.hit), {at, gain: k})) {
+    if (type !== 'Fire' && type !== 'Water' && type !== 'Normal') voice(a, at, dur, 0.55 * k);
+  } else voice(a, at, dur, k);
 }
 
 function typeStream(a: A, type: string, dur: number, k: number): void {
   const set = TYPE_SFX[type] ?? TYPE_SFX.Normal;
-  if (set.stream && sample(a, set.stream, {gain: k, dur})) return;
-  // Sem jato gravado: emenda alguns acertos do tipo ao longo da duração.
-  const n = Math.max(2, Math.round(dur / 0.22));
-  for (let i = 0; i < n; i++) typeHit(a, type, i * (dur / n), 0.7 * k, dur / n + 0.1);
+  if (set.stream && sample(a, set.stream, {gain: k, dur})) {
+    if (type === 'Electric') VOICES.Electric(a, 0, dur, 0.5 * k);
+    return;
+  }
+  // Sem jato gravado: o timbre do tipo contínuo + acertos do tipo ao longo da duração.
+  (VOICES[type] ?? VOICES.Normal)(a, 0, dur, 0.6 * k);
+  const n = Math.max(2, Math.round(dur / 0.25));
+  for (let i = 0; i < n; i++) {
+    const set2 = TYPE_SFX[type] ?? TYPE_SFX.Normal;
+    sample(a, pick(set2.hit), {at: i * (dur / n), gain: 0.75 * k});
+  }
 }
 
 function whooshS(a: A, at: number, dur: number, rate = 1): void {
-  if (!sample(a, pick(['whoosh1', 'whoosh2'] as const), {at, gain: 0.6, rate})) whoosh(a, at, dur);
+  if (!sample(a, pick(['whoosh1', 'whoosh2'] as const), {at, gain: 0.4, rate})) whoosh(a, at, dur);
 }
 
 function impactS(a: A, at: number, k: number, kind: string): void {
@@ -377,15 +399,16 @@ export function playMove(moveName: string): void {
   switch (st.shape) {
     case 'contact':
       whooshS(a, 0, 0.18, 1.3);
-      impactS(a, 0.16, k, st.contact);
-      if (st.type !== 'Normal' && st.type !== 'Fighting') typeHit(a, st.type, 0.18, 0.6 * k, 0.25);
+      impactS(a, 0.16, st.type === 'Normal' ? k : 0.7 * k, st.contact);
+      if (st.type !== 'Normal') typeHit(a, st.type, 0.16, 0.95 * k, 0.3);
       break;
     case 'stream':
       typeStream(a, st.type, st.power >= 90 ? 1.1 : 0.8, k);
       break;
     case 'projectile': {
       const n = st.power > 0 && st.power <= 40 ? 2 : 1;
-      if (st.type !== 'Flying') whooshS(a, 0, 0.25, 1.2);
+      // Disparo já com a cara do tipo, depois o impacto do tipo.
+      (VOICES[st.type] ?? VOICES.Normal)(a, 0, 0.25, 0.45 * k);
       for (let i = 0; i < n; i++) typeHit(a, st.type, 0.3 + i * 0.15, k);
       break;
     }
