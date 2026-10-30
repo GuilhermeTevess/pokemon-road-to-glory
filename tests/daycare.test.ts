@@ -34,3 +34,22 @@ describe('creche', () => {
     expect(baby.nature).toBe('Adamant');
   });
 });
+
+describe('gênero', () => {
+  it('precisa de mãe fêmea e pai macho', async () => {
+    const {registerCatch} = await import('../src/game/meta');
+    const {createMon} = await import('../src/game/mon');
+    const c = col();
+    const f = createMon('Charmander', {level: 5});
+    f.gender = 'F';
+    registerCatch(c, f);
+    const m = createMon('Bulbasaur', {level: 5});
+    m.gender = 'F';
+    registerCatch(c, m);
+    expect(compatibility('Charmander', 'Bulbasaur', c).ok).toBe(false);
+    m.gender = 'M';
+    registerCatch(c, m);
+    expect(compatibility('Charmander', 'Bulbasaur', c).ok).toBe(true);
+    expect(compatibility('Bulbasaur', 'Charmander', c).ok).toBe(false);
+  });
+});

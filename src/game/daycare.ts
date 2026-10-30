@@ -3,7 +3,7 @@
 import {allLearnable, eggMoves, rarityOf, species} from '../data/dex';
 import {getItem} from '../data/items';
 import type {Collection} from './meta';
-import {entryOf, lineAbilities, lineRoot, ALL_NATURES} from './meta';
+import {entryOf, gendersOf, lineAbilities, lineRoot, ALL_NATURES} from './meta';
 import {createMon} from './mon';
 import {chance, pick, randInt, shuffle, uid} from './rng';
 import {STAT_IDS} from './types';
@@ -33,7 +33,7 @@ export function canBreedSpecies(name: string): boolean {
 }
 
 /** Os dois podem fazer um ovo? Devolve o motivo quando não. */
-export function compatibility(a: string, b: string): {ok: true; child: string} | {ok: false; why: string} {
+export function compatibility(a: string, b: string, c?: Collection): {ok: true; child: string} | {ok: false; why: string} {
   const sa = species(a);
   const sb = species(b);
   if (!canBreedSpecies(a) || !canBreedSpecies(b)) return {ok: false, why: 'Lendários e bebês não fazem ovos.'};
@@ -44,6 +44,10 @@ export function compatibility(a: string, b: string): {ok: true; child: string} |
   if (sa.gender === 'N' || sb.gender === 'N') return {ok: false, why: 'Pokémon sem gênero só fazem ovo com Ditto.'};
   const shared = sa.eggGroups.filter(g => sb.eggGroups.includes(g));
   if (!shared.length) return {ok: false, why: `Egg groups diferentes (${sa.eggGroups.join('/')} e ${sb.eggGroups.join('/')}).`};
+  if (c) {
+    if (!gendersOf(c, a).includes('F')) return {ok: false, why: `Você ainda não capturou um ${sa.name} fêmea (♀) para ser a mãe.`};
+    if (!gendersOf(c, b).includes('M')) return {ok: false, why: `Você ainda não capturou um ${sb.name} macho (♂) para ser o pai.`};
+  }
   return {ok: true, child: lineRoot(a)};
 }
 
@@ -57,7 +61,7 @@ export function hatchWaves(name: string): number {
  * (gastos ao fazer o ovo).
  */
 export function makeEgg(c: Collection, mother: string, father: string, items: [string | null, string | null]): Egg | null {
-  const comp = compatibility(mother, father);
+  const comp = compatibility(mother, father, c);
   if (!comp.ok) return null;
   const parents = [entryOf(c, mother), entryOf(c, father)];
   const childName = species(comp.child).name;
