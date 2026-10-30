@@ -183,8 +183,15 @@ export class BattleController {
 
   // ------------------------------------------------------------ Ações
 
-  chooseMove(index: number): BattleEvent[] {
-    return this.commit(`move ${index}`);
+  /** Com `mega`, o Pokémon mega-evolui antes de atacar (se puder). */
+  chooseMove(index: number, mega = false): BattleEvent[] {
+    return this.commit(`move ${index}`, mega);
+  }
+
+  /** Nome da forma mega, se o Pokémon em campo pode mega-evoluir agora. */
+  canMega(): string | null {
+    const f = this.playerActive?.canMegaEvo;
+    return typeof f === 'string' ? f : null;
   }
 
   chooseSwitch(uid: string): BattleEvent[] {
@@ -312,12 +319,11 @@ export class BattleController {
     return events;
   }
 
-  private commit(choice: string): BattleEvent[] {
+  private commit(choice: string, mega = false): BattleEvent[] {
     const b = this.battle;
     if (b.p2.requestState === 'move' && !b.p2.isChoiceDone()) b.choose('p2', this.wildChoice());
-    // Mega evolução automática no primeiro golpe (só 1 mega por time, controlado na loja/mochila).
-    const active = this.playerActive;
-    if (choice.startsWith('move') && active?.canMegaEvo && b.choose('p1', `${choice} mega`)) {
+    // Mega evolução quando o jogador pede (só 1 mega por time, controlado na loja/mochila).
+    if (mega && choice.startsWith('move') && this.canMega() && b.choose('p1', `${choice} mega`)) {
       this.friendshipCure();
       this.markParticipant();
       return this.readLog();

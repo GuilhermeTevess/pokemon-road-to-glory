@@ -29,7 +29,7 @@ export function Sprite(props: {name: string; back?: boolean; shiny?: boolean; st
 
 /** Nome do Pokémon: apelido grande com a espécie pequena embaixo; coração no parceiro. */
 export function MonName({mon}: {mon: {species: string; nickname?: string; partner?: boolean}}) {
-  const sp = species(mon.species).name;
+  const sp = species(mon.species).name.replace(/^(.*)-Mega(?:-([XY]))?$/, (_, base: string, xy?: string) => `Mega ${base}${xy ? ` ${xy}` : ''}`);
   return (
     <span className="mon-name">
       {mon.partner && (

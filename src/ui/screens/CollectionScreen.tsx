@@ -4,7 +4,7 @@ import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {ALL_TYPES, TYPE_COLORS, dex, species} from '../../data/dex';
 import {
-  ALL_NATURES, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_PRESETS, EV_RESET_PRICE, HEART_PERKS, TUTOR_PLANS, evTotal, lineAbilities, tutorPrice, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
+  ALL_NATURES, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_PRESETS, EV_RESET_PRICE, HEART_PERKS, TUTOR_PLANS, evTotal, lineAbilities, lineMegaStones, MEGA_STONE_PRICE, tutorPrice, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
   baseCost, favoriteOf, heartProgress, heartsOf, lineRoot, lineSpecies, movePrice, peekEntry, startMoveOptions, statsOf, teamCost,
 } from '../../game/meta';
 import type {CollectionEntry, Entry} from '../../game/meta';
@@ -12,7 +12,7 @@ import {NICK_MAX} from '../../game/mon';
 import {useGame} from '../../game/store';
 import {STAT_IDS, STAT_LABEL} from '../../game/types';
 import type {StatId} from '../../game/types';
-import {IvWeb, Modal, MoveInfo, PixelIcon, Sprite, TypeBadge, TypeFilter, Types} from '../components';
+import {IvWeb, ItemIcon, Modal, MoveInfo, PixelIcon, Sprite, TypeBadge, TypeFilter, Types} from '../components';
 import {playCry} from '../audio';
 import {TrainerAvatar} from './StartScreens';
 
@@ -211,7 +211,7 @@ function EvBox({root, e}: {root: string; e: Entry}) {
 
 /** Ficha da linha evolutiva. */
 export function LineSheet({line, onClose}: {line: string; onClose: () => void}) {
-  const {collection, setNickname, unlockMove, equipMove, equipNature, equipAbility, buyCostCut, buyShiny, setFavorite} = useGame();
+  const {collection, setNickname, unlockMove, equipMove, equipNature, equipAbility, buyCostCut, buyShiny, setFavorite, buyMegaStone} = useGame();
   const root = lineRoot(line);
   const e = peekEntry(collection, root);
   const [view, setView] = useState<Species>(species(root));
@@ -219,6 +219,7 @@ export function LineSheet({line, onClose}: {line: string; onClose: () => void}) 
   const [info, setInfo] = useState<string | null>(null);
   const [nick, setNick] = useState(collection.entries[root]?.nickname ?? '');
   const options = useMemo(() => startMoveOptions(root), [root]);
+  const stones = useMemo(() => lineMegaStones(root), [root]);
   if (!e) return null;
   const types = species(root).types as string[];
   const shownMoves = options.filter(o => !e.moves.includes(o.id) && (moveFilter === 'all' || types.includes(dex.moves.get(o.id).type)));
@@ -382,6 +383,31 @@ export function LineSheet({line, onClose}: {line: string; onClose: () => void}) 
                   <span className="hint">no máximo</span>
                 )}
               </li>
+              {stones.length > 0 && (
+                <li>
+                  <span>
+                    Começar com a Mega Pedra própria
+                    <small className="species-sub">Funciona quando ele estiver na forma que mega-evolui. Só 1 mega por time.</small>
+                  </span>
+                  {stones.map(st => (
+                    <button
+                      key={st.id}
+                      className={`btn small ${e.megaStone === st.id ? 'fav-on' : ''}`}
+                      disabled={!e.megaStone && e.candies < MEGA_STONE_PRICE}
+                      onClick={() => buyMegaStone(root, st.id)}
+                      title={st.desc}
+                    >
+                      <ItemIcon id={st.id} size={18} /> {st.name}
+                      {!e.megaStone && (
+                        <>
+                          {' · '}
+                          <Candies line={root} n={MEGA_STONE_PRICE} />
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </li>
+              )}
             </ul>
           </section>
         </div>
