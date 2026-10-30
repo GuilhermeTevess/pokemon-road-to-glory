@@ -1,6 +1,6 @@
 // Itens do jogo. Os "held" são itens reais do Showdown e funcionam dentro da batalha.
 
-export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money';
+export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability';
 export type ItemTier = 'common' | 'great' | 'ultra' | 'master';
 
 export interface ItemDef {
@@ -17,11 +17,29 @@ export interface ItemDef {
   power?: number;
   /** Nome do item no Showdown (itens de segurar). */
   showdown?: string;
+  /** Atributo que um item X aumenta na batalha. */
+  stat?: 'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy';
+  /** Natureza que a menta aplica. */
+  nature?: string;
+  /** Peso no sorteio de recompensas (padrão 1). */
+  weight?: number;
 }
 
-const held = (id: string, name: string, showdown: string, desc: string, tier: ItemTier, sprite: string): ItemDef => ({
-  id, name, desc, kind: 'held', tier, sprite, price: 0, showdown,
+const held = (id: string, name: string, showdown: string, desc: string, tier: ItemTier, sprite: string, weight?: number): ItemDef => ({
+  id, name, desc, kind: 'held', tier, sprite, price: 0, showdown, weight,
 });
+
+const xItem = (id: string, name: string, stat: ItemDef['stat'], label: string, sprite: string): ItemDef => ({
+  id, name, desc: `Na batalha: ${label} +2 estágios até o fim da luta.`, kind: 'battle', tier: 'common', sprite, price: 500, stat, weight: 0.4,
+});
+
+const mint = (id: string, name: string, nature: string, label: string, sprite: string): ItemDef => ({
+  id, name, desc: `Muda a natureza para ${nature} (${label}).`, kind: 'mint', tier: 'great', sprite, price: 0, nature, weight: 0.35,
+});
+
+/** Itens que fortalecem golpes de um tipo em 20%. */
+const typeBoost = (id: string, name: string, showdown: string, type: string, sprite: string): ItemDef =>
+  held(id, name, showdown, `Golpes do tipo ${type} 20% mais fortes.`, 'great', sprite, 0.12);
 
 export const ITEMS: ItemDef[] = [
   {id: 'pokeball', name: 'Poké Ball', desc: 'Captura Pokémon selvagens.', kind: 'ball', tier: 'common', sprite: 'poke-ball', price: 200, power: 1},
@@ -36,12 +54,31 @@ export const ITEMS: ItemDef[] = [
   {id: 'revive', name: 'Reviver', desc: 'Revive um Pokémon com metade do HP.', kind: 'revive', tier: 'great', sprite: 'revive', price: 1500, power: 0.5},
   {id: 'maxrevive', name: 'Reviver Máximo', desc: 'Revive um Pokémon com HP cheio.', kind: 'revive', tier: 'ultra', sprite: 'max-revive', price: 0, power: 1},
 
-  {id: 'rarecandy', name: 'Doce Raro', desc: 'Sobe o Pokémon 1 nível.', kind: 'candy', tier: 'great', sprite: 'rare-candy', price: 0},
+  {id: 'rarecandy', name: 'Doce Raro', desc: 'Sobe o Pokémon 1 nível.', kind: 'candy', tier: 'great', sprite: 'rare-candy', price: 0, power: 1},
+  {id: 'expcandym', name: 'Doce de EXP M', desc: 'Sobe o Pokémon 2 níveis.', kind: 'candy', tier: 'great', sprite: 'exp-candy-m', price: 0, power: 2, weight: 0.6},
+  {id: 'expcandyl', name: 'Doce de EXP G', desc: 'Sobe o Pokémon 4 níveis.', kind: 'candy', tier: 'ultra', sprite: 'exp-candy-l', price: 0, power: 4, weight: 0.6},
+  {id: 'abilitycapsule', name: 'Cápsula de Habilidade', desc: 'Troca a habilidade do Pokémon pela outra habilidade comum dele.', kind: 'ability', tier: 'ultra', sprite: 'ability-capsule', price: 0, weight: 0.5},
   {id: 'evostone', name: 'Pedra da Evolução', desc: 'Evolui Pokémon que evoluem por pedra, troca, amizade ou condição especial.', kind: 'evolution', tier: 'ultra', sprite: 'moon-stone', price: 0},
   {id: 'tm', name: 'Disco Técnico', desc: 'Ensina um golpe aleatório que o Pokémon consegue aprender.', kind: 'tm', tier: 'great', sprite: 'tm-normal', price: 0},
   {id: 'map', name: 'Mapa', desc: 'Permite trocar de bioma depois da próxima vitória.', kind: 'map', tier: 'great', sprite: 'town-map', price: 1000},
   {id: 'incense', name: 'Incenso Raro', desc: 'Pokémon raros aparecem mais pelas próximas 5 rondas.', kind: 'incense', tier: 'ultra', sprite: 'luck-incense', price: 0},
-  {id: 'money', name: 'Bolsa de Moedas', desc: 'Ganha dinheiro.', kind: 'money', tier: 'common', sprite: 'amulet-coin', price: 0},
+  {id: 'money', name: 'Bolsa de Moedas', desc: 'Vale dinheiro na hora.', kind: 'money', tier: 'common', sprite: 'amulet-coin', price: 0, power: 1},
+  {id: 'nugget', name: 'Pepita', desc: 'Vale bastante dinheiro na hora.', kind: 'money', tier: 'great', sprite: 'nugget', price: 0, power: 2.5, weight: 0.6},
+  {id: 'bignugget', name: 'Pepita Grande', desc: 'Vale muito dinheiro na hora.', kind: 'money', tier: 'ultra', sprite: 'big-nugget', price: 0, power: 5, weight: 0.5},
+
+  xItem('xattack', 'Ataque X', 'atk', 'Ataque', 'x-attack'),
+  xItem('xdefense', 'Defesa X', 'def', 'Defesa', 'x-defense'),
+  xItem('xspatk', 'Ataque Esp. X', 'spa', 'Ataque Especial', 'x-sp-atk'),
+  xItem('xspdef', 'Defesa Esp. X', 'spd', 'Defesa Especial', 'x-sp-def'),
+  xItem('xspeed', 'Velocidade X', 'spe', 'Velocidade', 'x-speed'),
+  xItem('xaccuracy', 'Precisão X', 'accuracy', 'Precisão', 'x-accuracy'),
+
+  mint('adamantmint', 'Menta Firme', 'Adamant', '+Ataque, -Atq. Esp.', 'adamant-mint'),
+  mint('modestmint', 'Menta Modesta', 'Modest', '+Atq. Esp., -Ataque', 'modest-mint'),
+  mint('jollymint', 'Menta Alegre', 'Jolly', '+Velocidade, -Atq. Esp.', 'jolly-mint'),
+  mint('timidmint', 'Menta Tímida', 'Timid', '+Velocidade, -Ataque', 'timid-mint'),
+  mint('boldmint', 'Menta Ousada', 'Bold', '+Defesa, -Ataque', 'bold-mint'),
+  mint('calmmint', 'Menta Calma', 'Calm', '+Def. Esp., -Ataque', 'calm-mint'),
 
   held('leftovers', 'Restos', 'Leftovers', 'Recupera 1/16 do HP por turno.', 'ultra', 'leftovers'),
   held('sitrusberry', 'Fruta Sitrus', 'Sitrus Berry', 'Cura 1/4 do HP quando fica abaixo da metade.', 'common', 'sitrus-berry'),
@@ -62,6 +99,30 @@ export const ITEMS: ItemDef[] = [
   held('assaultvest', 'Colete de Assalto', 'Assault Vest', 'Def. Especial x1,5, só golpes de ataque.', 'ultra', 'assault-vest'),
   held('eviolite', 'Eviolita', 'Eviolite', 'Defesas x1,5 se o Pokémon ainda pode evoluir.', 'ultra', 'eviolite'),
   held('scopelens', 'Lente de Mira', 'Scope Lens', 'Aumenta a chance de acerto crítico.', 'common', 'scope-lens'),
+  held('widelens', 'Lente Ampla', 'Wide Lens', 'Golpes acertam 10% mais.', 'common', 'wide-lens'),
+  held('brightpowder', 'Pó Brilhante', 'Bright Powder', 'O inimigo erra mais.', 'common', 'bright-powder'),
+  held('airballoon', 'Balão', 'Air Balloon', 'Imune a golpes de Terra até levar um golpe.', 'great', 'air-balloon'),
+  held('weaknesspolicy', 'Seguro Fraqueza', 'Weakness Policy', 'Ao levar golpe super efetivo: Ataque e Atq. Esp. +2.', 'ultra', 'weakness-policy'),
+  held('blacksludge', 'Lodo Negro', 'Black Sludge', 'Tipo Veneno: recupera 1/16 do HP por turno (outros perdem).', 'great', 'black-sludge', 0.4),
+
+  typeBoost('charcoal', 'Carvão', 'Charcoal', 'Fogo', 'charcoal'),
+  typeBoost('mysticwater', 'Água Mística', 'Mystic Water', 'Água', 'mystic-water'),
+  typeBoost('miracleseed', 'Semente Milagrosa', 'Miracle Seed', 'Planta', 'miracle-seed'),
+  typeBoost('magnet', 'Ímã', 'Magnet', 'Elétrico', 'magnet'),
+  typeBoost('nevermeltice', 'Gelo Eterno', 'Never-Melt Ice', 'Gelo', 'never-melt-ice'),
+  typeBoost('blackbelt', 'Faixa Preta', 'Black Belt', 'Lutador', 'black-belt'),
+  typeBoost('poisonbarb', 'Ferrão Venenoso', 'Poison Barb', 'Venenoso', 'poison-barb'),
+  typeBoost('softsand', 'Areia Macia', 'Soft Sand', 'Terra', 'soft-sand'),
+  typeBoost('sharpbeak', 'Bico Afiado', 'Sharp Beak', 'Voador', 'sharp-beak'),
+  typeBoost('twistedspoon', 'Colher Torta', 'Twisted Spoon', 'Psíquico', 'twisted-spoon'),
+  typeBoost('silverpowder', 'Pó Prateado', 'Silver Powder', 'Inseto', 'silver-powder'),
+  typeBoost('hardstone', 'Pedra Dura', 'Hard Stone', 'Pedra', 'hard-stone'),
+  typeBoost('spelltag', 'Selo Fantasma', 'Spell Tag', 'Fantasma', 'spell-tag'),
+  typeBoost('dragonfang', 'Presa de Dragão', 'Dragon Fang', 'Dragão', 'dragon-fang'),
+  typeBoost('blackglasses', 'Óculos Escuros', 'Black Glasses', 'Sombrio', 'black-glasses'),
+  typeBoost('metalcoat', 'Revestimento Metálico', 'Metal Coat', 'Aço', 'metal-coat'),
+  typeBoost('silkscarf', 'Lenço de Seda', 'Silk Scarf', 'Normal', 'silk-scarf'),
+  typeBoost('fairyfeather', 'Pena de Fada', 'Fairy Feather', 'Fada', 'fairy-feather'),
 ];
 
 export function getItem(id: string): ItemDef {
@@ -89,17 +150,26 @@ export function itemUsage(item: ItemDef): string {
     case 'heal':
       return 'Use na batalha (Mochila) ou entre batalhas.';
     case 'revive':
-      return 'Use entre batalhas, em "Time e mochila".';
+      return 'Use na batalha (Mochila) ou entre batalhas.';
     case 'candy':
     case 'evolution':
     case 'tm':
-      return 'Use entre batalhas, escolhendo um Pokémon.';
+    case 'mint':
+    case 'ability':
+      return 'Use ao pegar ou depois, pela Mochila, escolhendo um Pokémon.';
+    case 'battle':
+      return 'Só na batalha: Mochila > item. Vale até o fim da luta.';
     case 'held':
-      return 'Equipe num Pokémon: funciona sozinho na batalha.';
+      return 'Equipe num Pokémon (ao pegar ou pela Mochila): funciona sozinho na batalha.';
     case 'map':
     case 'incense':
-      return 'Use entre batalhas, em "Time e mochila".';
+      return 'Use ao pegar ou depois, pela Mochila.';
     case 'money':
       return 'Vira dinheiro na hora.';
   }
+}
+
+/** Itens que pedem um Pokémon como alvo fora da batalha. */
+export function needsTarget(item: ItemDef): boolean {
+  return ['heal', 'revive', 'candy', 'evolution', 'tm', 'held', 'mint', 'ability'].includes(item.kind);
 }

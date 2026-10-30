@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getBiome} from '../../data/biomes';
 import {TYPE_COLORS, defensiveMatchups, species} from '../../data/dex';
 import {getItem} from '../../data/items';
+import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
 import {isBossWave, isMilestoneWave, STAGE_LENGTH} from '../../game/encounters';
 import {getBattle, useGame} from '../../game/store';
@@ -156,7 +157,7 @@ export function BattleScreen() {
   };
 
   const balls = Object.entries(run.bag).filter(([id, n]) => n > 0 && getItem(id).kind === 'ball');
-  const heals = Object.entries(run.bag).filter(([id, n]) => n > 0 && getItem(id).kind === 'heal');
+  const heals = Object.entries(run.bag).filter(([id, n]) => n > 0 && ['heal', 'revive', 'battle'].includes(getItem(id).kind));
   const moves = ctl.moveOptions();
   const party = ctl.partyStatus();
   const wildTypes = ctl.wildActive.getTypes();
@@ -308,6 +309,7 @@ export function BattleScreen() {
                         PP {m.pp}/{m.maxpp}
                       </span>
                     </span>
+                    <span className="move-desc">{moveDescPt(m.name)}</span>
                     {eff && <span className={`eff ${eff.cls}`}>{eff.text}</span>}
                   </button>
                 );
@@ -334,13 +336,19 @@ export function BattleScreen() {
                   key={id}
                   className="btn item-btn"
                   onClick={() => {
+                    if (getItem(id).kind === 'battle') {
+                      if (!consume(id)) return;
+                      act(() => ctl.useBoostItem(id));
+                      return;
+                    }
                     setHealItem(id);
                     setMenu('healTarget');
                   }}
                 >
-                  <ItemIcon id={id} /> {getItem(id).name} x{n}
+                  <ItemIcon id={id} /> {getItem(id).name} x{n} <span className="muted small-desc">{getItem(id).desc}</span>
                 </button>
               ))}
+              {!heals.length && <p className="hint">Nenhum item de batalha na mochila. Poções, Reviver e itens X aparecem aqui.</p>}
               <button className="btn small back" onClick={() => setMenu('main')}>
                 ← Voltar
               </button>
@@ -348,7 +356,7 @@ export function BattleScreen() {
           ) : menu === 'healTarget' && healItem ? (
             <div className="list-actions">
               {party
-                .filter(p => p.hp > 0 && p.hp < p.maxhp)
+                .filter(p => (getItem(healItem).kind === 'revive' ? p.hp <= 0 : p.hp > 0 && p.hp < p.maxhp))
                 .map(p => (
                   <button
                     key={p.uid}

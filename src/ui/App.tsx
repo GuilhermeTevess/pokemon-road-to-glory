@@ -4,14 +4,15 @@ import {setSoundEnabled, soundEnabled} from './audio';
 import {HelpModal} from './screens/HelpModal';
 import {IvWeb, Modal, PixelIcon, Sprite} from './components';
 import {BattleScreen} from './screens/BattleScreen';
-import {EndScreen, PartyPanel, PendingModal, RewardScreen} from './screens/RunScreens';
+import {EndScreen, PartyPanel, PendingModal, RewardScreen, RunSidebar} from './screens/RunScreens';
+import type {PartyTab} from './screens/RunScreens';
 import {BiomeSelect, CollectionScreen, StarterSelect, TitleScreen} from './screens/StartScreens';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
   const [sound, setSound] = useState(soundEnabled());
-  const [partyOpen, setPartyOpen] = useState(false);
+  const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
 
   let body;
   if (screen === 'title') body = <TitleScreen />;
@@ -26,14 +27,14 @@ export function App() {
   const inRun = screen === 'run' && run && run.party.length > 0 && run.phase !== 'gameOver' && run.phase !== 'stageClear';
 
   return (
-    <div className="app">
+    <div className={`app ${inRun ? 'wide' : ''}`}>
       <nav className="topnav">
         <button className="btn small ghost" onClick={() => setScreen('title')}>
           <PixelIcon name="home" /> Início
         </button>
         {inRun && (
-          <button className="btn small" onClick={() => setPartyOpen(true)}>
-            <img className="nav-icon" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/explorer-kit.png" alt="" /> Time e mochila
+          <button className="btn small nav-bag" onClick={() => setPartyOpen({tab: 'bag'})}>
+            <img className="nav-icon" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/explorer-kit.png" alt="" /> Time, mochila e PC
           </button>
         )}
         <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
@@ -50,8 +51,15 @@ export function App() {
           <PixelIcon name={sound ? 'sound' : 'mute'} /> {sound ? 'Som' : 'Mudo'}
         </button>
       </nav>
-      <main>{body}</main>
-      {partyOpen && <PartyPanel onClose={() => setPartyOpen(false)} />}
+      {inRun ? (
+        <div className="run-layout">
+          <main>{body}</main>
+          <RunSidebar onOpen={(tab, mon) => setPartyOpen({tab, mon})} />
+        </div>
+      ) : (
+        <main>{body}</main>
+      )}
+      {partyOpen && <PartyPanel key={`${partyOpen.tab}-${partyOpen.mon}`} initialTab={partyOpen.tab} initialMon={partyOpen.mon} onClose={() => setPartyOpen(null)} />}
       {screen === 'run' && <PendingModal />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
       {ivGain && (

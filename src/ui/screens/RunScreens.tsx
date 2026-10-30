@@ -1,16 +1,95 @@
 import {useEffect, useState} from 'react';
 import {dex, species} from '../../data/dex';
-import {TIER_COLORS, getItem, itemUsage} from '../../data/items';
+import {moveDescPt} from '../../data/movesPt';
+import {getBiome} from '../../data/biomes';
+import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {BIOME_CHANGE_EVERY, HEAL_EVERY, STAGE_LENGTH} from '../../game/encounters';
 import {calcStats, expForLevel, itemEvolutions} from '../../game/mon';
-import {rerollCost, shopItems} from '../../game/rewards';
+import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
-import {HpBar, ItemIcon, MatchupPanel, Modal, PixelIcon, Sprite, StatsTable, TypeBadge, Types} from '../components';
+import {playCoins, playItem} from '../audio';
+import {HpBar, ItemIcon, MatchupPanel, Modal, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
+import {TrainerAvatar} from './StartScreens';
+
+/** Lista de Pokémon para escolher em quem usar um item. */
+function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: OwnedMon[]; onPick: (uid: string) => void; children?: React.ReactNode}) {
+  const item = getItem(itemId);
+  const note = (m: OwnedMon): string => {
+    const max = calcStats(m).hp;
+    switch (item.kind) {
+      case 'heal':
+        return m.hp <= 0 ? 'Desmaiado' : m.hp >= max ? 'HP cheio' : `HP ${m.hp}/${max}`;
+      case 'revive':
+        return m.hp <= 0 ? 'Pode reviver' : 'Não está desmaiado';
+      case 'evolution':
+        return itemEvolutions(m).length ? 'Pode evoluir!' : 'Não evolui com pedra';
+      case 'held':
+        return m.item ? `Segura ${getItem(m.item).name} (volta p/ mochila)` : 'Mãos livres';
+      case 'mint':
+        return `Natureza atual: ${m.nature}`;
+      case 'ability':
+        return `Habilidade: ${m.ability}`;
+      default:
+        return `Nv. ${m.level}`;
+    }
+  };
+  const ok = (m: OwnedMon): boolean => {
+    const max = calcStats(m).hp;
+    if (item.kind === 'heal') return m.hp > 0 && m.hp < max;
+    if (item.kind === 'revive') return m.hp <= 0;
+    if (item.kind === 'evolution') return itemEvolutions(m).length > 0;
+    if (item.kind === 'mint') return m.nature !== item.nature;
+    return true;
+  };
+  return (
+    <div className="target-picker">
+      <div className="row center">
+        <ItemIcon id={itemId} size={40} />
+        <div className="left">
+          <strong>{item.name}</strong>
+          <div className="muted">{item.desc}</div>
+        </div>
+      </div>
+      <p className="hint">Em qual Pokémon?</p>
+      <div className="target-list">
+        {mons.map(m => (
+          <button key={m.uid} className="target-btn" disabled={!ok(m)} onClick={() => onPick(m.uid)}>
+            <Sprite name={m.species} shiny={m.shiny} size={48} />
+            <span className="left">
+              <span>
+                {m.species} Nv.{m.level}
+              </span>
+              <span className="muted">{note(m)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RewardCard({id, wave, onClick}: {id: string; wave: number; onClick: () => void}) {
+  const it = getItem(id);
+  return (
+    <button className={`reward-card tier-${it.tier}`} style={{['--tier' as string]: TIER_COLORS[it.tier]}} onClick={onClick}>
+      <span className="tier-tag">{TIER_LABEL[it.tier]}</span>
+      <ItemIcon id={id} size={56} />
+      <span className="reward-name">{it.name}</span>
+      {it.kind === 'money' && <span className="reward-money">+₽ {moneyValue(it, wave)}</span>}
+      <span className="reward-desc">{it.desc}</span>
+      <span className="reward-usage">{itemUsage(it)}</span>
+    </button>
+  );
+}
+
+const TIER_LABEL: Record<string, string> = {common: 'Comum', great: 'Bom', ultra: 'Raro', master: 'Lendário'};
 
 export function RewardScreen() {
   const {run, pickReward, reroll, buy, skipReward} = useGame();
   const [tab, setTab] = useState<'reward' | 'shop'>('reward');
+  const [choosing, setChoosing] = useState<string | null>(null);
   if (!run) return null;
   const cost = rerollCost(run.rerolls, run.wave);
   const nextWave = run.wave + 1;
@@ -19,6 +98,17 @@ export function RewardScreen() {
     run.wave % HEAL_EVERY === 0 ? (['heart', 'Seu time será curado no Centro Pokémon.'] as const) : null,
     run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady ? (['map', 'Você vai poder trocar de bioma.'] as const) : null,
   ].filter(n => n !== null);
+  const choose = (id: string) => {
+    const it = getItem(id);
+    if (it.kind === 'money') {
+      playCoins();
+      return pickReward(id);
+    }
+    playItem();
+    if (needsTarget(it) || it.kind === 'map' || it.kind === 'incense') return setChoosing(id);
+    pickReward(id);
+  };
+  const choosingItem = choosing ? getItem(choosing) : null;
   return (
     <div className="screen reward-screen">
       <h2>Ronda {run.wave} concluída!</h2>
@@ -27,29 +117,21 @@ export function RewardScreen() {
           <PixelIcon name={icon} /> {text}
         </p>
       ))}
-      <div className="tabs">
+      <div className="tabs big">
         <button className={`tab ${tab === 'reward' ? 'active' : ''}`} onClick={() => setTab('reward')}>
-          Recompensa
+          Recompensa grátis
         </button>
         <button className={`tab ${tab === 'shop' ? 'active' : ''}`} onClick={() => setTab('shop')}>
-          Loja (₽ {run.money})
+          Loja · ₽ {run.money}
         </button>
       </div>
       {tab === 'reward' ? (
         <>
-          <p className="hint">Escolha 1 item:</p>
+          <p className="hint">Escolha 1 item de graça. Itens que vão num Pokémon podem ser usados na hora ou guardados na mochila.</p>
           <div className="rewards">
-            {run.rewardOptions.map(id => {
-              const it = getItem(id);
-              return (
-                <button key={id} className="reward-card" style={{borderColor: TIER_COLORS[it.tier]}} onClick={() => pickReward(id)}>
-                  <ItemIcon id={id} size={48} />
-                  <span className="reward-name">{it.name}</span>
-                  <span className="reward-desc">{it.desc}</span>
-                  <span className="reward-usage">{itemUsage(it)}</span>
-                </button>
-              );
-            })}
+            {run.rewardOptions.map(id => (
+              <RewardCard key={id} id={id} wave={run.wave} onClick={() => choose(id)} />
+            ))}
           </div>
           <div className="row center">
             <button className="btn" disabled={run.money < cost} onClick={reroll}>
@@ -62,111 +144,254 @@ export function RewardScreen() {
         </>
       ) : (
         <div className="shop">
-          {shopItems().map(it => (
-            <button key={it.id} className="btn item-btn" disabled={run.money < it.price} onClick={() => buy(it.id)}>
-              <ItemIcon id={it.id} /> {it.name} · ₽ {it.price} <span className="muted">(tem {run.bag[it.id] ?? 0})</span>
-            </button>
+          <div className="wallet panel">
+            <ItemIcon id="money" size={32} /> Você tem <strong>₽ {run.money}</strong>
+            <span className="muted"> · ganha dinheiro a cada vitória e com Bolsas e Pepitas</span>
+          </div>
+          {SHOP.map(shelf => (
+            <section key={shelf.title} className="shelf">
+              <h3>{shelf.title}</h3>
+              <div className="shelf-items">
+                {shelf.items.map(id => {
+                  const it = getItem(id);
+                  return (
+                    <div key={id} className="shop-card panel">
+                      <ItemIcon id={id} size={40} />
+                      <div className="shop-text">
+                        <strong>{it.name}</strong>
+                        <span className="muted">{it.desc}</span>
+                        <span className="muted">Na mochila: {run.bag[id] ?? 0}</span>
+                      </div>
+                      <button className="btn small primary" disabled={run.money < it.price} onClick={() => { playCoins(); buy(id); }}>
+                        ₽ {it.price}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           ))}
+          <button className="btn" onClick={() => setTab('reward')}>
+            Voltar para a recompensa
+          </button>
         </div>
       )}
-      <p className="hint">Próxima: ronda {Math.min(nextWave, STAGE_LENGTH)}. Abra "Time" para usar itens, equipar e organizar.</p>
+      <p className="hint">Próxima: ronda {Math.min(nextWave, STAGE_LENGTH)}.</p>
+      {choosing && choosingItem && (
+        <Modal onClose={() => setChoosing(null)}>
+          <h2>Usar agora?</h2>
+          {needsTarget(choosingItem) ? (
+            <TargetPicker itemId={choosing} mons={[...run.party, ...run.box]} onPick={uid => pickReward(choosing, uid)}>
+              <button className="btn" onClick={() => pickReward(choosing)}>
+                Guardar na mochila
+              </button>
+            </TargetPicker>
+          ) : (
+            <div className="list-actions">
+              <p>{choosingItem.desc}</p>
+              <button className="btn primary" onClick={() => pickReward(choosing, '')}>
+                Usar agora
+              </button>
+              <button className="btn" onClick={() => pickReward(choosing)}>
+                Guardar na mochila
+              </button>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
 
-export function PartyPanel({onClose}: {onClose: () => void}) {
+export type PartyTab = 'party' | 'bag' | 'box' | 'weak';
+
+const BAG_GROUPS: {title: string; kinds: string[]}[] = [
+  {title: 'Pokébolas', kinds: ['ball']},
+  {title: 'Cura', kinds: ['heal', 'revive']},
+  {title: 'Para a batalha', kinds: ['battle']},
+  {title: 'Para melhorar Pokémon', kinds: ['candy', 'evolution', 'tm', 'mint', 'ability']},
+  {title: 'Itens para segurar', kinds: ['held']},
+  {title: 'Viagem', kinds: ['map', 'incense']},
+];
+
+export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose: () => void; initialTab?: PartyTab; initialMon?: string}) {
   const {run, useItem, takeItem, setLead, swapWithBox} = useGame();
-  const [selected, setSelected] = useState<string | null>(run?.party[0]?.uid ?? null);
-  const [tab, setTab] = useState<'party' | 'bag' | 'box'>('party');
+  const [selected, setSelected] = useState<string | null>(initialMon ?? run?.party[0]?.uid ?? null);
+  const [tab, setTab] = useState<PartyTab>(initialTab);
+  const [using, setUsing] = useState<string | null>(null);
   if (!run) return null;
   const mon = run.party.find(m => m.uid === selected) ?? run.box.find(m => m.uid === selected);
   const inBattle = run.phase === 'battle';
   const bagEntries = Object.entries(run.bag).filter(([, n]) => n > 0);
+  const bagCount = bagEntries.reduce((a, [, n]) => a + n, 0);
   return (
     <Modal onClose={onClose} wide>
-      <div className="tabs">
+      <div className="tabs big">
         <button className={`tab ${tab === 'party' ? 'active' : ''}`} onClick={() => setTab('party')}>
           Time ({run.party.length}/6)
         </button>
         <button className={`tab ${tab === 'bag' ? 'active' : ''}`} onClick={() => setTab('bag')}>
-          Mochila
+          Mochila ({bagCount})
         </button>
         <button className={`tab ${tab === 'box' ? 'active' : ''}`} onClick={() => setTab('box')}>
-          Caixa ({run.box.length})
+          PC ({run.box.length})
+        </button>
+        <button className={`tab ${tab === 'weak' ? 'active' : ''}`} onClick={() => setTab('weak')}>
+          Fraquezas do time
         </button>
       </div>
-      <div className="party-layout">
-        <div className="party-list">
-          {(tab === 'box' ? run.box : run.party).map((m, i) => (
-            <MonRow key={m.uid} mon={m} lead={tab !== 'box' && i === 0} selected={m.uid === selected} onClick={() => setSelected(m.uid)} />
-          ))}
-          {tab === 'box' && !run.box.length && <p className="hint">Pokémon capturados com o time cheio vêm para cá.</p>}
+      {tab === 'weak' ? (
+        <div>
+          <p className="hint">Quantos Pokémon do seu time levam dano dobrado (fraco) ou reduzido (resiste) de cada tipo de golpe.</p>
+          <TeamWeakness party={run.party} />
         </div>
-        <div className="party-detail">
-          {tab === 'bag' ? (
-            <div className="bag">
-              {!bagEntries.length && <p className="hint">Mochila vazia.</p>}
-              {bagEntries.map(([id, n]) => {
-                const it = getItem(id);
-                const needsMon = !['map', 'incense'].includes(it.kind);
-                const usable = !inBattle && it.kind !== 'ball';
-                return (
-                  <div key={id} className="bag-row">
-                    <ItemIcon id={id} />
-                    <div className="bag-text">
-                      <strong>
-                        {it.name} x{n}
-                      </strong>
-                      <span className="muted">{it.desc}</span>
-                      <span className="usage">{itemUsage(it)}</span>
-                    </div>
-                    {usable && (
-                      <button className="btn small" disabled={needsMon && !mon} onClick={() => useItem(id, mon?.uid ?? '')}>
-                        {it.kind === 'held' ? 'Equipar' : 'Usar'}
-                        {needsMon && mon ? ` em ${mon.species}` : ''}
+      ) : tab === 'bag' ? (
+        <div className="bag">
+          {inBattle && <p className="banner">Durante a batalha, use itens pelo botão Mochila da batalha. Aqui você só consulta.</p>}
+          {!bagEntries.length && <p className="hint">Mochila vazia. Pegue itens nas recompensas ou compre na loja.</p>}
+          {using ? (
+            <TargetPicker
+              itemId={using}
+              mons={[...run.party, ...run.box]}
+              onPick={uid => {
+                useItem(using, uid);
+                setUsing(null);
+              }}
+            >
+              <button className="btn" onClick={() => setUsing(null)}>
+                Cancelar
+              </button>
+            </TargetPicker>
+          ) : (
+            BAG_GROUPS.map(g => {
+              const list = bagEntries.filter(([id]) => g.kinds.includes(getItem(id).kind));
+              if (!list.length) return null;
+              return (
+                <section key={g.title} className="shelf">
+                  <h3>{g.title}</h3>
+                  {list.map(([id, n]) => {
+                    const it = getItem(id);
+                    const usable = !inBattle && !['ball', 'battle'].includes(it.kind);
+                    return (
+                      <div key={id} className="bag-row">
+                        <ItemIcon id={id} />
+                        <div className="bag-text">
+                          <strong>
+                            {it.name} x{n}
+                          </strong>
+                          <span className="muted">{it.desc}</span>
+                          <span className="usage">{itemUsage(it)}</span>
+                        </div>
+                        {usable && (
+                          <button className="btn small primary" onClick={() => (needsTarget(it) ? setUsing(id) : useItem(id, ''))}>
+                            {it.kind === 'held' ? 'Equipar' : 'Usar'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <div className="party-layout">
+          <div className="party-list">
+            {tab === 'box' && <p className="hint">PC: Pokémon capturados com o time cheio. Troque com o time quando quiser (fora da batalha).</p>}
+            {(tab === 'box' ? run.box : run.party).map((m, i) => (
+              <MonRow key={m.uid} mon={m} lead={tab !== 'box' && i === 0} selected={m.uid === selected} onClick={() => setSelected(m.uid)} />
+            ))}
+            {tab === 'box' && !run.box.length && <p className="hint">O PC está vazio.</p>}
+          </div>
+          <div className="party-detail">
+            {mon ? (
+              <MonDetail
+                mon={mon}
+                actions={
+                  <div className="row wrap">
+                    {tab === 'party' && run.party[0]?.uid !== mon.uid && !inBattle && (
+                      <button className="btn small" onClick={() => setLead(mon.uid)}>
+                        Colocar na frente
                       </button>
                     )}
-                  </div>
-                );
-              })}
-              {inBattle && <p className="hint">Durante a batalha, use itens pelo menu da batalha.</p>}
-              {mon && <p className="hint">Selecionado: {mon.species} (troque na aba Time).</p>}
-            </div>
-          ) : mon ? (
-            <MonDetail
-              mon={mon}
-              actions={
-                <div className="row wrap">
-                  {tab === 'party' && run.party[0]?.uid !== mon.uid && !inBattle && (
-                    <button className="btn small" onClick={() => setLead(mon.uid)}>
-                      Colocar na frente
-                    </button>
-                  )}
-                  {mon.item && !inBattle && (
-                    <button className="btn small" onClick={() => takeItem(mon.uid)}>
-                      Tirar {getItem(mon.item).name}
-                    </button>
-                  )}
-                  {tab === 'box' && !inBattle &&
-                    (run.party.length < 6 ? (
-                      <button className="btn small" onClick={() => swapWithBox(mon.uid, null)}>
-                        Levar para o time
+                    {mon.item && !inBattle && (
+                      <button className="btn small" onClick={() => takeItem(mon.uid)}>
+                        Tirar {getItem(mon.item).name}
                       </button>
-                    ) : (
-                      run.party.map(p => (
-                        <button key={p.uid} className="btn small" onClick={() => swapWithBox(mon.uid, p.uid)}>
-                          Trocar por {p.species}
+                    )}
+                    {tab === 'box' && !inBattle &&
+                      (run.party.length < 6 ? (
+                        <button className="btn small" onClick={() => swapWithBox(mon.uid, null)}>
+                          Levar para o time
                         </button>
-                      ))
-                    ))}
-                  {itemEvolutions(mon).length > 0 && <span className="hint">Evolui com Pedra da Evolução.</span>}
-                </div>
-              }
-            />
-          ) : null}
+                      ) : (
+                        run.party.map(p => (
+                          <button key={p.uid} className="btn small" onClick={() => swapWithBox(mon.uid, p.uid)}>
+                            Trocar por {p.species}
+                          </button>
+                        ))
+                      ))}
+                    {itemEvolutions(mon).length > 0 && <span className="hint">Evolui com Pedra da Evolução.</span>}
+                  </div>
+                }
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Painel fixo ao lado da run: treinador, dinheiro, time, mochila, PC e fraquezas. */
+export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => void}) {
+  const {run, trainer} = useGame();
+  if (!run) return null;
+  const bagCount = Object.values(run.bag).reduce((a, n) => a + n, 0);
+  return (
+    <aside className="run-sidebar">
+      <div className="panel sb-head">
+        {trainer && <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={48} />}
+        <div>
+          <div className="trainer-name">{trainer?.name}</div>
+          <div className="sb-money">₽ {run.money}</div>
+          <div className="muted">
+            Ronda {run.wave}/{STAGE_LENGTH} · {getBiome(run.biome).name}
+          </div>
         </div>
       </div>
-    </Modal>
+      <div className="panel sb-team">
+        <h3>Time</h3>
+        {run.party.map((m, i) => (
+          <button key={m.uid} className={`sb-mon ${m.hp <= 0 ? 'fainted' : ''}`} onClick={() => onOpen('party', m.uid)}>
+            <Sprite name={m.species} shiny={m.shiny} size={40} still />
+            <span className="sb-mon-info">
+              <span className="sb-mon-name">
+                {i === 0 && <PixelIcon name="star" color="#e0a100" size={10} />} {m.species} <span className="muted">Nv.{m.level}</span>
+                {m.item && <ItemIcon id={m.item} size={18} />}
+              </span>
+              <HpBar hp={m.hp} maxhp={calcStats(m).hp} />
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="sb-buttons">
+        <button className="btn" onClick={() => onOpen('bag')}>
+          <ItemIcon id="pokeball" size={24} /> Mochila · {bagCount}
+        </button>
+        <button className="btn" onClick={() => onOpen('box')}>
+          <PixelIcon name="home" /> PC · {run.box.length}
+        </button>
+      </div>
+      <div className="panel sb-weak">
+        <h3>Fraquezas do time</h3>
+        <TeamWeakness party={run.party} compact />
+        <button className="btn small ghost" onClick={() => onOpen('weak')}>
+          Ver tabela completa
+        </button>
+      </div>
+    </aside>
   );
 }
 
@@ -214,8 +439,11 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
           const mv = dex.moves.get(m);
           return (
             <div key={m} className="move-chip">
-              <TypeBadge type={mv.type} small /> {mv.name}
-              {mv.basePower > 0 && <span className="muted"> · {mv.basePower}</span>}
+              <span className="row">
+                <TypeBadge type={mv.type} small /> {mv.name}
+                {mv.basePower > 0 && <span className="muted"> · Poder {mv.basePower}</span>}
+              </span>
+              <span className="move-desc">{moveDescPt(m)}</span>
             </div>
           );
         })}
@@ -268,14 +496,14 @@ export function PendingModal() {
       <div className="move-chip big">
         <TypeBadge type={newMove.type} /> {newMove.name} · {newMove.basePower || '—'} poder · {newMove.category}
       </div>
-      <p className="muted">{newMove.shortDesc}</p>
+      <p className="muted">{moveDescPt(newMove.name)}</p>
       <p>Qual golpe esquecer?</p>
       <div className="list-actions">
         {mon.moves.map((m, i) => {
           const mv = dex.moves.get(m);
           return (
-            <button key={m} className="btn item-btn" onClick={() => resolvePending(i)}>
-              <TypeBadge type={mv.type} small /> {mv.name} ({mv.basePower || '—'})
+            <button key={m} className="btn item-btn" onClick={() => resolvePending(i)} title={moveDescPt(m)}>
+              <TypeBadge type={mv.type} small /> {mv.name} ({mv.basePower || '—'}) <span className="muted small-desc">{moveDescPt(m)}</span>
             </button>
           );
         })}

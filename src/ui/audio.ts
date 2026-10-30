@@ -1,7 +1,7 @@
 // Sons: gritos dos Pokémon (versões modernas do PokéAPI, com os do Showdown como
-// reserva) e efeitos de golpe sintetizados com Web Audio. Cada tipo tem um timbre
-// próprio e cada formato de golpe (moveStyle.ts) tem seu ritmo: soco, jato, chuva...
-import {species, toID} from '../data/dex';
+// reserva) e efeitos de golpe. Os golpes usam sons gravados livres (CC0) por tipo,
+// no ritmo do formato do golpe (moveStyle.ts); o sintetizador é a reserva.
+import {dex, species, toID} from '../data/dex';
 import {moveStyle} from './moveStyle';
 
 let enabled = (() => {
@@ -86,6 +86,7 @@ function audio(): {c: AudioContext; out: AudioNode} | null {
       bus.connect(verb);
       out = bus;
     }
+    preload(ctx);
     if (ctx.state === 'suspended') void ctx.resume();
     return {c: ctx, out: out!};
   } catch {
@@ -270,58 +271,184 @@ function whoosh(a: A, at: number, dur: number): void {
   noise(a, {filter: 'bandpass', from: 300, to: 1800, dur, gain: 0.25, at, q: 2, attack: dur * 0.5});
 }
 
-/** Som do golpe: timbre do tipo + ritmo do formato. */
+// ------------------------------------------------------------ Amostras gravadas (CC0)
+// Sons reais (fogo crepitando, água, trovão, "zoom"...) em public/sfx. Ver CREDITS.txt.
+// Enquanto uma amostra não carregou, o sintetizador acima faz as vezes dela.
+
+const SFX = [
+  'fire1', 'fire2', 'fire3', 'fire-stream', 'water1', 'water2', 'bubble1', 'bubble2', 'water-stream',
+  'electric1', 'electric-stream', 'thunder', 'ice1', 'ice2', 'ice3', 'grass1', 'grass2', 'rock1', 'rock2',
+  'rock3', 'quake', 'steel1', 'steel2', 'hit1', 'hit2', 'hit3', 'thunk', 'whoosh1', 'whoosh2', 'twirl',
+  'slash', 'psychic1', 'psychic2', 'ghost1', 'poison1', 'poison2', 'dragon1', 'dragon2', 'dark1', 'fairy1',
+  'fairy2', 'explosion', 'explosion2', 'buff1', 'buff2', 'buff3', 'debuff', 'coins', 'item',
+] as const;
+type Sfx = (typeof SFX)[number];
+
+const buffers = new Map<string, AudioBuffer>();
+let preloaded = false;
+
+function preload(c: AudioContext): void {
+  if (preloaded) return;
+  preloaded = true;
+  for (const name of SFX) {
+    fetch(`${import.meta.env.BASE_URL}sfx/${name}.mp3`)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .then(b => c.decodeAudioData(b))
+      .then(buf => buffers.set(name, buf))
+      .catch(() => {});
+  }
+}
+
+/** Toca uma amostra; devolve false se ela ainda não está pronta. */
+function sample(a: A, name: Sfx, o: {at?: number; gain?: number; rate?: number; dur?: number} = {}): boolean {
+  const buf = buffers.get(name);
+  if (!buf) return false;
+  const t = a.c.currentTime + (o.at ?? 0);
+  const src = a.c.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = (o.rate ?? 1) * (0.95 + Math.random() * 0.1);
+  const g = a.c.createGain();
+  g.gain.value = (o.gain ?? 1) * volume * 1.4;
+  if (o.dur) {
+    g.gain.setValueAtTime(g.gain.value, t + o.dur * 0.7);
+    g.gain.linearRampToValueAtTime(0, t + o.dur);
+  }
+  src.connect(g).connect(a.out);
+  src.start(t);
+  if (o.dur) src.stop(t + o.dur + 0.02);
+  return true;
+}
+
+const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
+
+/** Amostras de cada tipo: golpe curto (hit) e jato longo (stream). */
+const TYPE_SFX: Record<string, {hit: Sfx[]; stream?: Sfx}> = {
+  Fire: {hit: ['fire1', 'fire2', 'fire3'], stream: 'fire-stream'},
+  Water: {hit: ['water1', 'water2', 'bubble1'], stream: 'water-stream'},
+  Electric: {hit: ['electric1'], stream: 'electric-stream'},
+  Ice: {hit: ['ice1', 'ice2', 'ice3']},
+  Grass: {hit: ['grass1', 'grass2']},
+  Rock: {hit: ['rock1', 'rock2', 'rock3']},
+  Ground: {hit: ['rock3', 'thunk']},
+  Steel: {hit: ['steel1', 'steel2']},
+  Fighting: {hit: ['hit2', 'hit3']},
+  Flying: {hit: ['whoosh1', 'whoosh2']},
+  Psychic: {hit: ['psychic1', 'psychic2']},
+  Ghost: {hit: ['ghost1']},
+  Poison: {hit: ['poison1', 'poison2']},
+  Dragon: {hit: ['dragon1', 'dragon2']},
+  Dark: {hit: ['dark1', 'slash']},
+  Fairy: {hit: ['fairy1', 'fairy2']},
+  Bug: {hit: ['grass2']},
+  Normal: {hit: ['hit1', 'thunk']},
+};
+
+/** Som "do tipo": amostra se houver, sintetizador se não. */
+function typeHit(a: A, type: string, at: number, k: number, dur = 0.3): void {
+  const set = TYPE_SFX[type] ?? TYPE_SFX.Normal;
+  if (!sample(a, pick(set.hit), {at, gain: k})) (VOICES[type] ?? VOICES.Normal)(a, at, dur, k);
+  if (type === 'Bug') VOICES.Bug(a, at, dur, 0.6 * k);
+}
+
+function typeStream(a: A, type: string, dur: number, k: number): void {
+  const set = TYPE_SFX[type] ?? TYPE_SFX.Normal;
+  if (set.stream && sample(a, set.stream, {gain: k, dur})) return;
+  // Sem jato gravado: emenda alguns acertos do tipo ao longo da duração.
+  const n = Math.max(2, Math.round(dur / 0.22));
+  for (let i = 0; i < n; i++) typeHit(a, type, i * (dur / n), 0.7 * k, dur / n + 0.1);
+}
+
+function whooshS(a: A, at: number, dur: number, rate = 1): void {
+  if (!sample(a, pick(['whoosh1', 'whoosh2'] as const), {at, gain: 0.6, rate})) whoosh(a, at, dur);
+}
+
+function impactS(a: A, at: number, k: number, kind: string): void {
+  const name: Sfx = kind === 'slash' || kind === 'claw' ? 'slash' : kind === 'bite' ? 'thunk' : pick(['hit1', 'hit2', 'hit3'] as const);
+  if (!sample(a, name, {at, gain: k})) impact(a, at, k);
+}
+
+/** Som do golpe: amostra do tipo + ritmo do formato. */
 export function playMove(moveName: string): void {
   const a = audio();
   if (!a) return;
   const st = moveStyle(moveName);
-  const voice = VOICES[st.type] ?? VOICES.Normal;
-  const k = st.power >= 100 ? 1.25 : st.power >= 70 ? 1 : 0.8;
+  const m = dex.moves.get(moveName);
+  const k = st.power >= 100 ? 1.1 : st.power >= 70 ? 0.9 : 0.75;
   switch (st.shape) {
     case 'contact':
-      whoosh(a, 0, 0.18);
-      impact(a, 0.18, k);
-      if (st.type !== 'Normal') voice(a, 0.18, 0.22, 0.8 * k);
-      if (st.contact === 'claw' || st.contact === 'slash') noise(a, {filter: 'highpass', from: 3000, to: 7000, dur: 0.12, gain: 0.3, at: 0.2});
+      whooshS(a, 0, 0.18, 1.3);
+      impactS(a, 0.16, k, st.contact);
+      if (st.type !== 'Normal' && st.type !== 'Fighting') typeHit(a, st.type, 0.18, 0.6 * k, 0.25);
       break;
     case 'stream':
-      voice(a, 0, st.power >= 90 ? 0.9 : 0.65, k);
+      typeStream(a, st.type, st.power >= 90 ? 1.1 : 0.8, k);
       break;
     case 'projectile': {
-      const n = st.power >= 80 ? 1 : st.power > 0 && st.power <= 40 ? 3 : 2;
-      for (let i = 0; i < n; i++) voice(a, i * 0.11, 0.3, 0.8 * k);
-      impact(a, 0.42 + (n - 1) * 0.11, 0.7 * k);
+      const n = st.power > 0 && st.power <= 40 ? 2 : 1;
+      if (st.type !== 'Flying') whooshS(a, 0, 0.25, 1.2);
+      for (let i = 0; i < n; i++) typeHit(a, st.type, 0.3 + i * 0.15, k);
       break;
     }
     case 'rain':
       if (st.type === 'Electric') {
-        noise(a, {filter: 'highpass', from: 1500, to: 300, dur: 0.25, gain: 0.6});
-        tone(a, {wave: 'sine', from: 70, to: 30, dur: 1, gain: 0.5, at: 0.05});
-        noise(a, {filter: 'lowpass', from: 300, to: 60, dur: 1, gain: 0.4, at: 0.1});
+        if (!sample(a, 'thunder', {gain: 1.1})) VOICES.Electric(a, 0, 0.8, 1.2);
       } else {
-        for (let i = 0; i < 6; i++) voice(a, i * 0.08, 0.2, 0.6 * k);
-        impact(a, 0.5, k);
+        for (let i = 0; i < 3; i++) typeHit(a, st.type, i * 0.16, 0.7 * k);
       }
       break;
     case 'quake':
-      VOICES.Ground(a, 0, 0.9, 1.2);
+      if (!sample(a, 'quake', {gain: 1.2})) VOICES.Ground(a, 0, 0.9, 1.2);
       break;
     case 'burst':
-      noise(a, {filter: 'lowpass', from: 4000, to: 100, dur: 1, gain: 0.7});
-      tone(a, {wave: 'sine', from: 100, to: 30, dur: 0.9, gain: 0.6});
-      voice(a, 0.05, 0.5, k);
+      if (!sample(a, pick(['explosion', 'explosion2'] as const), {gain: 1.1})) {
+        noise(a, {filter: 'lowpass', from: 4000, to: 100, dur: 1, gain: 0.7});
+        tone(a, {wave: 'sine', from: 100, to: 30, dur: 0.9, gain: 0.6});
+      }
+      typeHit(a, st.type, 0.05, 0.6 * k);
       break;
     case 'self': {
-      const wave: OscillatorType = st.type === 'Electric' || st.type === 'Steel' ? 'square' : 'sine';
-      [523, 659, 784, 1047].forEach((f, i) => tone(a, {wave, from: f, to: f, dur: 0.14, gain: 0.12, at: i * 0.08}));
-      voice(a, 0.1, 0.3, 0.4);
+      const boosts = {...(m.boosts ?? {}), ...(m.self?.boosts ?? {})} as Record<string, number>;
+      if (boosts.spe && boosts.spe > 0) {
+        // Buff de velocidade: giro + "zuum" rápido.
+        sample(a, 'twirl', {gain: 0.8, rate: 1.2});
+        whooshS(a, 0.12, 0.3, 1.6);
+        sample(a, 'buff1', {at: 0.3, gain: 0.6, rate: 1.3});
+      } else if (m.heal || m.flags.heal) {
+        sample(a, 'fairy2', {gain: 0.8});
+        sample(a, 'buff2', {at: 0.15, gain: 0.7});
+      } else if (Object.values(boosts).some(v => v > 0)) {
+        if (!sample(a, pick(['buff1', 'buff2', 'buff3'] as const), {gain: 0.9})) {
+          [523, 659, 784, 1047].forEach((f, i) => tone(a, {wave: 'sine', from: f, to: f, dur: 0.14, gain: 0.12, at: i * 0.08}));
+        }
+        typeHit(a, st.type, 0.1, 0.35);
+      } else {
+        typeHit(a, st.type, 0, 0.7);
+        sample(a, 'buff3', {at: 0.1, gain: 0.4});
+      }
       break;
     }
-    case 'targetStatus':
-      [880, 740, 587].forEach((f, i) => tone(a, {wave: 'triangle', from: f, to: f * 0.97, dur: 0.15, gain: 0.12, at: i * 0.09}));
-      voice(a, 0.25, 0.3, 0.5);
+    case 'targetStatus': {
+      const lowers = Object.values((m.boosts ?? {}) as Record<string, number>).some(v => v < 0);
+      if (lowers) {
+        if (!sample(a, 'debuff', {gain: 0.9})) [880, 740, 587].forEach((f, i) => tone(a, {wave: 'triangle', from: f, to: f * 0.97, dur: 0.15, gain: 0.12, at: i * 0.09}));
+        typeHit(a, st.type, 0.2, 0.35);
+      } else {
+        typeHit(a, st.type, 0, 0.6);
+      }
       break;
+    }
   }
+}
+
+/** Moedas (itens de dinheiro) e "pegou item". */
+export function playCoins(): void {
+  const a = audio();
+  if (a && !sample(a, 'coins', {gain: 0.8})) [1319, 1760].forEach((f, i) => tone(a, {wave: 'square', from: f, to: f, dur: 0.1, gain: 0.07, at: i * 0.08}));
+}
+
+export function playItem(): void {
+  const a = audio();
+  if (a && !sample(a, 'item', {gain: 0.7})) tone(a, {wave: 'triangle', from: 880, to: 1320, dur: 0.12, gain: 0.1});
 }
 
 export function playHit(effect: 'normal' | 'super' | 'resisted' | 'crit'): void {
@@ -345,7 +472,7 @@ export function playHit(effect: 'normal' | 'super' | 'resisted' | 'crit'): void 
 export function playBall(): void {
   const a = audio();
   if (!a) return;
-  whoosh(a, 0, 0.35);
+  whooshS(a, 0, 0.35, 0.9);
   tone(a, {wave: 'square', from: 900, to: 400, dur: 0.08, gain: 0.12, at: 0.45});
 }
 

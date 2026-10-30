@@ -1,7 +1,8 @@
-// Progresso que sobrevive entre runs (coleção). É a base da etapa 2:
+// Progresso que sobrevive entre runs (coleção), separado por treinador. É a base da etapa 2:
 // doces, IVs melhores com repetidos, EVs, breeding e venda vão morar aqui.
 import {species, toID} from '../data/dex';
 import {zeroStats} from './mon';
+import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
 import type {OwnedMon, StatTable} from './types';
 
@@ -28,17 +29,15 @@ export interface Collection {
   runs: RunSummary[];
 }
 
-const KEY = 'rtg-collection';
-
 export function lineRoot(name: string): string {
   let s = species(name);
   for (let guard = 0; guard < 4 && s.prevo; guard++) s = species(s.prevo);
   return toID(s.name);
 }
 
-export function loadCollection(): Collection {
+export function loadCollection(trainerId: string | null): Collection {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = trainerId ? localStorage.getItem(collectionKey(trainerId)) : null;
     if (raw) return JSON.parse(raw) as Collection;
   } catch {
     /* sem storage: começa vazio */
@@ -46,9 +45,10 @@ export function loadCollection(): Collection {
   return {version: 1, entries: {}, runs: []};
 }
 
-export function saveCollection(c: Collection): void {
+export function saveCollection(trainerId: string | null, c: Collection): void {
+  if (!trainerId) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify(c));
+    localStorage.setItem(collectionKey(trainerId), JSON.stringify(c));
   } catch {
     /* ignora */
   }

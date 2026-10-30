@@ -7,7 +7,8 @@ src/
   data/        dados estáticos
     dex.ts       espécies jogáveis, golpes por nível, tipos/fraquezas, sprites
     biomes.ts    biomas e pools de Pokémon por raridade
-    items.ts     itens (pokébolas, cura, itens de segurar do Showdown...)
+    items.ts     itens (pokébolas, cura, itens X, mentas, itens de segurar do Showdown...)
+    movesPt.ts   descrições dos golpes em português (modelos + movesPtDict.ts)
   game/        regras (sem React)
     types.ts     modelos salvos no localStorage (OwnedMon, RunState)
     mon.ts       criação de Pokémon, status, XP, evolução, conversão p/ time do Showdown
@@ -16,8 +17,11 @@ src/
                  captura, itens em batalha, tradução do log para eventos em PT-BR
     rewards.ts   recompensas, loja, dinheiro
     meta.ts      coleção permanente entre runs (base da etapa 2)
+    trainers.ts  perfis de treinador; cada um tem coleção e run próprias no localStorage
     store.ts     estado global (zustand): todas as ações da run
-  ui/          telas e componentes React, sons (audio.ts), CSS
+  ui/          telas e componentes React, CSS
+    audio.ts     gritos + sons de golpe (amostras CC0 em public/sfx, sintetizador de reserva)
+    fx.ts        animações de golpe: partículas pixeladas num canvas por cima da arena
 tests/         testes (vitest) que rodam batalhas completas sem UI
 ```
 

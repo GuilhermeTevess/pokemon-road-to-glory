@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
-import {RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, itemSpriteUrl, species, spriteUrls} from '../data/dex';
+import {ALL_TYPES, RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, itemSpriteUrl, species, spriteUrls, typeMultiplier} from '../data/dex';
 import type {Rarity} from '../data/dex';
 import {getItem} from '../data/items';
 import {STATUS_PT} from '../game/battle';
@@ -229,5 +229,53 @@ export function IvWeb({before, after, size = 260}: {before: Record<string, numbe
         );
       })}
     </svg>
+  );
+}
+
+/**
+ * Fraquezas do time: para cada tipo de ataque, quantos Pokémon do time levam
+ * dano dobrado e quantos resistem. Tipos que pegam metade do time sem ninguém
+ * resistindo ficam marcados como perigo.
+ */
+export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boolean}) {
+  if (!party.length) return null;
+  const rows = ALL_TYPES.map(t => {
+    let weak = 0;
+    let resist = 0;
+    for (const m of party) {
+      const mult = typeMultiplier(t, species(m.species).types);
+      if (mult > 1) weak++;
+      else if (mult < 1) resist++;
+    }
+    return {type: t, weak, resist, danger: weak >= Math.ceil(party.length / 2) && resist === 0};
+  });
+  const danger = rows.filter(r => r.danger);
+  const shown = compact ? rows.filter(r => r.weak > 0).sort((a, b) => b.weak - b.resist - (a.weak - a.resist)) : rows;
+  return (
+    <div className={`team-weak ${compact ? 'compact' : ''}`}>
+      {danger.length > 0 && (
+        <p className="tw-alert">
+          Cuidado com:{' '}
+          {danger.map(r => (
+            <TypeBadge key={r.type} type={r.type} small />
+          ))}
+        </p>
+      )}
+      <div className="tw-grid">
+        {shown.map(r => (
+          <div key={r.type} className={`tw-cell ${r.danger ? 'danger' : ''}`}>
+            <TypeBadge type={r.type} small />
+            <span className={r.weak ? 'tw-weak' : 'tw-zero'} title="Fracos a esse tipo">
+              {r.weak} fraco{r.weak === 1 ? '' : 's'}
+            </span>
+            {!compact && (
+              <span className={r.resist ? 'tw-res' : 'tw-zero'} title="Resistem ou são imunes">
+                {r.resist} resiste{r.resist === 1 ? '' : 'm'}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

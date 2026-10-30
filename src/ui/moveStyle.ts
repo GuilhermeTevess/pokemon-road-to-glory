@@ -48,7 +48,7 @@ export function moveStyle(moveName: string): MoveStyle {
     shape = 'rain';
   } else if (m.flags.contact) {
     shape = 'contact';
-  } else if (has(name, /beam|thrower|pump|cannon|jet|spray|stream|breath|hose|wheel|laser|ray|flash cannon|torrent|blast burn|fire spin|whirlpool|scald|discharge|vine/)) {
+  } else if (has(name, /thunderbolt|beam|thrower|pump|cannon|jet|spray|stream|breath|hose|wheel|laser|ray|flash cannon|torrent|blast burn|fire spin|whirlpool|scald|discharge|vine/)) {
     shape = 'stream';
   } else {
     shape = 'projectile';
