@@ -80,3 +80,26 @@ export const TIER_COLORS: Record<ItemTier, string> = {
   ultra: '#f2c94c',
   master: '#c77dff',
 };
+
+/** Onde e como o item é usado — mostrado em todo lugar que o item aparece. */
+export function itemUsage(item: ItemDef): string {
+  switch (item.kind) {
+    case 'ball':
+      return 'Use na batalha, pelo botão Pokébola.';
+    case 'heal':
+      return 'Use na batalha (Mochila) ou entre batalhas.';
+    case 'revive':
+      return 'Use entre batalhas, em "Time e mochila".';
+    case 'candy':
+    case 'evolution':
+    case 'tm':
+      return 'Use entre batalhas, escolhendo um Pokémon.';
+    case 'held':
+      return 'Equipe num Pokémon: funciona sozinho na batalha.';
+    case 'map':
+    case 'incense':
+      return 'Use entre batalhas, em "Time e mochila".';
+    case 'money':
+      return 'Vira dinheiro na hora.';
+  }
+}
