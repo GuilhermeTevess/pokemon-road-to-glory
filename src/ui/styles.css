@@ -804,3 +804,10 @@ table.move-info td { padding: 3px 0; }
 .trail { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; cursor: help; }
 .trail-bar { flex: 1; height: 8px; border: 2px solid var(--ink); border-radius: 4px; background: var(--panel-2); overflow: hidden; min-width: 50px; }
 .trail-bar i { display: block; height: 100%; background: linear-gradient(90deg, #b39ae0, #e0a100); transition: width .4s; }
+.diary-row { display: flex; gap: 12px; align-items: center; padding: 10px 12px; margin: 8px 0; text-align: left; }
+.diary-row .silhouette { filter: brightness(0) opacity(.55); }
+.diary-row.here { border-color: #e0a100; box-shadow: 0 0 0 3px #f8e3a0; }
+.diary-row.found { opacity: .8; }
+.diary-text { font-style: italic; margin: 0 0 4px; }
+.diary-ok { color: #2f8f4e; margin: 4px 0 0; font-weight: 600; }
+.biome-hidden { font-size: 11px; color: #fff; background: #6a4fb8; padding: 2px 8px; border-radius: 8px; }

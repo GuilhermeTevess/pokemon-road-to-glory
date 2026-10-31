@@ -3,6 +3,7 @@
 import {getItem, ITEMS} from '../data/items';
 import {generateEncounter, isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
 import {chance, pick} from './rng';
+import {travelerEvent} from './travelers';
 import type {Encounter, RunEvent, RunState} from './types';
 
 export const EVENT_CHANCE = 0.1;
@@ -27,7 +28,7 @@ export function shouldRollEvent(run: RunState): boolean {
 
 export function rollEvent(run: RunState): RunEvent {
   const tradable = Object.keys(run.bag).filter(id => run.bag[id] > 0 && getItem(id).tier !== 'ultra' && getItem(id).tier !== 'master');
-  const kinds: RunEvent['kind'][] = ['house', 'berries', 'hurt', 'rival', 'seer'];
+  const kinds: RunEvent['kind'][] = ['house', 'berries', 'hurt', 'rival', 'seer', 'traveler', 'traveler'];
   if (tradable.length) kinds.push('merchant');
   const kind = pick(kinds);
   switch (kind) {
@@ -47,6 +48,11 @@ export function rollEvent(run: RunState): RunEvent {
     }
     case 'rival':
       return {kind, name: pick(RIVAL_NAMES)};
+    case 'traveler': {
+      const ev = travelerEvent(run);
+      if (ev) return ev;
+      return {kind: 'seer', upcoming: upcomingEncounters(run, 3)};
+    }
     case 'seer':
     default:
       return {kind: 'seer', upcoming: upcomingEncounters(run, 3)};

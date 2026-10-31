@@ -1,6 +1,8 @@
 // Estado global da run (zustand). Toda regra de jogo passa por aqui; a UI só chama ações.
 import {create} from 'zustand';
-import {BIOMES} from '../data/biomes';
+import {BIOMES, getBiome} from '../data/biomes';
+import {getHint} from '../data/hints';
+import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
@@ -234,6 +236,13 @@ export const useGame = create<Store>((set, get) => {
       return;
     }
     run.encounter = run.upcoming?.shift();
+    const hinted = !run.encounter && !isBossWave(run.wave) ? rollHintLegendary(run) : null;
+    if (hinted) {
+      const h = hintHere(run)!;
+      run.encounter = hinted;
+      run.diary = run.diary?.filter(id => id !== h.id);
+      run.found = [...(run.found ?? []), h.id];
+    }
     const legend = !run.encounter && !isBossWave(run.wave) ? rollLegend(run) : null;
     if (legend) {
       run.encounter = legendEncounter(legend, run.party);
@@ -242,7 +251,7 @@ export const useGame = create<Store>((set, get) => {
     if (!run.encounter) {
       // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
       for (let i = 0; i < 4; i++) {
-        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region);
+        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0 || !!getBiome(run.biome).region, run.perks?.luck, run.region);
         if (!run.recent?.includes(run.encounter.mon.species)) break;
       }
     }
@@ -276,13 +285,13 @@ export const useGame = create<Store>((set, get) => {
       run.region = pick(REGIONS).id;
       run.regionLeft = REGION_STAY;
       run.regionPass = false;
-      setBiome(run, pick(BIOMES).id);
+      setBiome(run, rollBiome(run));
       run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome};
       run.phase = 'travel';
       return;
     }
     if ((run.biomeLeft ?? 1) <= 0) {
-      setBiome(run, pick(BIOMES).id);
+      setBiome(run, rollBiome(run));
       run.travel = {biome: run.biome, fromBiome};
       run.phase = 'travel';
       return;
@@ -731,6 +740,23 @@ export const useGame = create<Store>((set, get) => {
             }
             break;
           case 'seer':
+            break;
+          case 'traveler':
+            if (choice === 'help') {
+              if (ev.ask === 'money') {
+                if (run.money < (ev.cost ?? 0)) return;
+                run.money -= ev.cost ?? 0;
+              } else {
+                const id = ev.ask === 'heal' ? cheapestHeal(run) : ev.item;
+                if (!id || !run.bag[id]) return;
+                run.bag[id]--;
+                if (!run.bag[id]) delete run.bag[id];
+              }
+              run.diary = [...(run.diary ?? []), ev.hint];
+              addTrail(run, TRAIL.traveler);
+              const h = getHint(ev.hint);
+              message = `Dica anotada no diário!${h ? ` (${getRegion(h.region).name} · ${getBiome(h.biome).name})` : ''}`;
+            }
             break;
         }
         run.event = undefined;

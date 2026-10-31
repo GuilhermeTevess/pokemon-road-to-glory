@@ -32,6 +32,12 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   Diantha, Kukui, Leon, Geeta). O **Rastro da lenda** sobe vencendo chefes e ajudando Pokémon
   nos eventos; a cada ronda a chance de a lenda te desafiar é o rastro (até 40%). O time dela
   tem o tamanho do seu (mínimo 3) e nível do seu mais forte +3. Perder não acaba a run.
+- **Viajantes e Diário**: um evento em que alguém pede ajuda (dinheiro, poção ou Pokébola).
+  Ajudar dá uma dica enigmática sobre um lendário (vai para o **Diário**, com onde procurar) e
+  +25% no Rastro da lenda. Na região e no bioma da dica, o lendário tem 30% de chance por ronda.
+- **Biomas ocultos** (um por região: Caverna Celeste, Torre de Lata, Torre do Céu, Mundo
+  Distorcido, Torre Espiral do Dragão, Caverna Terminus, Ultra Espaço, Floresta Adormecida,
+  Área Zero): 3% de chance no sorteio do bioma, 50% com a dica, e entram no Mapa de Bioma.
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,

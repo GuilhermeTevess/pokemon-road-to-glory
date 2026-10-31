@@ -1,5 +1,5 @@
 import type {Species} from '@pkmn/sim';
-import {BASE_STAGE, PLAYABLE, evolutionLine, isLegendary, rarityOf} from './dex';
+import {BASE_STAGE, PLAYABLE, evolutionLine, isLegendary, rarityOf, species} from './dex';
 import type {Rarity} from './dex';
 
 export interface Biome {
@@ -12,6 +12,10 @@ export interface Biome {
   filter?: string;
   /** Cor de destaque do bioma (cartões e reserva do fundo). */
   color: string;
+  /** Bioma oculto: só aparece com dica de viajante (ou muita sorte), numa região só. */
+  region?: string;
+  /** Moradores fixos do bioma oculto (em vez de sortear pelos tipos). */
+  species?: string[];
 }
 
 export const BIOMES: Biome[] = [
@@ -37,8 +41,34 @@ export const BIOMES: Biome[] = [
   {id: 'abyss', name: 'Abismo', types: ['Dark', 'Ghost', 'Psychic'], bg: 'deepsea', filter: 'hue-rotate(60deg) saturate(1.2)', color: '#8a7fb8'},
 ];
 
+/** Biomas ocultos: Pokémon raros e lendários. Ficam fora do sorteio normal. */
+export const HIDDEN_BIOMES: Biome[] = [
+  {id: 'ceruleancave', name: 'Caverna Celeste', region: 'kanto', types: ['Psychic', 'Normal'], bg: 'dampcave', filter: 'hue-rotate(180deg) saturate(1.3)', color: '#7fb3e8',
+    species: ['Mewtwo', 'Ditto', 'Chansey', 'Abra', 'Voltorb', 'Lickitung', 'Rhyhorn', 'Wobbuffet', 'Porygon']},
+  {id: 'tintower', name: 'Torre de Lata', region: 'johto', types: ['Fire', 'Flying'], bg: 'mountain', filter: 'sepia(0.6) hue-rotate(-20deg) saturate(1.6)', color: '#e8b85a',
+    species: ['Ho-Oh', 'Entei', 'Raikou', 'Suicune', 'Gastly', 'Misdreavus', 'Eevee', 'Hoothoot']},
+  {id: 'skypillar', name: 'Torre do Céu', region: 'hoenn', types: ['Dragon', 'Flying'], bg: 'mountain', filter: 'hue-rotate(90deg) brightness(1.05)', color: '#7fd8a8',
+    species: ['Rayquaza', 'Swablu', 'Bagon', 'Baltoy', 'Sableye', 'Shuppet', 'Beldum']},
+  {id: 'distortion', name: 'Mundo Distorcido', region: 'sinnoh', types: ['Ghost', 'Dragon'], bg: 'deepsea', filter: 'hue-rotate(250deg) saturate(1.4) brightness(0.85)', color: '#8f6fc8',
+    species: ['Giratina', 'Uxie', 'Mesprit', 'Azelf', 'Gible', 'Spiritomb', 'Rotom', 'Duskull']},
+  {id: 'dragonspiral', name: 'Torre Espiral do Dragão', region: 'unova', types: ['Dragon', 'Fire', 'Electric'], bg: 'icecave', filter: 'hue-rotate(200deg) saturate(0.8)', color: '#9aa6c8',
+    species: ['Reshiram', 'Zekrom', 'Kyurem', 'Deino', 'Axew', 'Druddigon', 'Golett', 'Tynamo']},
+  {id: 'terminus', name: 'Caverna Terminus', region: 'kalos', types: ['Dragon', 'Ground', 'Rock'], bg: 'earthycave', filter: 'hue-rotate(80deg) saturate(1.2)', color: '#8fc87f',
+    species: ['Zygarde', 'Noibat', 'Goomy', 'Carbink', 'Larvitar', 'Diglett', 'Graveler']},
+  {id: 'ultraspace', name: 'Ultra Espaço', region: 'alola', types: ['Psychic', 'Dark', 'Steel'], bg: 'thunderplains', filter: 'hue-rotate(160deg) saturate(1.5) brightness(0.9)', color: '#c88fe0',
+    species: ['Necrozma', 'Nihilego', 'Buzzwole', 'Pheromosa', 'Xurkitree', 'Celesteela', 'Kartana', 'Guzzlord', 'Poipole', 'Stakataka', 'Blacephalon']},
+  {id: 'slumbering', name: 'Floresta Adormecida', region: 'galar', types: ['Fairy', 'Fighting', 'Psychic'], bg: 'forest', filter: 'hue-rotate(200deg) saturate(0.9) brightness(0.9)', color: '#7f9ae0',
+    species: ['Zacian', 'Zamazenta', 'Impidimp', 'Hatenna', 'Ponyta-Galar', 'Dreepy', 'Farfetch’d-Galar']},
+  {id: 'area0', name: 'Área Zero', region: 'paldea', types: ['Dragon', 'Fighting', 'Electric'], bg: 'desert', filter: 'hue-rotate(130deg) saturate(1.3)', color: '#5fc8b8',
+    species: ['Koraidon', 'Miraidon', 'Great Tusk', 'Scream Tail', 'Flutter Mane', 'Iron Treads', 'Iron Bundle', 'Roaring Moon', 'Iron Valiant', 'Glimmet']},
+];
+
 export function getBiome(id: string): Biome {
-  return BIOMES.find(b => b.id === id) ?? BIOMES[0];
+  return BIOMES.find(b => b.id === id) ?? HIDDEN_BIOMES.find(b => b.id === id) ?? BIOMES[0];
+}
+
+export function hiddenBiomeOf(region: string | undefined): Biome | undefined {
+  return HIDDEN_BIOMES.find(b => b.region === region);
 }
 
 export type Pools = Record<Rarity, Species[]>;
@@ -52,6 +82,16 @@ const poolCache = new Map<string, Pools>();
 export function biomePools(biome: Biome): Pools {
   const cached = poolCache.get(biome.id);
   if (cached) return cached;
+  if (biome.species) {
+    const fixed: Pools = {common: [], uncommon: [], rare: [], superRare: [], legendary: []};
+    for (const name of biome.species) {
+      const s = species(name);
+      if (!s.exists) continue;
+      fixed[isLegendary(s) ? 'legendary' : rarityOf(s)].push(s);
+    }
+    poolCache.set(biome.id, fixed);
+    return fixed;
+  }
   const fits = (s: Species) => evolutionLine(s).some(x => x.types.some(t => biome.types.includes(t)));
   const pools: Pools = {common: [], uncommon: [], rare: [], superRare: [], legendary: []};
   for (const s of BASE_STAGE) {

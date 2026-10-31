@@ -155,6 +155,40 @@ export function EventScreen() {
         </Scene>
       );
     }
+    case 'traveler': {
+      const heal = cheapestHeal(run);
+      const can = ev.ask === 'money' ? run.money >= (ev.cost ?? 0) : ev.ask === 'heal' ? !!heal : !!ev.item && !!run.bag[ev.item];
+      const ask =
+        ev.ask === 'money' ? (
+          <>"Estou sem dinheiro para seguir viagem... você me empresta <b>₽ {ev.cost}</b>?"</>
+        ) : ev.ask === 'heal' ? (
+          <>"Meu Pokémon se machucou no caminho. Você teria uma poção?"</>
+        ) : (
+          <>
+            "Perdi minhas Pokébolas... você me dá uma <b>{getItem(ev.item!).name}</b>?"
+          </>
+        );
+      const pay =
+        ev.ask === 'money' ? `Dar ₽ ${ev.cost}` : ev.ask === 'heal' ? (heal ? `Dar ${getItem(heal).name}` : 'Sem poção na mochila') : `Dar ${getItem(ev.item!).name}`;
+      return (
+        <Scene
+          title={ev.name}
+          art={<TrainerAvatar avatar={ev.avatar} name={ev.name} size={96} />}
+          text={
+            <p>
+              {ask}
+              <br />
+              <small className="hint">Quem ajuda ganha uma dica sobre um Pokémon lendário (vai para o Diário) e o Rastro da lenda da região sobe.</small>
+            </p>
+          }
+        >
+          <button className="btn primary" disabled={!can} onClick={() => resolveEvent('help')}>
+            {pay}
+          </button>
+          {next('Agora não')}
+        </Scene>
+      );
+    }
     case 'seer':
       return (
         <Scene

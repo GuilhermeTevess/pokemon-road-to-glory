@@ -21,7 +21,7 @@ describe('eventos', () => {
   it('sorteia todos os tipos', () => {
     const kinds = new Set<string>();
     for (let i = 0; i < 300; i++) kinds.add(rollEvent(run(6)).kind);
-    expect([...kinds].sort()).toEqual(['berries', 'house', 'hurt', 'merchant', 'rival', 'seer']);
+    expect([...kinds].sort()).toEqual(['berries', 'house', 'hurt', 'merchant', 'rival', 'seer', 'traveler']);
   });
   it('vidente e rival', () => {
     expect(upcomingEncounters(run(6), 3)).toHaveLength(3);

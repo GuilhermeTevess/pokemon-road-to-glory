@@ -10,6 +10,7 @@ import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../
 import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game/rewards';
 import {gloryFor, rerollPrice} from '../../game/glory';
 import {TRAIL, TRAIL_CAP, trailOf} from '../../game/legend';
+import {getHint} from '../../data/hints';
 import {EV_MAX_STAT} from '../../game/meta';
 import {tourAt} from '../../game/tournament';
 import {useGame} from '../../game/store';
@@ -426,6 +427,7 @@ export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose
 export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => void}) {
   const {run, trainer} = useGame();
   const [shop, setShop] = useState(false);
+  const [diary, setDiary] = useState(false);
   if (!run) return null;
   const bagCount = Object.values(run.bag).reduce((a, n) => a + n, 0);
   return (
@@ -473,6 +475,9 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
         <button className="btn" onClick={() => onOpen('box')}>
           <PixelIcon name="home" /> PC · {run.box.length}
         </button>
+        <button className="btn" onClick={() => setDiary(true)}>
+          <ItemIcon id="map" size={24} /> Diário · {run.diary?.length ?? 0}
+        </button>
         <button
           className="btn sb-shop"
           onClick={() => setShop(true)}
@@ -483,6 +488,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
         </button>
       </div>
       {shop && <ShopModal onClose={() => setShop(false)} />}
+      {diary && <DiaryModal onClose={() => setDiary(false)} />}
       <div className="panel sb-weak">
         <h3>Fraquezas do time</h3>
         <TeamWeakness party={run.party} compact>
@@ -801,7 +807,7 @@ export function TravelScreen() {
 
 /** Medidor do Rastro da lenda (no painel lateral). */
 function TrailMeter({value}: {value: number}) {
-  const help = `Uma lenda da região pode te desafiar a cada ronda, com chance igual ao rastro (até ${TRAIL_CAP}%). Sobe vencendo chefes (+${TRAIL.boss}%) e ajudando Pokémon nos eventos (+${TRAIL.event}%). Zera depois do desafio.`;
+  const help = `Uma lenda da região pode te desafiar a cada ronda, com chance igual ao rastro (até ${TRAIL_CAP}%). Sobe vencendo chefes (+${TRAIL.boss}%) e ajudando Pokémon nos eventos (+${TRAIL.event}%) e viajantes (+${TRAIL.traveler}%). Zera depois do desafio.`;
   return (
     <div className="trail" title={help}>
       <span className="muted">Rastro da lenda</span>
@@ -810,5 +816,38 @@ function TrailMeter({value}: {value: number}) {
       </span>
       <b>{Math.min(value, TRAIL_CAP)}%</b>
     </div>
+  );
+}
+
+/** Diário: dicas dos viajantes e lendários já encontrados nesta run. */
+function DiaryModal({onClose}: {onClose: () => void}) {
+  const run = useGame(s => s.run);
+  if (!run) return null;
+  const row = (id: string, found: boolean) => {
+    const h = getHint(id);
+    if (!h) return null;
+    const here = !found && h.region === run.region && h.biome === run.biome;
+    return (
+      <div key={id} className={`panel diary-row ${found ? 'found' : ''} ${here ? 'here' : ''}`}>
+        <Sprite name={h.species} size={56} className={found ? '' : 'silhouette'} />
+        <div>
+          <p className="diary-text">“{h.text}”</p>
+          <p className="muted">
+            Onde procurar: <b>{getRegion(h.region).name}</b> · <b>{getBiome(h.biome).name}</b>
+            {getBiome(h.biome).region && ' (bioma oculto)'}
+          </p>
+          {found ? <p className="diary-ok">Encontrado: {species(h.species).name}!</p> : here && <p className="diary-ok">Você está no lugar certo! Ele pode aparecer a qualquer ronda.</p>}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <Modal onClose={onClose} wide>
+      <h2>Diário de viagem</h2>
+      <p className="hint">Ajude viajantes nos eventos para ganhar dicas. Com a dica, vá para a região e o bioma certos: o lendário tem boa chance de aparecer. Biomas ocultos aparecem bem mais no sorteio quando você tem a dica deles.</p>
+      {!run.diary?.length && !run.found?.length && <p className="muted">Nenhuma dica ainda.</p>}
+      {run.diary?.map(id => row(id, false))}
+      {run.found?.map(id => row(id, true))}
+    </Modal>
   );
 }
