@@ -850,3 +850,19 @@ table.move-info td { padding: 3px 0; }
   .rank-row .sprite { display: none; }
   .season-item { grid-template-columns: 1fr 1fr; }
 }
+
+/* Batalha em dupla */
+.slot-group { display: contents; }
+.arena.doubles .mon-slot { width: 28%; height: 34%; }
+.arena.doubles .wild-slot.s0 { right: 26%; top: 16%; --s: 1.45; }
+.arena.doubles .wild-slot.s1 { right: 3%; top: 10%; --s: 1.45; }
+.arena.doubles .player-slot.s0 { left: 2%; bottom: 3%; --s: 1.8; }
+.arena.doubles .player-slot.s1 { left: 27%; bottom: 7%; --s: 1.8; }
+.arena.doubles .info-box { width: min(36%, 240px); padding: 3px 7px; gap: 2px; }
+.arena.doubles .info-box .info-name { font-size: 14px; }
+.arena.doubles .wild-box.s0 { left: 2%; top: 3%; }
+.arena.doubles .wild-box.s1 { left: 2%; top: 26%; }
+.arena.doubles .player-box.s0 { right: 2%; bottom: 30%; }
+.arena.doubles .player-box.s1 { right: 2%; bottom: 4%; }
+.mon-slot.choosing::after { content: '▼'; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); color: #e0a100; font-size: 18px; animation: bob 1s steps(2) infinite; text-shadow: 1px 1px 0 var(--ink); }
+@keyframes bob { 50% { transform: translate(-50%, -4px); } }

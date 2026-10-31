@@ -69,6 +69,8 @@ export interface Encounter {
   arena?: string;
   /** Lendário que apareceu pela dica de um viajante. */
   hinted?: boolean;
+  /** Dois selvagens juntos (batalha em dupla): o time é `team`. */
+  double?: boolean;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
