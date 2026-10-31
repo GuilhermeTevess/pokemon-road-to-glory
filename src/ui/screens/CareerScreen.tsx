@@ -1,6 +1,6 @@
 // Carreira online: criar (host escolhe as regras), entrar com o código e ver a classificação.
 import {useEffect, useState} from 'react';
-import {DEFAULT_RULES, deviceId, newCareerCode, playerId, roundBlockers, rulesSummary, standings} from '../../game/career';
+import {DEFAULT_RULES, MAX_PLAYERS, deviceId, newCareerCode, playerId, roundBlockers, rulesSummary, standings} from '../../game/career';
 import type {CareerDoc, CareerRules, PlayerDoc} from '../../game/career';
 import {cloud, cloudReady} from '../../game/cloud';
 import {useGame} from '../../game/store';
@@ -160,6 +160,11 @@ function CareerSetup() {
     try {
       const doc = await cloud.getCareer(code.trim());
       if (!doc) setError('Não achei nenhuma carreira com esse código.');
+      else if ((await cloud.players(doc.code)).length >= MAX_PLAYERS) {
+        setError(`Essa carreira já está cheia (${MAX_PLAYERS} jogadores, o tamanho da chave dos torneios).`);
+        setBusy(false);
+        return;
+      }
       setFound(doc);
     } catch {
       setError('Não consegui falar com a nuvem. Confira a internet e tente de novo.');

@@ -72,7 +72,7 @@ function wire(conn: DataConnection, onMsg: OnMsg, onOpen: () => void, onClose: (
 export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, onClose: () => void, onError: (e: string) => void): Promise<Link> {
   if (localMode()) return localLink(code, 'host', onMsg, onOpen);
   const {Peer} = await import('peerjs');
-  const peer: PeerT = new Peer(PREFIX + code);
+  const peer: PeerT = new Peer(PREFIX + code.toUpperCase());
   let link: Link | null = null;
   peer.on('error', e => onError(String((e as {type?: string}).type ?? e)));
   peer.on('connection', conn => {

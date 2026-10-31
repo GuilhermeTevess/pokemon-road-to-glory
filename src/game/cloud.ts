@@ -83,10 +83,21 @@ async function listDocs<T>(path: string): Promise<T[]> {
     }
     return out;
   }
-  const res = await fetch(`${BASE()}/${path}?pageSize=100&${KEY()}`);
-  if (!res.ok) throw new Error(`Firestore ${res.status}`);
-  const data = (await res.json()) as {documents?: Doc[]};
-  return (data.documents ?? []).map(d => parse<T>(d)).filter((x): x is T => !!x);
+  // Lê todas as páginas (uma carreira longa passa de 100 partidas).
+  const out: T[] = [];
+  let token = '';
+  for (let page = 0; page < 50; page++) {
+    const res = await fetch(`${BASE()}/${path}?pageSize=300${token ? `&pageToken=${encodeURIComponent(token)}` : ''}&${KEY()}`);
+    if (!res.ok) throw new Error(`Firestore ${res.status}`);
+    const data = (await res.json()) as {documents?: Doc[]; nextPageToken?: string};
+    for (const d of data.documents ?? []) {
+      const v = parse<T>(d);
+      if (v) out.push(v);
+    }
+    if (!data.nextPageToken) break;
+    token = data.nextPageToken;
+  }
+  return out;
 }
 
 const code = (c: string) => encodeURIComponent(c.toUpperCase());
