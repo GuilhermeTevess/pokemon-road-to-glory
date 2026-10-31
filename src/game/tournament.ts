@@ -146,9 +146,33 @@ export function tourName(t: {kind: TourKind; region?: string}): string {
 }
 
 /** Time de um rival conhecido: os Pokémon famosos dele, no nível da ronda. */
+/** Itens que os rivais costumam levar (cada Pokémon de cada rival tem o seu, sempre o mesmo). */
+const RIVAL_ITEMS = ['leftovers', 'sitrusberry', 'lumberry', 'choiceband', 'choicespecs', 'choicescarf', 'lifeorb', 'focussash', 'expertbelt', 'assaultvest', 'rockyhelmet', 'weaknesspolicy'];
+
+function hash(text: string): number {
+  return [...text].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+}
+
+/** O item "de sempre" daquele Pokémon daquele rival. */
+export function rivalItem(rival: string, speciesName: string): string {
+  return RIVAL_ITEMS[hash(rival + speciesName) % RIVAL_ITEMS.length];
+}
+
+/**
+ * Time de um rival no torneio: os 2 primeiros (os carros-chefes) sempre vão; o resto sai
+ * sorteado do elenco dele, então nem sempre é o mesmo time.
+ */
 export function rivalTeam(rival: Rival, wave: number, size: number, skill: number): OwnedMon[] {
   const level = Math.max(5, Math.min(100, Math.round(wave * 0.9) + 1 + skill));
-  return rival.team.slice(0, size).map(name => createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1}));
+  const core = rival.team.slice(0, Math.min(2, size));
+  const picked = [...core, ...shuffle(rival.team.slice(2)).slice(0, size - core.length)];
+  // Quem abre a luta também varia (mas costuma ser um dos carros-chefes).
+  if (Math.random() < 0.35) picked.unshift(...picked.splice(randInt(0, picked.length - 1), 1));
+  return picked.map(name => {
+    const mon = createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
+    mon.item = rivalItem(rival.name, name);
+    return mon;
+  });
 }
 
 /** Quem joga: na League Cup e no Regional, os rivais da região primeiro; no Internacional e no Mundial, gente de todo lugar. */

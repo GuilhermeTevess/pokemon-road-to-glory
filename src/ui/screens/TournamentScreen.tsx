@@ -41,22 +41,41 @@ function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
   );
 }
 
-/** Últimas batalhas de um rival: o que já foi visto, sem entregar o time de hoje. */
-export function ScoutPanel({name, wave}: {name: string; wave: number}) {
-  const r = scoutReport(name, wave);
+/** Estatísticas da temporada de um rival: dá uma ideia do que vem, sem entregar o time de hoje. */
+export function ScoutPanel({name, wave, team}: {name: string; wave: number; team: string[]}) {
+  const r = scoutReport(name, wave, team);
   if (!r) return <p className="muted">Ninguém sabe muito sobre {name} ainda.</p>;
+  const top = r.usage[0];
   return (
     <div className="scout">
-      <p className="muted">
-        Mais visto nas últimas lutas: <TeamRow team={r.favorites} size={32} />
-        {r.lead && <> · costuma abrir com <b>{species(r.lead).name}</b></>}
+      <p className="scout-top">
+        Pokémon mais jogado: <Sprite name={top.species} size={32} still /> <b>{species(top.species).name}</b> · {top.rounds} rondas
       </p>
+      {r.lead && (
+        <p className="muted">
+          Costuma abrir com <b>{species(r.lead).name}</b>
+        </p>
+      )}
+      <h4>Uso na temporada ({r.season} rondas)</h4>
+      <div className="scout-usage">
+        {r.usage.map(u => (
+          <div key={u.species} className="scout-use">
+            <Sprite name={u.species} size={32} still />
+            <span>{species(u.species).name}</span>
+            <span className="scout-bar">
+              <i style={{width: `${Math.round((u.rounds / r.season) * 100)}%`}} />
+            </span>
+            <small>{u.rounds} rondas</small>
+            <small className="muted">{u.item}</small>
+          </div>
+        ))}
+      </div>
+      <h4>Últimas batalhas</h4>
       {r.matches.map((m, i) => (
         <div key={i} className="scout-row">
           <span className={m.won ? 'win-tag' : 'lose-tag'}>{m.won ? 'Venceu' : 'Perdeu'}</span>
           <span>vs {m.vs}</span>
           <TeamRow team={m.seen} size={32} />
-          <small className="muted">{m.items.join(', ')}</small>
         </div>
       ))}
     </div>
@@ -79,7 +98,7 @@ function MatchDetail({data, match, onClose, wave}: {data: BracketData; match: Ma
             <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={56} />
             <b>{e.name}</b>
             {match.winner === (i === 0 ? match.a : match.b) && <span className="win-tag">Venceu</span>}
-            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} />}
+            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} team={e.team} />}
           </div>
         ))}
       </div>
@@ -122,6 +141,13 @@ export function Bracket({data, wave = 0}: {data: BracketData; wave?: number}) {
                       <span key={id} className={`bracket-slot ${cls}`}>
                         <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={20} />
                         {e.name}
+                        {m.teams && (
+                          <span className="bracket-team">
+                            {m.teams[id === m.a ? 0 : 1].map((sp, k) => (
+                              <Sprite key={k} name={sp} size={22} still />
+                            ))}
+                          </span>
+                        )}
                       </span>
                     );
                   })}
@@ -278,7 +304,7 @@ export function TournamentScreen() {
                 <b>
                   {ROUND_NAMES[t.rounds.length - 1]}: {trainer?.name ?? 'Você'} vs {foe.name}
                 </b>
-                <ScoutToggle name={foe.name} wave={t.wave} />
+                <ScoutToggle name={foe.name} wave={t.wave} team={foe.team.map(m => m.species)} />
               </div>
               <button className="btn primary" onClick={tourFight}>
                 Lutar!
@@ -380,7 +406,7 @@ export function CareerCard() {
 }
 
 /** Botão "Estudar adversário": abre as últimas batalhas dele. */
-function ScoutToggle({name, wave}: {name: string; wave: number}) {
+function ScoutToggle({name, wave, team}: {name: string; wave: number; team: string[]}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -390,8 +416,8 @@ function ScoutToggle({name, wave}: {name: string; wave: number}) {
       {open && (
         <Modal onClose={() => setOpen(false)}>
           <h2>Últimas batalhas de {name}</h2>
-          <ScoutPanel name={name} wave={wave} />
-          <p className="hint">O time de hoje pode ser diferente: isso é só o que já foi visto em campo.</p>
+          <ScoutPanel name={name} wave={wave} team={team} />
+          <p className="hint">O elenco dele é maior que o time: quem joga hoje deve sair dos mais usados, mas não dá para ter certeza.</p>
         </Modal>
       )}
     </>

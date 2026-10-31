@@ -1,8 +1,8 @@
 import {BadgeCeremony, GymIntroScreen} from './screens/GymScreens';
 import {LegendAfterModal, LegendMeetScreen} from './screens/LegendScreens';
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useGame} from '../game/store';
-import {setSoundEnabled, soundEnabled} from './audio';
+import {playAchievement, setSoundEnabled, soundEnabled} from './audio';
 import {HelpModal} from './screens/HelpModal';
 import {IvWeb, Modal, PixelIcon, Sprite, TypeCalc} from './components';
 import {BattleScreen} from './screens/BattleScreen';
@@ -18,7 +18,7 @@ import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
 import {fast, setFast} from './settings';
 
 export function App() {
-  const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
+  const {screen, run, toasts, achievePops, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
   const [sound, setSound] = useState(soundEnabled());
   const [fastOn, setFastOn] = useState(fast);
@@ -113,6 +113,11 @@ export function App() {
           </button>
         </Modal>
       )}
+      <div className="achieve-pops">
+        {achievePops.map(a => (
+          <AchievePop key={a.id} name={a.name} icon={a.icon} desc={a.desc} />
+        ))}
+      </div>
       <div className="toasts">
         {toasts.map(t => (
           <div key={t.id} className="toast">
@@ -120,6 +125,23 @@ export function App() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Aviso de conquista: entra pela lateral com um sonzinho. */
+function AchievePop({name, icon, desc}: {name: string; icon: string; desc: string}) {
+  useEffect(() => playAchievement(), []);
+  return (
+    <div className="achieve-pop">
+      <span className="achieve-pop-icon">
+        <PixelIcon name={icon} color="#e0a100" size={28} />
+      </span>
+      <span>
+        <small>Conquista desbloqueada!</small>
+        <b>{name}</b>
+        {desc && <em>{desc}</em>}
+      </span>
     </div>
   );
 }
