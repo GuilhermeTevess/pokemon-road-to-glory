@@ -774,3 +774,7 @@ table.move-info td { padding: 3px 0; }
 .menu-tile b { font-family: 'Press Start 2P', monospace; font-size: 10px; }
 .menu-tile small { font-size: 12px; color: var(--ink-soft); }
 .trainer-badge .link { font-size: 13px; }
+.nat-up { color: #c0392b; font-size: 11px; }
+.nat-down { color: #2f6fb5; font-size: 11px; }
+.stats-help { font-size: 13px; background: var(--panel-2); border: 2px solid var(--line); padding: 6px 8px; margin-top: 6px; }
+.stats-help p { margin: 2px 0; }
