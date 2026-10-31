@@ -26,6 +26,8 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Às vezes dois selvagens aparecem juntos (dupla): escolha o golpe de cada um dos seus dois Pokémon em campo. Para capturar, derrote um e jogue a Pokébola no outro.</li>
         <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo e o que faz.</li>
         <li>O painel ao lado mostra seu time, a Mochila, o PC e as fraquezas do time. Toque num Pokémon para ver detalhes.</li>
+        <li>Quer saber quem aparece em cada bioma? Abra o Guia no menu de cima: ele mostra a chance de cada Pokémon por bioma, região e ronda.</li>
+        <li>Antes de um torneio, “Estudar no PC” mostra só o que é público do adversário: as últimas lutas dele no noticiário (2 destaques por luta) e os Pokémon que você mesmo já enfrentou.</li>
         <li>Cada treinador tem sua coleção. Monte o time inicial com 6 pontos: cada Pokémon tem um custo (o número no canto). Tudo que você capturar vira opção.</li>
         <li>Cada linha evolutiva ganha doces (capturar, vencer, evoluir) e corações de amizade (lutar no time). Na ficha da coleção, gaste doces em golpe inicial, custo menor e chance de shiny.</li>
         <li>Corações dão mais EXP. Escolha um parceiro por time (o coração na montagem): ele ganha corações em dobro e, com eles, pode curar status sozinho, aguentar com 1 HP e acertar mais críticos.</li>

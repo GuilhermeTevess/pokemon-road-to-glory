@@ -209,6 +209,8 @@ export interface RunState {
   skipStreak?: number;
   /** Biomas visitados por último (não aparecem de novo logo) e espécies das últimas rondas. */
   visited?: string[];
+  /** Pokémon de cada treinador que você já viu numa luta sua (o PokéPC mostra esses). */
+  faced?: Record<string, string[]>;
   recent?: string[];
   /** Evento atual (fase 'event'). */
   event?: RunEvent;

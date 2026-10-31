@@ -1,37 +1,45 @@
-// Estudo do adversário: em vez de mostrar o time exato, mostra as estatísticas da temporada
-// (quem ele mais jogou, quantas rondas, itens) e as últimas batalhas. O time de hoje sai
-// desses números, mas sempre fica uma dúvida: o elenco dele é maior que o time.
+// Estudo do adversário com "névoa": o PokéPC só sabe o que é público.
+// - Lutas públicas (Ginásio, Torneio, Lenda) saem no noticiário, mas cada notícia só cita
+//   até 2 Pokémon (os destaques), e só as últimas 3 lutas ficam no banco de dados.
+// - Quem você já enfrentou numa luta sua aparece inteiro (você viu com os próprios olhos).
+// - Nada de rondas por Pokémon, itens ou com quem abre: isso entregava o time.
 import {RIVALS, getRival} from '../data/rivals';
-import {getItem} from '../data/items';
-import {rivalItem} from './tournament';
 import type {CareerFight, PlayerDoc} from './career';
 import type {WorldBot} from './world';
 
-export interface ScoutUse {
+export interface ScoutSeen {
   species: string;
-  /** Em quantas rondas da temporada ele usou esse Pokémon. */
-  rounds: number;
-  /** Item que costuma levar nele. */
-  item: string;
+  /** Em quantas notícias de lutas públicas ele apareceu. */
+  news: number;
+  /** Você já enfrentou esse Pokémon numa luta sua contra esse treinador. */
+  faced: boolean;
 }
 
 export interface ScoutMatch {
-  /** Tipo da luta (Ginásio, Torneio...), quando é um jogador de verdade. */
+  /** Tipo da luta (Ginásio, Torneio...). */
   label?: string;
   vs: string;
   won: boolean;
-  /** Pokémon que apareceram naquela luta. */
+  /** Destaques daquela luta (no máximo 2). */
   seen: string[];
 }
 
 export interface ScoutReport {
-  /** Uso de cada Pokémon na temporada, do mais jogado ao menos jogado. */
-  usage: ScoutUse[];
+  /** Pokémon conhecidos: os que você enfrentou primeiro, depois os mais citados. */
+  seen: ScoutSeen[];
   matches: ScoutMatch[];
-  /** Com quem costuma abrir (nem sempre). */
-  lead?: string;
-  /** Rondas jogadas na temporada até agora. */
-  season: number;
+}
+
+/** Lutas que saem no noticiário. Selvagens, chefes e rivais de rota são privados. */
+const PUBLIC: CareerFight['kind'][] = ['gym', 'tour', 'legend'];
+/** Quantas lutas públicas o PC guarda e quantos Pokémon cada notícia cita. */
+export const SCOUT_FIGHTS = 3;
+export const SCOUT_PER_FIGHT = 2;
+
+const FIGHT_LABEL = {gym: 'Ginásio', tour: 'Torneio', legend: 'Lenda', boss: 'Chefe', rival: 'Rival'} as const;
+
+function hash(text: string): number {
+  return [...text].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 }
 
 function seeded(seed: number) {
@@ -39,50 +47,59 @@ function seeded(seed: number) {
   return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
 }
 
+/** Os destaques de uma luta: até 2 Pokémon, sempre os mesmos para a mesma luta. */
+export function glimpse(seen: string[], key: string): string[] {
+  const rand = seeded(hash(key));
+  return [...seen].map(s => [s, rand()] as const).sort((a, b) => a[1] - b[1]).slice(0, SCOUT_PER_FIGHT).map(([s]) => s);
+}
+
+/** Lutas públicas, como o noticiário conta (as últimas 3, com até 2 destaques cada). */
+export function publicFights(fights: CareerFight[]): ScoutMatch[] {
+  return fights
+    .filter(f => PUBLIC.includes(f.kind))
+    .slice(0, SCOUT_FIGHTS)
+    .map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: glimpse(f.seen, `${f.kind}|${f.vs}|${f.wave}`)}));
+}
+
+function build(matches: ScoutMatch[], faced: string[]): ScoutReport {
+  const news = new Map<string, number>();
+  for (const m of matches) for (const s of m.seen) news.set(s, (news.get(s) ?? 0) + 1);
+  const names = [...new Set([...faced, ...news.keys()])];
+  const seen = names
+    .map(s => ({species: s, news: news.get(s) ?? 0, faced: faced.includes(s)}))
+    .sort((a, b) => Number(b.faced) - Number(a.faced) || b.news - a.news);
+  return {seen, matches};
+}
+
 /**
- * `team` é o time que o rival trouxe para ESTE torneio (o que ele vai usar de verdade).
- * Os Pokémon do time aparecem bem jogados; os que ficaram no banco aparecem menos.
+ * Rival da lista fixa (fora do mundo da carreira): inventa 3 lutas públicas recentes,
+ * quase sempre com Pokémon do time de hoje, mas cada uma só cita 2.
  */
-export function scoutReport(name: string, wave: number, team: string[]): ScoutReport | null {
+export function scoutReport(name: string, wave: number, team: string[], faced: string[] = []): ScoutReport | null {
   const rival = getRival(name);
   if (!rival) return null;
-  const rand = seeded([...name].reduce((a, c) => a * 31 + c.charCodeAt(0), wave) >>> 0);
-  const season = Math.max(10, wave);
+  const rand = seeded(hash(`${name}|${wave}`));
   const bench = rival.team.filter(s => !team.includes(s));
-  const usage: ScoutUse[] = [
-    ...team.map((s, i) => ({species: s, rounds: Math.round(season * (i < 2 ? 0.8 + rand() * 0.2 : 0.5 + rand() * 0.35))})),
-    // Quem está no banco também já jogou, só que menos (é o que deixa a dúvida).
-    ...bench.map(s => ({species: s, rounds: Math.round(season * (0.15 + rand() * 0.4))})),
-  ]
-    .map(u => ({...u, item: getItem(rivalItem(name, u.species)).name}))
-    .sort((a, b) => b.rounds - a.rounds);
   const others = RIVALS.filter(r => r.name !== name);
-  const matches: ScoutMatch[] = Array.from({length: 3}, () => {
-    // Em cada luta apareceram 2 ou 3 Pokémon, quase sempre do time de agora.
+  const matches: ScoutMatch[] = Array.from({length: SCOUT_FIGHTS}, () => {
     const pool = [...team, ...(rand() < 0.5 ? bench.slice(0, 1) : [])];
-    const seen = [...pool].sort(() => rand() - 0.5).slice(0, 2 + Math.floor(rand() * 2));
-    return {vs: others[Math.floor(rand() * others.length)].name, won: rand() < 0.6, seen};
+    const seen = [...pool].sort(() => rand() - 0.5).slice(0, SCOUT_PER_FIGHT);
+    return {label: rand() < 0.5 ? 'Torneio' : 'Ginásio', vs: others[Math.floor(rand() * others.length)].name, won: rand() < 0.6, seen};
   });
-  return {usage, matches, season, lead: rand() < 0.7 ? team[0] : undefined};
+  return build(matches, faced);
 }
 
-const FIGHT_LABEL = {gym: 'Ginásio', tour: 'Torneio', legend: 'Lenda', boss: 'Chefe', rival: 'Rival'} as const;
-
-/** Estudo de um jogador da carreira: números reais da temporada dele (uso, lutas importantes). */
-export function playerScout(p: PlayerDoc): ScoutReport {
-  const items = new Map(p.team.map(m => [m.species, m.item ? getItem(m.item).name : '—']));
-  return realScout(p.usage ?? {}, p.fights ?? [], sp => items.get(sp) ?? '—', p.round, p.team[0]?.species);
+/** Névoa a partir de uma lista de lutas (perfis). */
+export function playerScoutFromFights(fights: CareerFight[], faced: string[] = []): ScoutReport {
+  return build(publicFights(fights), faced);
 }
 
-/** Estudo de um rival do mundo da temporada: o que ele jogou de verdade. */
-export function botScout(b: WorldBot): ScoutReport {
-  return realScout(b.usage, b.fights, sp => getItem(rivalItem(b.name, sp)).name, 1, b.team[0]);
+/** Jogador da carreira: só as lutas públicas dele e o que você já enfrentou. */
+export function playerScout(p: PlayerDoc, faced: string[] = []): ScoutReport {
+  return build(publicFights(p.fights ?? []), faced);
 }
 
-function realScout(usageMap: Record<string, number>, fights: CareerFight[], item: (sp: string) => string, round: number, lead?: string): ScoutReport {
-  const usage = Object.entries(usageMap)
-    .map(([sp, rounds]) => ({species: sp, rounds, item: item(sp)}))
-    .sort((a, b) => b.rounds - a.rounds);
-  const matches = fights.slice(0, 6).map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: f.seen}));
-  return {usage, matches, season: Math.max(1, round, ...usage.map(u => u.rounds)), lead};
+/** Rival do mundo da temporada: só as lutas públicas dele e o que você já enfrentou. */
+export function botScout(b: WorldBot, faced: string[] = []): ScoutReport {
+  return build(publicFights(b.fights), faced);
 }
