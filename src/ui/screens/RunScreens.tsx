@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
-import {TYPE_COLORS, dex, species} from '../../data/dex';
+import {dex, species} from '../../data/dex';
 import {moveDescPt} from '../../data/movesPt';
 import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
@@ -13,9 +13,8 @@ import {TRAIL, TRAIL_CAP, trailOf} from '../../game/legend';
 import {getHint} from '../../data/hints';
 import {seasonPoints} from '../../game/league';
 import {SeasonSummary} from './LeagueScreens';
-import {bookName, getGym, gymsOf} from '../../data/gyms';
-import type {Gym} from '../../data/gyms';
-import {badgesIn, gymStatus, gymWaves, ticketPrice} from '../../game/gym';
+import {getGym, gymsOf} from '../../data/gyms';
+import {badgesIn} from '../../game/gym';
 import {EV_MAX_STAT} from '../../game/meta';
 import {tourAt} from '../../game/tournament';
 import {useGame} from '../../game/store';
@@ -23,6 +22,7 @@ import type {OwnedMon} from '../../game/types';
 import {playCoins, playEvolve, playItem, playJingle} from '../audio';
 import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {BiomeCard, RegionCard, TrainerAvatar} from './StartScreens';
+import {BadgeBooksModal} from './GymScreens';
 import {EggInfo} from './DaycareScreen';
 import {fast} from '../settings';
 
@@ -489,7 +489,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <ItemIcon id="map" size={24} /> Diário · {run.diary?.length ?? 0}
         </button>
         <button className="btn" onClick={() => setGyms(true)}>
-          <PixelIcon name="trophy" /> {run.region === 'alola' ? 'Provas' : 'Ginásios'} · {badgesIn(run)}/{gymsOf(run.region).length}
+          <PixelIcon name="trophy" /> Cadernetas · {badgesIn(run)}/{gymsOf(run.region).length}
         </button>
         <button
           className="btn sb-shop"
@@ -502,7 +502,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
       </div>
       {shop && <ShopModal onClose={() => setShop(false)} />}
       {diary && <DiaryModal onClose={() => setDiary(false)} />}
-      {gyms && <GymModal onClose={() => setGyms(false)} />}
+      {gyms && <BadgeBooksModal onClose={() => setGyms(false)} />}
       <div className="panel sb-weak">
         <h3>Fraquezas do time</h3>
         <TeamWeakness party={run.party} compact>
@@ -919,82 +919,3 @@ function DiaryModal({onClose}: {onClose: () => void}) {
   );
 }
 
-/** Caderneta de insígnias da região: marcar ginásio (ingresso) e ver as insígnias. */
-function GymModal({onClose}: {onClose: () => void}) {
-  const {run, scheduleGym} = useGame();
-  const [picking, setPicking] = useState<Gym | null>(null);
-  const [wave, setWave] = useState(0);
-  if (!run) return null;
-  const list = gymsOf(run.region);
-  const price = ticketPrice(run);
-  const waves = gymWaves(run);
-  const region = getRegion(run.region);
-  return (
-    <Modal onClose={onClose} wide>
-      <h2>
-        {bookName(region.id)} · {region.name}
-      </h2>
-      <p className="hint">
-        Compre o ingresso e escolha a ronda da luta (enquanto você estiver em {region.name}). Cada insígnia vale {GYM_PRIZE_TEXT}. Perder não acaba a run, mas o ingresso é gasto.
-      </p>
-      <div className="badge-book">
-        {list.map(g => {
-          const st = gymStatus(run, g);
-          const booked = run.gyms?.find(x => x.id === g.id);
-          return (
-            <div key={g.id} className={`panel gym-card ${st}`}>
-              <span className="gym-badge" style={{['--tc' as string]: TYPE_COLORS[g.type]}}>
-                {st === 'won' ? '★' : ''}
-              </span>
-              <Sprite name={g.team[g.team.length - 1]} size={56} still className={st === 'won' ? '' : 'dim'} />
-              <b>{g.leader}</b>
-              <TypeBadge type={g.type} small />
-              <span className="muted gym-badge-name">{g.badge}</span>
-              {st === 'won' ? (
-                <span className="diary-ok">Conquistada!</span>
-              ) : st === 'booked' ? (
-                <span className="gym-when">Luta na ronda {booked?.wave}</span>
-              ) : (
-                <button className="btn small primary" disabled={!waves.length || run.money < price} onClick={() => { setPicking(g); setWave(waves[0]); }}>
-                  Ingresso ₽ {price}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {!waves.length && <p className="muted">Não sobra ronda livre nesta região para marcar ginásio. Um Passe Regional dobra a estadia.</p>}
-      {picking && (
-        <div className="panel gym-pick">
-          <p>
-            Ginásio de <b>{picking.leader}</b>: escolha a ronda
-          </p>
-          <div className="row center wrap">
-            {waves.slice(0, 12).map(w => (
-              <button key={w} className={`btn small ${w === wave ? 'primary' : ''}`} onClick={() => setWave(w)}>
-                {w}
-              </button>
-            ))}
-          </div>
-          <div className="row center">
-            <button className="btn" onClick={() => setPicking(null)}>
-              Cancelar
-            </button>
-            <button
-              className="btn primary"
-              onClick={() => {
-                playCoins();
-                scheduleGym(picking.id, wave);
-                setPicking(null);
-              }}
-            >
-              Pagar ₽ {price} e marcar ronda {wave}
-            </button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-const GYM_PRIZE_TEXT = 'Glória, e a caderneta completa dá um bônus grande';

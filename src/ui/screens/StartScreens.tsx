@@ -6,7 +6,7 @@ import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
-import {CLOTHES, DEFAULT_LOOK, EYES, HAIR_COLORS, HAIR_STYLES, HATS, SKINS, decodeLook, encodeLook, isCustom, lookPixels, randomLook} from '../../game/look';
+import {CLOTHES, DEFAULT_LOOK, EYES, HAIR_COLORS, HAIR_STYLES, HATS, SKINS, decodeLook, encodeLook, isCustom, lookFromName, lookPixels, randomLook} from '../../game/look';
 import type {Look} from '../../game/look';
 import type {Trainer} from '../../game/trainers';
 import {PARTY_SIZE, useGame} from '../../game/store';
@@ -36,13 +36,8 @@ export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: 
   useEffect(() => setFailed(false), [avatar]);
   const look = useMemo(() => (isCustom(avatar) ? decodeLook(avatar) : null), [avatar]);
   if (look) return <PixelTrainer look={look} size={size} />;
-  if (failed) {
-    return (
-      <span className="avatar-fallback" style={{width: size, height: size}}>
-        {name.slice(0, 1).toUpperCase()}
-      </span>
-    );
-  }
+  // Sem sprite: um treinador em pixel art com visual fixo para aquele nome.
+  if (failed) return <PixelTrainer look={lookFromName(name)} size={size} />;
   return <img className="trainer-avatar" src={avatarUrl(avatar)} alt={name} width={size} height={size} onError={() => setFailed(true)} draggable={false} />;
 }
 

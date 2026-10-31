@@ -2,7 +2,6 @@
 import {useMemo, useState} from 'react';
 import {getBiome} from '../../data/biomes';
 import {getLegend} from '../../data/legends';
-import type {Legend} from '../../data/legends';
 import {getRegion} from '../../data/regions';
 import {VENUES, approachLines, challengeLines, foundLines, outroLines, venueName, venueTier} from '../../game/legend';
 import type {Fame, Line} from '../../game/legend';
@@ -108,15 +107,15 @@ export function ArenaBackdrop({tier, color}: {tier: number; color: string}) {
   );
 }
 
-function fameNow(): Fame {
+export function fameNow(): Fame {
   const {trainer, collection} = useGame.getState();
   const c = careerOf(structuredClone(collection));
   return {name: trainer?.name ?? 'Você', fame: c.fame, worlds: c.titles.worlds ?? 0, titles: Object.values(c.titles).reduce((a, b) => a + (b ?? 0), 0)};
 }
 
 /** Uma fala com o nome de quem fala. */
-function Bubble({line, legend, me}: {line: Line; legend: Legend; me: string}) {
-  const who = line.who === 'legend' ? legend.name : line.who === 'me' ? me : line.who === 'narrator' ? 'Narrador' : null;
+export function Bubble({line, other, me}: {line: Line; other: string; me: string}) {
+  const who = line.who === 'legend' ? other : line.who === 'me' ? me : line.who === 'narrator' ? 'Narrador' : null;
   return (
     <div className={`legend-bubble ${line.who}`}>
       {who && <b>{who}</b>}
@@ -182,7 +181,7 @@ export function LegendMeetScreen() {
       </div>
       <div className="legend-dialog panel">
         {lines.slice(0, shown).map((l, i) => (
-          <Bubble key={i} line={l} legend={legend} me={me.name} />
+          <Bubble key={i} line={l} other={legend.name} me={me.name} />
         ))}
       </div>
       <div className="row center">
@@ -233,7 +232,7 @@ export function LegendAfterModal() {
         <TrainerAvatar avatar={legend.avatar} name={legend.name} size={120} />
         <h2>{after.won ? `Você venceu ${legend.name}!` : `${legend.name} venceu desta vez`}</h2>
         {outroLines(legend, me, after.won, tier).map((l, i) => (
-          <Bubble key={i} line={l} legend={legend} me={trainer?.name ?? 'Você'} />
+          <Bubble key={i} line={l} other={legend.name} me={trainer?.name ?? 'Você'} />
         ))}
         <button className="btn primary" onClick={closeLegendAfter}>
           Continuar a jornada

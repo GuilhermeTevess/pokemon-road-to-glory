@@ -11,6 +11,7 @@ import {getRegion} from '../../data/regions';
 import {getGym} from '../../data/gyms';
 import {venueName} from '../../game/legend';
 import {ArenaBackdrop} from './LegendScreens';
+import {GymBackdrop} from './GymScreens';
 import {
   CategoryIcon,
   HpBar,
@@ -272,6 +273,8 @@ export function BattleScreen() {
       <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
         {enc?.venue != null ? (
           <ArenaBackdrop tier={enc.venue} color={biome.color} />
+        ) : enc?.gym && getGym(enc.gym) ? (
+          <GymBackdrop gym={getGym(enc.gym)!} crowd={!!enc.intro?.[0]?.startsWith('🎙️')} />
         ) : (
           <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         )}
