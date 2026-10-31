@@ -292,21 +292,24 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
     }
     return {type: t, weak, resist, danger: weak >= Math.ceil(party.length / 2) && resist === 0};
   });
-  const danger = rows.filter(r => r.danger);
+  // Buraco de verdade: alguém é fraco e ninguém do time resiste.
+  const holes = rows.filter(r => r.weak > 0 && r.resist === 0);
   const shown = compact ? rows.filter(r => r.weak > 0).sort((a, b) => b.weak - b.resist - (a.weak - a.resist)) : rows;
   return (
     <div className={`team-weak ${compact ? 'compact' : ''}`}>
-      {danger.length > 0 && (
+      {holes.length > 0 ? (
         <p className="tw-alert">
-          Cuidado com:{' '}
-          {danger.map(r => (
+          Sem defesa contra:{' '}
+          {holes.map(r => (
             <TypeBadge key={r.type} type={r.type} small info />
           ))}
         </p>
+      ) : (
+        <p className="tw-ok">Seu time tem alguém que aguenta cada tipo. 👍</p>
       )}
       <div className="tw-grid">
         {shown.map(r => (
-          <div key={r.type} className={`tw-cell ${r.danger ? 'danger' : ''}`}>
+          <div key={r.type} className={`tw-cell ${r.weak > 0 && r.resist === 0 ? 'danger' : ''}`}>
             <TypeBadge type={r.type} small info />
             <span className={r.weak ? 'tw-weak' : 'tw-zero'} title="Fracos a esse tipo">
               {r.weak} fraco{r.weak === 1 ? '' : 's'}
@@ -319,6 +322,9 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
           </div>
         ))}
       </div>
+      <button className="btn small calc-open" onClick={() => useGame.getState().openTypeCalc([])}>
+        Calculadora de Tipos
+      </button>
     </div>
   );
 }
@@ -332,7 +338,6 @@ export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => 
   const [sel, setSel] = useState<string[]>(initial.slice(0, 2));
   const toggle = (t: string) =>
     setSel(cur => (cur.includes(t) ? cur.filter(x => x !== t) : cur.length >= 2 ? [cur[1], t] : [...cur, t]));
-  const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
   return (
     <Modal onClose={onClose} wide>
       <h2>Calculadora de tipos</h2>
@@ -349,41 +354,50 @@ export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => 
           </button>
         ))}
       </div>
-      {sel.length > 0 && (
-        <div className="calc-grid">
-          <section className="calc-box">
-            <MatchupPanel types={sel} title={`${name} defendendo`} />
-          </section>
-          {sel.map(a => {
-            const by = (f: (x: number) => boolean) => ALL_TYPES.filter(d => f(typeMultiplier(a, [d])));
-            const rows: [string, string[], string][] = [
-              ['Dá 2x em', by(x => x > 1), 'mu-x2'],
-              ['Dá ½ em', by(x => x > 0 && x < 1), 'mu-half'],
-              ['Não afeta', by(x => x === 0), 'mu-immune'],
-            ];
-            return (
-              <section key={a} className="calc-box">
-                <div className="matchups">
-                  <div className="mu-title">{TYPE_PT[a] ?? a} atacando</div>
-                  {rows.map(([label, list, cls]) =>
-                    list.length ? (
-                      <div key={label} className={`mu-row ${cls}`}>
-                        <span className="mu-label">{label}</span>
-                        <span className="mu-types">
-                          {list.map(t => (
-                            <TypeBadge key={t} type={t} small />
-                          ))}
-                        </span>
-                      </div>
-                    ) : null,
-                  )}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
+      {sel.length > 0 && <CalcTable sel={sel} />}
     </Modal>
+  );
+}
+
+const MULT_LABEL = (x: number) => (x === 0 ? 'imune' : x === 0.25 ? '¼' : x === 0.5 ? '½' : x === 1 ? '' : `${x}x`);
+const MULT_CLS = (x: number) => (x === 0 ? 'mu-immune' : x > 1 ? 'mu-x2' : x < 1 ? 'mu-half' : '');
+
+/** Um card só: para cada tipo, quanto o(s) tipo(s) escolhido(s) toma(m) e quanto cada um dá. */
+function CalcTable({sel}: {sel: string[]}) {
+  const rows = ALL_TYPES.map(t => ({t, takes: typeMultiplier(t, sel), gives: sel.map(a => typeMultiplier(a, [t]))})).filter(
+    r => r.takes !== 1 || r.gives.some(g => g !== 1),
+  );
+  const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
+  return (
+    <div className="calc-table-wrap">
+      <table className="calc-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>{name} toma</th>
+            {sel.map(a => (
+              <th key={a}>{TYPE_PT[a] ?? a} dá</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.t}>
+              <td>
+                <TypeBadge type={r.t} small />
+              </td>
+              <td className={MULT_CLS(r.takes)}>{MULT_LABEL(r.takes)}</td>
+              {r.gives.map((g, i) => (
+                <td key={i} className={MULT_CLS(g)}>
+                  {MULT_LABEL(g)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="hint small">Só aparecem os tipos com alguma diferença. Vazio = normal (1x).</p>
+    </div>
   );
 }
 
@@ -435,54 +449,65 @@ export function MoveInfo({move, onClose}: {move: string; onClose: () => void}) {
   if (m.heal) effects.push(<li key="heal">Cura {Math.round((m.heal[0] / m.heal[1]) * 100)}% do HP máximo</li>);
   if (m.multihit) effects.push(<li key="multi">Acerta {Array.isArray(m.multihit) ? `${m.multihit[0]} a ${m.multihit[1]}` : m.multihit} vezes</li>);
   if (m.critRatio && m.critRatio > 1) effects.push(<li key="crit">Chance alta de acerto crítico</li>);
+  const [more, setMore] = useState(false);
   return (
     <Modal onClose={onClose}>
-      <h2>{m.name}</h2>
-      <div className="row center wrap">
-        <TypeBadge type={m.type} />
-        <span className={`cat-badge cat-${m.category}`}>{cat.name}</span>
+      <div className="move-card" style={{['--mc' as string]: TYPE_COLORS[m.type]}}>
+        <div className="move-card-head">
+          <h2>{m.name}</h2>
+          <TypeBadge type={m.type} />
+          <CategoryIcon category={m.category} />
+        </div>
+        <div className="move-card-stats">
+          <span>
+            <small>Poder</small>
+            <b>{m.basePower || '—'}</b>
+          </span>
+          <span>
+            <small>Precisão</small>
+            <b>{m.accuracy === true ? '—' : `${m.accuracy}%`}</b>
+          </span>
+          <span>
+            <small>PP</small>
+            <b>{m.pp}</b>
+          </span>
+        </div>
+        <p className="move-info-desc">{moveDescPt(m.name)}</p>
+        {m.priority !== 0 && (
+          <p className="move-tag">{m.priority > 0 ? '⚡ Age antes dos outros golpes' : '🐢 Age depois dos outros golpes'}</p>
+        )}
+        <button className="link" onClick={() => setMore(x => !x)}>
+          {more ? 'Menos detalhes ▴' : 'Mais detalhes ▾'}
+        </button>
+        {more && (
+          <div className="move-more">
+            <p>
+              <b>{cat.name}:</b> {cat.hint}
+              {m.category !== 'Status' && ' Golpe do mesmo tipo de quem usa bate 1,5x.'}
+            </p>
+            <p>
+              Alvo: {TARGET_PT[m.target] ?? m.target} · Contato: {m.flags.contact ? 'sim' : 'não'}
+            </p>
+            {effects.length > 0 && <ul className="move-effects">{effects}</ul>}
+          </div>
+        )}
       </div>
-      <p className="move-info-desc">{moveDescPt(m.name)}</p>
-      <table className="move-info">
-        <tbody>
-          <tr>
-            <th>Poder</th>
-            <td>{m.basePower ? m.basePower : m.category === 'Status' ? '— (não causa dano)' : 'Varia'}</td>
-          </tr>
-          <tr>
-            <th>Precisão</th>
-            <td>{m.accuracy === true ? 'Nunca erra' : `${m.accuracy}%`}</td>
-          </tr>
-          <tr>
-            <th>PP</th>
-            <td>{m.pp} usos</td>
-          </tr>
-          <tr>
-            <th>Prioridade</th>
-            <td>
-              {m.priority > 0 ? `+${m.priority} (age antes dos outros)` : m.priority < 0 ? `${m.priority} (age depois dos outros)` : 'Normal (o mais rápido age primeiro)'}
-            </td>
-          </tr>
-          <tr>
-            <th>Alvo</th>
-            <td>{TARGET_PT[m.target] ?? m.target}</td>
-          </tr>
-          <tr>
-            <th>Contato</th>
-            <td>{m.flags.contact ? 'Sim (encosta no alvo)' : 'Não'}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p className="hint">
-        <b>{cat.name}:</b> {cat.hint}
-        {m.category !== 'Status' && ' Se o golpe tem o mesmo tipo de quem usa, bate 1,5x mais forte.'}
-      </p>
-      {effects.length > 0 && (
-        <>
-          <h3>Efeitos</h3>
-          <ul className="move-effects">{effects}</ul>
-        </>
-      )}
     </Modal>
+  );
+}
+
+/** Símbolo oficial da categoria (Físico, Especial, Status), com texto de reserva. */
+export function CategoryIcon({category}: {category: string}) {
+  const [failed, setFailed] = useState(false);
+  const name = CATEGORY_PT[category]?.name ?? category;
+  if (failed) return <span className={`cat-badge cat-${category}`}>{name}</span>;
+  return (
+    <img
+      className="cat-icon"
+      src={`https://play.pokemonshowdown.com/sprites/categories/${category}.png`}
+      alt={name}
+      title={name}
+      onError={() => setFailed(true)}
+    />
   );
 }

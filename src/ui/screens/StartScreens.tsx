@@ -1,12 +1,13 @@
 import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
-import {BIOMES, getBiome} from '../../data/biomes';
+import {BIOMES, biomePools, getBiome} from '../../data/biomes';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
-import {lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
+import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
 import {PARTY_SIZE, useGame} from '../../game/store';
+import type {Screen} from '../../game/store';
 import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
 import {FX} from '../fx';
@@ -118,39 +119,51 @@ export function TitleScreen() {
   const [confirm, setConfirm] = useState(false);
   if (!trainer) return <TrainerSelect />;
   const active = run && run.phase !== 'gameOver' && run.phase !== 'stageClear';
+  const fav = favoriteOf(collection);
+  const heroMons = fav ? [species(fav).name, 'Pikachu', 'Eevee'] : ['Charmander', 'Pikachu', 'Squirtle'];
+  const st = statsOf(structuredClone(collection));
+  const tiles: {icon: string; label: string; sub: string; go: Screen}[] = [
+    {icon: 'star', label: 'Coleção', sub: `${Object.keys(collection.entries).length} Pokémon`, go: 'collection'},
+    {icon: 'trophy', label: 'Torneios', sub: `${careerOf(structuredClone(collection)).cp} CP`, go: 'tournaments'},
+    {icon: 'candy', label: 'Glória', sub: `${collection.glory ?? 0} para gastar`, go: 'glory'},
+    {icon: 'egg', label: 'Creche', sub: collection.eggs?.length ? `${collection.eggs.length} ovo(s)` : 'fazer ovos', go: 'daycare'},
+  ];
   return (
     <div className="screen title-screen">
-      <div className="logo">
-        <div className="logo-top">POKÉMON</div>
-        <div className="logo-main">ROAD TO GLORY</div>
-        <div className="logo-sub">roguelike entre amigos</div>
-      </div>
-      <div className="title-mons">
-        {['Venusaur', 'Charizard', 'Blastoise', 'Pikachu', 'Lucario', 'Gengar'].map(n => (
-          <Sprite key={n} name={n} />
-        ))}
+      <div className="title-hero" style={{backgroundImage: `url(${FX('bg/route.png')})`}}>
+        <div className="logo">
+          <div className="logo-top">POKÉMON</div>
+          <div className="logo-main">ROAD TO GLORY</div>
+        </div>
+        <div className="hero-mons">
+          {heroMons.map((n, i) => (
+            <span key={n} className="hero-mon" style={{animationDelay: `${i * 0.25}s`}}>
+              <Sprite name={n} />
+            </span>
+          ))}
+        </div>
       </div>
       <div className="title-row">
         <div className="panel trainer-badge">
-          <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={72} />
+          <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={64} />
           <div>
             <div className="trainer-name">{trainer.name}</div>
-            <div className="hint">
-              {Object.keys(collection.entries).length} na coleção · {statsOf(structuredClone(collection)).runs} runs
+            <div className="hint small">
+              {st.runs} runs · melhor ronda {st.bestWave}
             </div>
-            <button className="btn small" onClick={() => selectTrainer(null)}>
+            <button className="link" onClick={() => selectTrainer(null)}>
               Trocar treinador
             </button>
           </div>
         </div>
         <div className="menu panel">
           {active && (
-            <button className="btn primary" onClick={() => setScreen('run')}>
-              Continuar · ronda {run.wave}
+            <button className="btn primary big-play" onClick={() => setScreen('run')}>
+              ▶ Continuar · ronda {run.wave}
             </button>
           )}
           <button
-            className={`btn ${active ? '' : 'primary'}`}
+            className={`btn ${active ? '' : 'primary big-play'}`}
             onClick={() => {
               if (active && !confirm) return setConfirm(true);
               abandonRun();
@@ -158,23 +171,19 @@ export function TitleScreen() {
               useGame.getState().setScreen('run');
             }}
           >
-            {active && confirm ? 'Certeza? A run atual será perdida' : 'Nova run'}
+            {active && confirm ? 'Certeza? A run atual será perdida' : active ? 'Nova run' : '▶ Nova run'}
           </button>
-          <button className="btn" onClick={() => setScreen('collection')}>
-            Coleção · {Object.keys(collection.entries).length}
-          </button>
-          <button className="btn" onClick={() => setScreen('glory')}>
-            <PixelIcon name="trophy" /> Glória · {collection.glory ?? 0}
-          </button>
-          <button className="btn" onClick={() => setScreen('tournaments')}>
-            Torneios
-          </button>
-          <button className="btn" onClick={() => setScreen('daycare')}>
-            Creche{collection.eggs?.length ? ` · ${collection.eggs.length} ovo${collection.eggs.length > 1 ? 's' : ''}` : ''}
-          </button>
+          <div className="menu-tiles">
+            {tiles.map(t => (
+              <button key={t.label} className="menu-tile" onClick={() => setScreen(t.go)}>
+                <PixelIcon name={t.icon} size={22} color="var(--ink)" />
+                <b>{t.label}</b>
+                <small>{t.sub}</small>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <p className="hint">Uma temporada tem 120 rondas, com torneios nas rondas 30, 60, 90 e 120 (o Mundial).</p>
     </div>
   );
 }
@@ -417,9 +426,21 @@ export function StarterSelect() {
 }
 
 export function BiomeCard({biome, onClick, label}: {biome: Biome; onClick: () => void; label?: string}) {
+  // Alguns moradores do bioma passeando no cartão.
+  const locals = useMemo(() => {
+    const p = biomePools(biome);
+    return shuffle([...p.common, ...p.uncommon]).slice(0, 3);
+  }, [biome]);
   return (
     <button className="biome-card" onClick={onClick} style={{['--bc' as string]: biome.color}}>
-      <span className="biome-thumb" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+      <span className="biome-top">
+        <span className="biome-thumb" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+        <span className="biome-locals">
+          {locals.map(s => (
+            <Sprite key={s.id} name={s.name} size={44} />
+          ))}
+        </span>
+      </span>
       <span className="biome-name">{label ?? biome.name}</span>
       <span className="row center wrap">
         {biome.types.map(t => (
@@ -434,7 +455,9 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
   const {run, chooseStartBiome, chooseNextBiome} = useGame();
   const options = useMemo(() => {
     if (mode === 'start') return BIOMES;
-    return shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, 3 + (run?.perks?.biomes ?? 0));
+    const n = 3 + (run?.perks?.biomes ?? 0);
+    const fresh = shuffle(BIOMES.filter(b => b.id !== run?.biome && !run?.visited?.includes(b.id)));
+    return fresh.length >= n ? fresh.slice(0, n) : shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, n);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, run?.wave]);
   if (!run) return null;

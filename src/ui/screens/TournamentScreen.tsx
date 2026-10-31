@@ -8,6 +8,7 @@ import {
 import type {MatchRec, TourKind} from '../../game/tournament';
 import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
+import {fast} from '../settings';
 
 /** Formato comum para a chave ao vivo e para o histórico. */
 interface BracketData {
@@ -130,7 +131,7 @@ export function Bracket({data}: {data: BracketData}) {
 
 /** Sorteio: os nomes giram em cada vaga e vão travando um por um. */
 function DrawAnimation({names, onDone}: {names: string[]; onDone: () => void}) {
-  const [tick, setTick] = useState(0);
+  const [tick, setTick] = useState(() => (fast() ? names.length * 5 : 0));
   const locked = Math.floor(tick / 5);
   useEffect(() => {
     if (locked > names.length) return;

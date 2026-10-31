@@ -114,6 +114,11 @@ export interface RunState {
   /** Opções de recompensa da ronda (ids de itens). */
   rewardOptions: string[];
   rerolls: number;
+  /** Recompensa já pega nesta ronda (a tela fica aberta para a loja). */
+  rewardTaken?: string;
+  /** Biomas visitados por último (não aparecem de novo logo) e espécies das últimas rondas. */
+  visited?: string[];
+  recent?: string[];
   /** Evento atual (fase 'event'). */
   event?: RunEvent;
   lastEventWave?: number;

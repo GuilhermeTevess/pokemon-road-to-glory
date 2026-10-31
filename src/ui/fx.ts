@@ -16,6 +16,8 @@ const POS: Record<'p1' | 'p2', Point> = {p1: {x: 27, y: 70}, p2: {x: 72, y: 34}}
 interface Particle {
   file: string;
   size: number;
+  /** Endereço completo da imagem (no lugar de `file`). */
+  src?: string;
   /** Filtro CSS para tingir sprites genéricos. */
   filter?: string;
 }
@@ -34,7 +36,7 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 function spawn(layer: HTMLElement, p: Particle, at: Point, scale = 1): HTMLImageElement {
   const img = document.createElement('img');
-  img.src = FX(p.file);
+  img.src = p.src ?? FX(p.file);
   img.className = 'fx';
   img.style.left = `${at.x}%`;
   img.style.top = `${at.y}%`;
@@ -525,7 +527,7 @@ export async function playMoveFx(layer: HTMLElement, arena: HTMLElement, move: s
 }
 
 /** Animação da pokébola indo até o selvagem. */
-export function throwBallFx(layer: HTMLElement): Promise<void> {
-  fly(layer, {file: 'pokeball.png', size: 28}, {x: 20, y: 90}, POS.p2, 480, {spin: true});
+export function throwBallFx(layer: HTMLElement, src?: string): Promise<void> {
+  fly(layer, {file: 'pokeball.png', src, size: 28}, {x: 20, y: 90}, POS.p2, 480, {spin: true});
   return sleep(500);
 }

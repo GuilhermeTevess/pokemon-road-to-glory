@@ -219,7 +219,15 @@ export const useGame = create<Store>((set, get) => {
       battle = null;
       return;
     }
-    run.encounter = run.upcoming?.shift() ?? generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck);
+    run.encounter = run.upcoming?.shift();
+    if (!run.encounter) {
+      // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
+      for (let i = 0; i < 4; i++) {
+        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck);
+        if (!run.recent?.includes(run.encounter.mon.species)) break;
+      }
+    }
+    run.recent = [run.encounter!.mon.species, ...(run.recent ?? [])].slice(0, 8);
     if (!run.upcoming?.length) run.upcoming = undefined;
     if (run.incenseWaves > 0) run.incenseWaves--;
     run.phase = 'battle';
@@ -228,6 +236,7 @@ export const useGame = create<Store>((set, get) => {
   };
 
   const goToReward = (run: RunState) => {
+    run.rewardTaken = undefined;
     run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0));
     run.phase = 'reward';
   };
@@ -897,8 +906,9 @@ export const useGame = create<Store>((set, get) => {
           run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
           if (target !== undefined) message = applyItem(run, col, itemId, target);
         }
+        // Fica na tela da recompensa para dar tempo de passar na loja.
         run.rewardOptions = [];
-        afterReward(run);
+        run.rewardTaken = itemId;
       });
       if (message) get().toast(message);
     },
@@ -906,6 +916,7 @@ export const useGame = create<Store>((set, get) => {
     skipReward() {
       mutate(run => {
         run.rewardOptions = [];
+        run.rewardTaken = undefined;
         afterReward(run);
       });
     },
@@ -959,6 +970,7 @@ export const useGame = create<Store>((set, get) => {
     chooseNextBiome(id) {
       mutate(run => {
         if (id && id !== run.biome) {
+          run.visited = [run.biome, ...(run.visited ?? [])].slice(0, 4);
           run.biome = id;
           run.upcoming = undefined;
         }

@@ -534,3 +534,11 @@ export function playEvolve(phase: 'glow' | 'done'): void {
   }
   [523, 659, 784, 1047].forEach((f, i) => tone(a, {wave: 'square', from: f, to: f, dur: 0.5 - i * 0.05, gain: 0.06, at: i * 0.09}));
 }
+
+/** "Plin!" da pokébola fechando na captura. */
+export function playPlin(): void {
+  const a = audio();
+  if (!a) return;
+  tone(a, {wave: 'square', from: 1568, to: 1568, dur: 0.07, gain: 0.08});
+  tone(a, {wave: 'triangle', from: 2093, to: 2093, dur: 0.35, gain: 0.1, at: 0.07});
+}
