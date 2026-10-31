@@ -8,6 +8,7 @@ import {isBossWave, isMilestoneWave, SEASON_LENGTH} from '../../game/encounters'
 import {getBattle, useGame} from '../../game/store';
 import {ROUND_NAMES, tourName} from '../../game/tournament';
 import {getRegion} from '../../data/regions';
+import {getGym} from '../../data/gyms';
 import {
   CategoryIcon,
   HpBar,
@@ -69,7 +70,7 @@ export function BattleScreen() {
   const arenaRef = useRef<HTMLDivElement>(null);
   const caughtRef = useRef(false);
 
-  const biome = getBiome(run.biome);
+  const biome = getBiome(run.encounter?.arena ?? run.biome);
   const enc = run.encounter!;
   const collection = useGame(s => s.collection);
   const partner = run.party.find(m => m.partner);
@@ -225,6 +226,8 @@ export function BattleScreen() {
   const tour = run.tournament;
   const header = enc.tournament && tour
     ? `${tourName(tour)} · ${ROUND_NAMES[tour.rounds.length - 1]} · contra ${enc.trainer}`
+    : enc.gym
+    ? `Ginásio · Líder ${enc.trainer} · ${getGym(enc.gym)?.badge ?? ''}`
     : enc.legend
     ? `Lenda de ${getRegion(run.region).name} · ${enc.trainer}`
     : enc.trainer
@@ -256,7 +259,7 @@ export function BattleScreen() {
         <div className="fx-layer" ref={fxRef} />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
           {run.region ? `${getRegion(run.region).name} · ` : ''}
-          {biome.name}
+          {enc?.gym ? `Ginásio de ${enc.trainer}` : biome.name}
         </div>
         {wild && (
           <>

@@ -2,6 +2,8 @@
 import {create} from 'zustand';
 import {BIOMES, getBiome} from '../data/biomes';
 import {getHint} from '../data/hints';
+import {bookName, getGym, gymsOf} from '../data/gyms';
+import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
@@ -144,6 +146,8 @@ interface Store {
   chooseNextRegion(id: string | null): void;
   /** Depois da roleta de viagem, segue para a próxima ronda. */
   continueTravel(): void;
+  /** Compra o ingresso e marca a ronda da luta de ginásio. */
+  scheduleGym(id: string, wave: number): void;
   useItem(itemId: string, monUid: string): void;
   takeItem(monUid: string): void;
   setLead(monUid: string): void;
@@ -235,6 +239,21 @@ export const useGame = create<Store>((set, get) => {
       battle = null;
       return;
     }
+    // Ginásio marcado para esta ronda.
+    const booked = run.gyms?.find(g => g.wave === run.wave);
+    if (booked) {
+      run.gyms = run.gyms!.filter(g => g !== booked);
+      const gym = getGym(booked.id);
+      if (gym && gym.region === run.region) {
+        run.encounter = gymEncounter(gym, run);
+        run.phase = 'battle';
+        run.rerolls = 0;
+        battle = null;
+        return;
+      }
+      run.money += booked.paid ?? 0;
+      get().toast('Você saiu da região do ginásio: o ingresso foi devolvido.');
+    }
     run.encounter = run.upcoming?.shift();
     const hinted = !run.encounter && !isBossWave(run.wave) ? rollHintLegendary(run) : null;
     if (hinted) {
@@ -313,7 +332,7 @@ export const useGame = create<Store>((set, get) => {
     run.travel = undefined;
     if (run.regionMapReady) run.phase = 'regionChoice';
     else if (run.mapReady) run.phase = 'biomeChoice';
-    else if (shouldRollEvent(run)) {
+    else if (shouldRollEvent(run) && !run.gyms?.some(g => g.wave === run.wave + 1)) {
       run.event = rollEvent(run);
       run.lastEventWave = run.wave;
       if (run.event.kind === 'seer') run.upcoming = run.event.upcoming;
@@ -822,6 +841,11 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`${foe} venceu. Fim do torneio para você, mas a temporada continua!`);
             return;
           }
+        } else if (outcome === 'lost' && enc.gym) {
+          healAll(run);
+          get().toast(`${enc.trainer} venceu. Seu time foi curado; dá para tentar de novo com outro ingresso.`);
+          afterReward(run);
+          return;
         } else if (outcome === 'lost' && enc.legend) {
           // Perder para uma lenda não acaba a run: o time é curado e a jornada segue.
           healAll(run);
@@ -903,6 +927,19 @@ export const useGame = create<Store>((set, get) => {
         const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
         if (outcome === 'won' && enc.boss && !enc.trainer) addTrail(run, TRAIL.boss);
+        const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
+        if (gym && !run.badges?.includes(gym.id)) {
+          run.badges = [...(run.badges ?? []), gym.id];
+          col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
+          run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
+          get().toast(`Você ganhou a ${gym.badge}! +${GYM_PRIZE.glory} Glória`);
+          if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
+            col.glory += GYM_PRIZE.book;
+            run.tourGlory += GYM_PRIZE.book;
+            col.badgeBooks = {...col.badgeBooks, [gym.region]: (col.badgeBooks?.[gym.region] ?? 0) + 1};
+            get().toast(`${bookName(gym.region)} de ${getRegion(gym.region).name} completa! +${GYM_PRIZE.book} Glória`);
+          }
+        }
         if (outcome === 'won' && enc.legend) {
           const prize = legendPrize(run.wave);
           col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
@@ -1104,6 +1141,16 @@ export const useGame = create<Store>((set, get) => {
         }
         run.regionMapReady = false;
         nextStop(run);
+      });
+    },
+    scheduleGym(id, wave) {
+      mutate(run => {
+        const gym = getGym(id);
+        const price = ticketPrice(run);
+        if (!gym || gym.region !== run.region || gymStatus(run, gym) !== 'open') return;
+        if (!gymWaves(run).includes(wave) || run.money < price) return;
+        run.money -= price;
+        run.gyms = [...(run.gyms ?? []), {id, wave, paid: price}].sort((a, b) => a.wave - b.wave);
       });
     },
     continueTravel() {

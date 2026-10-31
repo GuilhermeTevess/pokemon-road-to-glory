@@ -62,6 +62,10 @@ export interface Encounter {
   tournament?: boolean;
   /** Desafio de treinador lendário (id): perder não acaba a run. */
   legend?: string;
+  /** Luta de ginásio (id): perder não acaba a run. */
+  gym?: string;
+  /** Bioma do fundo da batalha (ginásios usam o bioma do tipo). */
+  arena?: string;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
@@ -127,6 +131,9 @@ export interface RunState {
   /** Dicas de viajantes anotadas (ids de data/hints) e lendários já encontrados por elas. */
   diary?: string[];
   found?: string[];
+  /** Ginásios marcados (ingresso pago) e insígnias ganhas nesta temporada. */
+  gyms?: {id: string; wave: number; paid?: number}[];
+  badges?: string[];
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
   travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
   incenseWaves: number;
