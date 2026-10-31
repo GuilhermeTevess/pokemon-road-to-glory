@@ -10,8 +10,7 @@ import {ROUND_NAMES, tourName} from '../../game/tournament';
 import {getRegion} from '../../data/regions';
 import {getGym} from '../../data/gyms';
 import {venueName} from '../../game/legend';
-import {ArenaBackdrop} from './LegendScreens';
-import {GymBackdrop} from './GymScreens';
+import {ArenaBackdrop, GymBackdrop} from '../scene';
 import {
   CategoryIcon,
   HpBar,
@@ -148,7 +147,8 @@ export function BattleScreen() {
         }
         if (ev.text) {
           setMessage(ev.text);
-          await wait(850);
+          // O narrador fala mais devagar, para dar tempo de ler.
+          await wait(ev.narrator ? Math.min(3800, 1400 + ev.text.length * 28) : 850);
         } else if (ev.hp) {
           await wait(350);
         }

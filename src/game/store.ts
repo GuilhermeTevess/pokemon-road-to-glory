@@ -3,6 +3,7 @@ import {create} from 'zustand';
 import {BIOMES, getBiome} from '../data/biomes';
 import {getHint} from '../data/hints';
 import {bookName, getGym, gymsOf} from '../data/gyms';
+import type {Gym} from '../data/gyms';
 import {checkAchievements} from './achievements';
 import {POINTS, addPoints, finishSeason, rollRivalPoints} from './league';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
@@ -38,7 +39,7 @@ import {introLines} from './narration';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
-import type {OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
+import type {Encounter, OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
 
 export const PARTY_SIZE = 6;
 export const STARTER_LEVEL = 5;
@@ -207,6 +208,9 @@ function emptyRun(): RunState {
 /** Chance de dois selvagens aparecerem juntos (batalha em dupla). */
 /** Quantas opções sorteadas aparecem no fim da estadia (a atual pode ou não estar entre elas). */
 const TRAVEL_OPTIONS = 4;
+/** Chance de ganhar a insígnia por mérito mesmo perdendo (raro, como no anime). */
+const MERIT_CHANCE = 0.03;
+const TOUR_HYPE = {cup: 0, regional: 1, international: 2, worlds: 3} as const;
 const DOUBLE_CHANCE = 0.05;
 
 const boot = loadTrainers();
@@ -242,6 +246,31 @@ export const useGame = create<Store>((set, get) => {
 
   const healAll = (run: RunState) => {
     for (const m of run.party) m.hp = maxHp(m);
+  };
+
+  /** Cola a insígnia: caderneta (registro da vitória), pontos e Glória. `merit`: dada mesmo com a derrota. */
+  const awardBadge = (run: RunState, col: Collection, gym: Gym, enc: Encounter, turns: number, merit: boolean) => {
+    const prev = col.badgeLog?.[gym.id];
+    const team = enc.team ?? [enc.mon];
+    col.badgeLog = {
+      ...col.badgeLog,
+      [gym.id]: prev
+        ? {...prev, wins: prev.wins + 1}
+        : {at: Date.now(), wave: run.wave, turns, team: run.party.map(m => m.species), leaderTeam: team.map(m => m.species), leaderLevel: Math.max(...team.map(m => m.level)), wins: 1, merit},
+    };
+    if (run.badges?.includes(gym.id)) return;
+    run.badgeWon = gym.id;
+    run.badgeMerit = merit;
+    run.badges = [...(run.badges ?? []), gym.id];
+    addPoints(run, col, 'gyms', POINTS.badge, true, `${gym.badge} (${gym.leader})${merit ? ' por mérito' : ''}`);
+    col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
+    run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
+    if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
+      col.glory += GYM_PRIZE.book;
+      run.tourGlory += GYM_PRIZE.book;
+      addPoints(run, col, 'books', POINTS.book, true, `${bookName(gym.region)} de ${getRegion(gym.region).name} completa`);
+      col.badgeBooks = {...col.badgeBooks, [gym.region]: (col.badgeBooks?.[gym.region] ?? 0) + 1};
+    }
   };
 
   /** Você aos olhos das lendas: nome, fama e títulos. */
@@ -830,7 +859,7 @@ export const useGame = create<Store>((set, get) => {
                 if (!run.bag[id]) delete run.bag[id];
               }
               run.diary = [...(run.diary ?? []), ev.hint];
-              addPoints(run, col, 'travelers', POINTS.traveler);
+              addPoints(run, col, 'travelers', POINTS.traveler, true, `Viajante ajudado (${getRegion(run.region).name})`);
               addTrail(run, TRAIL.traveler);
               const h = getHint(ev.hint);
               message = `Dica anotada no diário!${h ? ` (${getRegion(h.region).name} · ${getBiome(h.biome).name})` : ''}`;
@@ -902,7 +931,13 @@ export const useGame = create<Store>((set, get) => {
           }
         } else if (outcome === 'lost' && enc.gym) {
           healAll(run);
-          get().toast(`${enc.trainer} venceu. Seu time foi curado; dá para tentar de novo com outro ingresso.`);
+          // Muito raro, como no anime: o líder dá a insígnia por mérito mesmo com a derrota
+          // (só se você derrubou pelo menos metade do time dele).
+          const gymLost = getGym(enc.gym);
+          const downed = ctl ? ctl.battle.p2.pokemon.filter(p => p.fainted).length : 0;
+          if (gymLost && !run.badges?.includes(gymLost.id) && downed * 2 >= (enc.team?.length ?? 1) && Math.random() < MERIT_CHANCE) {
+            awardBadge(run, col, gymLost, enc, ctl?.battle.turn ?? 0, true);
+          } else get().toast(`${enc.trainer} venceu. Seu time foi curado; dá para tentar de novo com outro ingresso.`);
           afterReward(run);
           return;
         } else if (outcome === 'lost' && enc.legend) {
@@ -994,39 +1029,14 @@ export const useGame = create<Store>((set, get) => {
           addTrail(run, TRAIL.boss);
           if (trailOf(run) > before) get().toast(`Rastro da lenda de ${getRegion(run.region).name}: ${Math.min(trailOf(run), 40)}%`);
         }
-        if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary);
+        if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary, true, `Lendário pela dica: ${species(enc.mon.species).name}`);
         const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
-        if (gym) {
-          const prev = col.badgeLog?.[gym.id];
-          col.badgeLog = {
-            ...col.badgeLog,
-            [gym.id]: prev
-              ? {...prev, wins: prev.wins + 1}
-              : {
-                  at: Date.now(), wave: run.wave, turns: ctl?.battle.turn ?? 0, team: run.party.map(m => m.species),
-                  leaderTeam: (enc.team ?? [enc.mon]).map(m => m.species), leaderLevel: Math.max(...(enc.team ?? [enc.mon]).map(m => m.level)), wins: 1,
-                },
-          };
-        }
-        if (gym && !run.badges?.includes(gym.id)) {
-          run.badgeWon = gym.id;
-          run.badges = [...(run.badges ?? []), gym.id];
-          addPoints(run, col, 'gyms', POINTS.badge);
-          col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
-          run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
-          if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
-            col.glory += GYM_PRIZE.book;
-            run.tourGlory += GYM_PRIZE.book;
-            addPoints(run, col, 'books', POINTS.book);
-            col.badgeBooks = {...col.badgeBooks, [gym.region]: (col.badgeBooks?.[gym.region] ?? 0) + 1};
-            get().toast(`${bookName(gym.region)} de ${getRegion(gym.region).name} completa! +${GYM_PRIZE.book} Glória`);
-          }
-        }
+        if (gym) awardBadge(run, col, gym, enc, ctl?.battle.turn ?? 0, false);
         if (outcome === 'won' && enc.legend) {
           run.legendAfter = {id: enc.legend, won: true};
           const prize = legendPrize(run.wave);
           col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
-          addPoints(run, col, 'legends', POINTS.legend);
+          addPoints(run, col, 'legends', POINTS.legend, true, `Vitória sobre ${enc.trainer}`);
           col.glory = (col.glory ?? 0) + prize.glory;
           run.tourGlory = (run.tourGlory ?? 0) + prize.glory;
           run.money += prize.money;
@@ -1081,7 +1091,8 @@ export const useGame = create<Store>((set, get) => {
           boss: true,
           trainer: foe.name,
           tournament: true,
-          intro: introLines({...me, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, foe, info.name, currentRound(t), !!c.defending[t.kind]),
+          hype: TOUR_HYPE[t.kind],
+          intro: introLines({...me, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, foe, info.name, currentRound(t), !!c.defending[t.kind], TOUR_HYPE[t.kind]),
         };
         run.phase = 'battle';
         battle = null;
@@ -1095,7 +1106,7 @@ export const useGame = create<Store>((set, get) => {
         const info = tourInfo(t.kind);
         const i = prizeIndex(t.placement ?? 5);
         applyToCareer(careerOf(col), t);
-        addPoints(run, col, 'tournaments', info.fame[i], false);
+        addPoints(run, col, 'tournaments', info.fame[i], false, `${tourName(t)}: ${placementLabel(t.placement ?? 5)}`);
         col.glory = (col.glory ?? 0) + info.glory[i];
         run.tourGlory = (run.tourGlory ?? 0) + info.glory[i];
         run.money += info.money[i];
@@ -1290,6 +1301,7 @@ export const useGame = create<Store>((set, get) => {
     closeBadgeWon() {
       mutate(run => {
         run.badgeWon = undefined;
+        run.badgeMerit = undefined;
       });
     },
     closeLegendAfter() {

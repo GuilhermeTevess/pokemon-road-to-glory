@@ -20,12 +20,12 @@ const KEY = 'rtg-trainers';
 
 /** Protagonistas de cada geração, em pares. */
 export const AVATARS = [
-  'red', 'ethan', 'lyra', 'brendan', 'may', 'lucas', 'dawn', 'hilbert', 'hilda',
-  'nate', 'rosa', 'calem', 'serena', 'elio', 'selene', 'victor', 'gloria',
+  'red', 'leaf-gen3', 'ethan', 'lyra', 'brendan', 'may', 'lucas', 'dawn', 'hilbert', 'hilda',
+  'nate', 'rosa', 'calem', 'serena', 'elio', 'selene', 'victor', 'gloria', 'florian-s', 'juliana-s',
 ];
 
-/** Sprites que o Showdown não tem: saves antigos com eles mostram um parecido. */
-const LEGACY: Record<string, string> = {leaf: 'lyra', florian: 'victor', juliana: 'gloria'};
+/** Nomes antigos sem sprite no Showdown: saves com eles usam a versão que existe. */
+const LEGACY: Record<string, string> = {leaf: 'leaf-gen3', florian: 'florian-s', juliana: 'juliana-s'};
 
 export function avatarUrl(avatar: string): string {
   return `https://play.pokemonshowdown.com/sprites/trainers/${LEGACY[avatar] ?? avatar}.png`;

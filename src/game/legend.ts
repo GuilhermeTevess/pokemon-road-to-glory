@@ -136,7 +136,7 @@ export function outroLines(legend: Legend, me: Fame, won: boolean, tier: number)
 export function legendEncounter(legend: Legend, party: OwnedMon[], me: Fame, regionName: string): Encounter {
   const team = legendTeam(legend, party);
   const venue = venueTier(me.fame);
-  return {mon: team[0], team, rarity: 'legendary', boss: true, trainer: legend.name, legend: legend.id, venue, intro: venueIntro(legend, me, venue, regionName)};
+  return {mon: team[0], team, rarity: 'legendary', boss: true, trainer: legend.name, legend: legend.id, venue, hype: venue, intro: venueIntro(legend, me, venue, regionName)};
 }
 
 /** Sorteia a lenda da região para esta ronda (ou null). */

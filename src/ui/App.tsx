@@ -94,9 +94,10 @@ export function App() {
         <main>{body}</main>
       )}
       {partyOpen && <PartyPanel key={`${partyOpen.tab}-${partyOpen.mon}`} initialTab={partyOpen.tab} initialMon={partyOpen.mon} onClose={() => setPartyOpen(null)} />}
-      {screen === 'run' && <PendingModal />}
-      {screen === 'run' && run?.badgeWon && run.phase !== 'battle' && !run.pending.length && <BadgeCeremony />}
-      {screen === 'run' && !run?.badgeWon && run?.legendAfter && run.phase !== 'battle' && !run.pending.length && <LegendAfterModal />}
+      {/* Cerimônias aparecem logo depois da luta; evoluções e golpes novos esperam por elas. */}
+      {screen === 'run' && run?.badgeWon && run.phase !== 'battle' && <BadgeCeremony />}
+      {screen === 'run' && !run?.badgeWon && run?.legendAfter && run.phase !== 'battle' && <LegendAfterModal />}
+      {screen === 'run' && !run?.badgeWon && !run?.legendAfter && <PendingModal />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
       {typeCalc && <TypeCalc initial={typeCalc} onClose={() => openTypeCalc(null)} />}
       {ivGain && (

@@ -46,6 +46,8 @@ export interface SeasonRec {
   region?: string;
   points: number;
   breakdown: Partial<Record<PointSource, number>>;
+  /** Extrato: de onde veio cada ponto. */
+  log?: PointEntry[];
   rank: number;
   top: RankRow[];
 }
@@ -73,9 +75,18 @@ export function leagueOf(col: Collection): League {
 }
 
 /** Soma pontos na temporada (run) e na fama da carreira. */
-export function addPoints(run: RunState, col: Collection | null, source: PointSource, n: number, fame = true): void {
+/** Uma entrada do extrato de pontos ("30 · Ginásio de Brock"). */
+export interface PointEntry {
+  source: PointSource;
+  label: string;
+  pts: number;
+  wave: number;
+}
+
+export function addPoints(run: RunState, col: Collection | null, source: PointSource, n: number, fame = true, label?: string): void {
   if (n <= 0) return;
   run.points = {...run.points, [source]: (run.points?.[source] ?? 0) + n};
+  run.pointLog = [...(run.pointLog ?? []), {source, label: label ?? SOURCE_LABEL[source], pts: n, wave: run.wave}];
   if (col && fame) careerOf(col).fame += n;
 }
 
@@ -123,6 +134,7 @@ export function finishSeason(col: Collection, run: RunState, me: {name: string; 
     region: run.region,
     points: seasonPoints(run),
     breakdown: {...run.points},
+    log: run.pointLog ?? [],
     rank: rows.findIndex(r => r.player) + 1,
     top: rows.slice(0, 3),
   };

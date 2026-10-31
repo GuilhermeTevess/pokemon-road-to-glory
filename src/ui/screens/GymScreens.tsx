@@ -1,17 +1,16 @@
 // Ginásios: entrada com conversa do líder, cenário do ginásio, cerimônia da insígnia e as cadernetas.
 import {useEffect, useState} from 'react';
-import {TYPE_COLORS, TYPE_PT, species} from '../../data/dex';
-import {getBiome} from '../../data/biomes';
-import {GYMS, GYM_BIOME, bookName, getGym, gymsOf} from '../../data/gyms';
+import {TYPE_PT, species} from '../../data/dex';
+import {GYMS, bookName, getGym, gymsOf} from '../../data/gyms';
 import type {Gym} from '../../data/gyms';
 import {REGIONS, getRegion} from '../../data/regions';
 import {GYM_PRIZE, badgesIn, gymDifficulty, gymLines, gymStatus, gymWaves, leaderAvatar, leaderWinLine, ticketPrice} from '../../game/gym';
 import {useGame} from '../../game/store';
 import {playCoins, playJingle, playPlin} from '../audio';
-import {FX} from '../fx';
 import {Modal, Sprite, TypeBadge} from '../components';
 import {fast} from '../settings';
-import {Bubble, fameNow} from './LegendScreens';
+import {fameNow} from './LegendScreens';
+import {DialogueBar, GymBackdrop} from '../scene';
 import {TrainerAvatar} from './StartScreens';
 
 export const badgeImg = (gym: Gym) => `${import.meta.env.BASE_URL}badges/${gym.id}.png`;
@@ -30,47 +29,6 @@ const BOOK_SKINS: Record<string, {cover: string; trim: string; felt: string}> = 
 };
 const skinOf = (region: string) => BOOK_SKINS[region] ?? BOOK_SKINS.kanto;
 
-/** Interior do ginásio: parede com o tema do tipo, piso quadriculado e o emblema no meio. */
-export function GymBackdrop({gym, crowd}: {gym: Gym; crowd?: boolean}) {
-  const color = TYPE_COLORS[gym.type] ?? '#888';
-  const biome = getBiome(gymBiome(gym));
-  return (
-    <div className="arena-bg gym-bg">
-      <div className="gym-wall" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
-      <svg viewBox="0 0 160 90" preserveAspectRatio="none" shapeRendering="crispEdges">
-        {crowd &&
-          Array.from({length: 38}, (_, i) => (
-            <g key={i} className={`crowd-row r${i % 2}`}>
-              <rect x={3 + i * 4.1} y={30} width="2" height="2" fill="#f4c8a0" />
-              <rect x={2.5 + i * 4.1} y={32} width="3" height="3" fill={['#dc4646', '#3c64c8', color, '#f0d040'][i % 4]} />
-            </g>
-          ))}
-        <rect x="0" y="36" width="160" height="3" fill="#222" />
-        {Array.from({length: 8}, (_, r) =>
-          Array.from({length: 16}, (_, c) => (
-            <rect key={`${r}-${c}`} x={c * 10} y={39 + r * 6.5} width="10" height="6.5" fill={(r + c) % 2 ? color : '#f4f0e6'} opacity={(r + c) % 2 ? 0.75 : 0.9} />
-          )),
-        )}
-        <g opacity=".55">
-          <circle cx="80" cy="64" r="9" fill="#fff" stroke="#222" strokeWidth="1.2" />
-          <rect x="71" y="63.4" width="18" height="1.2" fill="#222" />
-          <path d="M71 64 A9 9 0 0 1 89 64 Z" fill={color} />
-          <circle cx="80" cy="64" r="2.5" fill="#fff" stroke="#222" strokeWidth="1" />
-        </g>
-        {[6, 142].map(x => (
-          <g key={x}>
-            <rect x={x} y="4" width="12" height="26" fill={color} />
-            <rect x={x + 2} y="6" width="8" height="2" fill="#fff" opacity=".7" />
-            <polygon points={`${x},30 ${x + 6},34 ${x + 12},30`} fill={color} />
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-const gymBiome = (gym: Gym) => GYM_BIOME[gym.type] ?? 'city';
-
 /** Chegada ao ginásio: o líder aparece e conversa antes da luta. */
 export function GymIntroScreen() {
   const {run, trainer, startGymBattle} = useGame();
@@ -78,9 +36,7 @@ export function GymIntroScreen() {
   const gym = enc?.gym ? getGym(enc.gym) : undefined;
   const [me] = useState(fameNow);
   const [lines] = useState(() => (gym && run ? gymLines(gym, me, badgesIn(run, gym.region)) : []));
-  const [shown, setShown] = useState(fast() ? lines.length : 1);
   if (!run || !gym || !enc) return null;
-  const more = shown < lines.length;
   return (
     <div className="screen legend-screen gym-intro">
       <h2>
@@ -93,86 +49,115 @@ export function GymIntroScreen() {
           <TrainerAvatar avatar={leaderAvatar(gym)} name={gym.leader} size={140} />
         </div>
       </div>
-      <div className="legend-dialog panel">
-        {lines.slice(0, shown).map((l, i) => (
-          <Bubble key={i} line={l} other={gym.leader} me={me.name} />
-        ))}
-      </div>
-      <p className="hint">
-        Time do líder: {enc.team?.length ?? 1} Pokémon, até o nível {Math.max(...(enc.team ?? [enc.mon]).map(m => m.level))}. Fica mais forte com cada insígnia que você já tem
-        aqui e com o tamanho e o nível do seu time.
-      </p>
-      <div className="row center">
-        {more ? (
-          <button className="btn primary" onClick={() => setShown(n => n + 1)}>
-            ▶ Continuar
-          </button>
-        ) : (
-          <button className="btn primary big" onClick={() => (playJingle('levelUp'), startGymBattle())}>
-            Batalhar!
-          </button>
-        )}
-      </div>
+      <DialogueBar
+        lines={lines}
+        other={{name: gym.leader, avatar: leaderAvatar(gym)}}
+        me={{name: me.name, avatar: trainer?.avatar ?? 'red'}}
+        end={
+          <>
+            <p className="hint">
+              Time do líder: {enc.team?.length ?? 1} Pokémon, até o nível {Math.max(...(enc.team ?? [enc.mon]).map(m => m.level))}. Fica mais forte com cada insígnia que
+              você já tem aqui e com o tamanho e o nível do seu time.
+            </p>
+            <button className="btn primary big" onClick={() => (playJingle('levelUp'), startGymBattle())}>
+              Batalhar!
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }
 
-/** Cerimônia da insígnia: brilha, vai para a mão do treinador e é colada na caderneta. */
+/**
+ * Cerimônia logo depois da vitória: no ginásio, o líder entrega a insígnia, ela brilha e
+ * vai para a mão do treinador, que comemora e cola na caderneta. O líder fecha com uma fala.
+ */
 export function BadgeCeremony() {
   const {run, trainer, closeBadgeWon} = useGame();
   const gym = run?.badgeWon ? getGym(run.badgeWon) : undefined;
-  const [step, setStep] = useState(fast() ? 3 : 0);
+  const [step, setStep] = useState<'talk' | 'give' | 'cheer' | 'book' | 'bye'>('talk');
   useEffect(() => {
-    if (step >= 3) return;
-    const t = setTimeout(() => {
-      setStep(s => s + 1);
-      if (step === 0) playJingle('levelUp');
-      if (step === 2) playPlin();
-    }, [1500, 1300, 1100][step]);
-    return () => clearTimeout(t);
+    if (step === 'give') {
+      playJingle('levelUp');
+      const t = setTimeout(() => setStep('cheer'), fast() ? 200 : 1300);
+      return () => clearTimeout(t);
+    }
+    if (step === 'cheer') {
+      const t = setTimeout(() => setStep('book'), fast() ? 200 : 1600);
+      return () => clearTimeout(t);
+    }
+    if (step === 'book') {
+      const t = setTimeout(() => (playPlin(), setStep('bye')), fast() ? 200 : 1400);
+      return () => clearTimeout(t);
+    }
   }, [step]);
   if (!run || !gym) return null;
   const list = gymsOf(gym.region);
-  const idx = list.findIndex(g => g.id === gym.id);
   const skin = skinOf(gym.region);
   const complete = badgesIn(run, gym.region) === list.length;
-  // Posição da vaga na caderneta (4 colunas × 2 linhas, no lado direito).
-  const col = idx % 4;
-  const row = Math.floor(idx / 4);
-  const slot = {left: `${56 + (38 * (col + 0.5)) / 4}%`, top: `${22 + (64 * (row + 0.5)) / 2}%`};
-  const pos = step === 0 ? {left: '50%', top: '30%'} : step === 1 ? {left: '26%', top: '72%'} : slot;
+  const merit = run.badgeMerit;
+  const me = {name: trainer?.name ?? 'Você', avatar: trainer?.avatar ?? 'red'};
+  const leader = {name: gym.leader, avatar: leaderAvatar(gym)};
+  const talk = merit
+    ? [
+        {who: 'legend' as const, text: 'Você perdeu a luta... mas eu vi como você e seus Pokémon lutaram juntos até o fim.'},
+        {who: 'legend' as const, text: `Isso vale mais que uma vitória. Leve a ${gym.badge}. Você mereceu!`},
+      ]
+    : [
+        {who: 'legend' as const, text: leaderWinLine(gym)},
+        {who: 'legend' as const, text: `Como prova da sua vitória, aceite a ${gym.badge}!`},
+      ];
+  const bye = complete
+    ? `Com essa, a ${bookName(gym.region).toLowerCase()} de ${getRegion(gym.region).name} está completa! Agora vá mostrar seu valor na Liga.`
+    : badgesIn(run, gym.region) === 1
+      ? 'É a sua primeira insígnia daqui! Ainda tem muito ginásio pela frente.'
+      : 'Boa sorte nos próximos ginásios. Vou torcer por você!';
+  const inBook = step === 'book' || step === 'bye';
   return (
-    <Modal onClose={step >= 3 ? closeBadgeWon : undefined} wide>
+    <Modal wide>
       <div className="ceremony">
-        <h2>{step < 3 ? `Você venceu ${gym.leader}!` : `${gym.badge} na caderneta!`}</h2>
-        <Bubble line={{who: 'legend', text: leaderWinLine(gym)}} other={gym.leader} me="" />
-        <div className={`ceremony-stage step${step}`}>
-          <div className={`ceremony-trainer ${step >= 1 ? 'cheer' : ''}`}>
-            <TrainerAvatar avatar={trainer?.avatar ?? 'red'} name={trainer?.name ?? 'Você'} size={140} />
+        <h2>{inBook ? `${gym.badge} na caderneta!` : merit ? `Insígnia por mérito!` : `Você venceu ${gym.leader}!`}</h2>
+        <div className={`legend-scene ceremony-scene step-${step}`}>
+          <GymBackdrop gym={gym} />
+          <div className="legend-people close">
+            <span className={step === 'cheer' || inBook ? 'cheer-loop' : ''}>
+              <TrainerAvatar avatar={me.avatar} name={me.name} size={130} />
+            </span>
+            <TrainerAvatar avatar={leader.avatar} name={leader.name} size={140} />
           </div>
-          <div className={`ceremony-book ${step >= 2 ? 'open' : ''}`} style={{['--cover' as string]: skin.cover, ['--trim' as string]: skin.trim, ['--felt' as string]: skin.felt}}>
-            {list.map((g, i) => {
-              const has = run.badges?.includes(g.id) && (g.id !== gym.id || step >= 3);
-              return (
-                <span key={g.id} className={`book-slot ${has ? 'has' : ''} ${g.id === gym.id && step >= 3 ? 'stamped' : ''}`} style={{gridColumn: (i % 4) + 1}}>
-                  {has && <img src={badgeImg(g)} alt="" />}
-                </span>
-              );
-            })}
-          </div>
-          {step < 3 && (
-            <img className={`ceremony-badge step${step}`} src={badgeImg(gym)} alt={gym.badge} style={pos} />
+          {!inBook && step !== 'talk' && <img className={`ceremony-badge2 ${step}`} src={badgeImg(gym)} alt={gym.badge} />}
+          {inBook && (
+            <div className="ceremony-book open" style={{['--cover' as string]: skin.cover, ['--trim' as string]: skin.trim, ['--felt' as string]: skin.felt}}>
+              {list.map(g => {
+                const has = run.badges?.includes(g.id) && (g.id !== gym.id || step === 'bye');
+                return (
+                  <span key={g.id} className={`book-slot ${has ? 'has' : ''} ${g.id === gym.id && step === 'bye' ? 'stamped' : ''}`}>
+                    {has && <img src={badgeImg(g)} alt="" />}
+                  </span>
+                );
+              })}
+            </div>
           )}
         </div>
-        {step >= 3 && (
-          <>
-            <p className="note">
-              +{GYM_PRIZE.glory} Glória{complete ? ` · ${bookName(gym.region)} de ${getRegion(gym.region).name} completa! +${GYM_PRIZE.book} Glória` : ''}
-            </p>
-            <button className="btn primary" onClick={closeBadgeWon}>
-              Continuar
-            </button>
-          </>
+        {step === 'talk' && <DialogueBar key="talk" lines={talk} other={leader} me={me} onDone={() => setStep('give')} />}
+        {step === 'bye' && (
+          <DialogueBar
+            key="bye"
+            lines={[{who: 'legend', text: bye}]}
+            other={leader}
+            me={me}
+            end={
+              <>
+                <p className="note">
+                  +{GYM_PRIZE.glory} Glória{complete ? ` · caderneta completa! +${GYM_PRIZE.book} Glória` : ''}
+                </p>
+                <button className="btn primary" onClick={closeBadgeWon}>
+                  Continuar
+                </button>
+              </>
+            }
+          />
         )}
       </div>
     </Modal>

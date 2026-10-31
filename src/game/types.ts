@@ -1,4 +1,4 @@
-import type {PointSource, SeasonRec} from './league';
+import type {PointEntry, PointSource, SeasonRec} from './league';
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
 import type {Egg} from './daycare';
 import type {Tournament} from './tournament';
@@ -73,6 +73,8 @@ export interface Encounter {
   hinted?: boolean;
   /** Dois selvagens juntos (batalha em dupla): o time é `team`. */
   double?: boolean;
+  /** Tamanho do evento para o narrador (0 League Cup ... 3 Mundial). */
+  hype?: number;
   /** Luta de lenda: nível do local (0 quadra da cidade ... 3 grande estádio). */
   venue?: number;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
@@ -151,6 +153,8 @@ export interface RunState {
   badges?: string[];
   /** Pontos de fama desta temporada, por fonte, e pontos finais dos rivais (NPCs). */
   points?: Partial<Record<PointSource, number>>;
+  /** Extrato dos pontos da temporada. */
+  pointLog?: PointEntry[];
   rivalPoints?: Record<string, number>;
   /** Resultado da temporada (tela final). */
   season?: SeasonRec;
@@ -161,6 +165,8 @@ export interface RunState {
   legendMeet?: {id: string; kind: 'approach' | 'found'};
   /** Insígnia que acabou de ganhar (para a animação). */
   badgeWon?: string;
+  /** A insígnia veio por mérito (o líder deu mesmo com a derrota). */
+  badgeMerit?: boolean;
   /** Fala da lenda depois da luta. */
   legendAfter?: {id: string; won: boolean};
   incenseWaves: number;
