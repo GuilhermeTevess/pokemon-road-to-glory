@@ -67,6 +67,9 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
   border-radius: 0;
   box-shadow: 4px 4px 0 rgba(59, 51, 85, .18);
 }
+/* Respiro padrão: o texto nunca encosta na borda da caixa. */
+.panel { padding: 14px 16px; }
+.panel > h2:first-child, .panel > h3:first-child { margin-top: 0; }
 
 /* ---------- Botões */
 .btn {
@@ -192,7 +195,7 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 /* ---------- Batalha */
 .battle-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; padding: 2px 2px 6px; flex-wrap: wrap; }
 .battle-top span { background: var(--panel); border: var(--px) solid var(--line); padding: 1px 8px; font-size: 14px; }
-.arena { position: relative; aspect-ratio: 3 / 2; max-height: 520px; width: 100%; border: var(--px) solid var(--line); overflow: hidden; }
+.arena { position: relative; aspect-ratio: 16 / 11; max-height: 640px; width: 100%; border: var(--px) solid var(--line); overflow: hidden; }
 .arena-bg { position: absolute; inset: 0; background-size: cover; background-position: center bottom; image-rendering: pixelated; }
 .fx-layer { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
 .fx { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
@@ -1013,9 +1016,9 @@ table.move-info td { padding: 3px 0; }
 .venue-bg .crowd { z-index: 1; }
 .gym-bg .crowd { z-index: 3; }
 .gym-bg svg { z-index: 2; }
-.gym-statue { position: absolute; bottom: 8%; z-index: 3; filter: grayscale(1) brightness(.9) contrast(1.2); }
-.gym-statue.s0 { left: 5%; }
-.gym-statue.s1 { right: 5%; transform: scaleX(-1); }
+.gym-statue { position: absolute; bottom: 11%; z-index: 3; filter: grayscale(1) brightness(.9) contrast(1.2); }
+.gym-statue.s0 { left: 2.5%; }
+.gym-statue.s1 { right: 2.5%; transform: scaleX(-1); }
 .legend-people { z-index: 4; }
 .legend-people.close { justify-content: center; gap: 4%; }
 .cheer-loop { display: inline-block; animation: cheerhop .5s steps(2) infinite; }
@@ -1184,3 +1187,16 @@ table.move-info td { padding: 3px 0; }
 .rush-result { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 16px; overflow: hidden; }
 .rush-result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 @media (max-width: 640px) { .rush-pair, .rush-pair.three { grid-template-columns: 1fr; } .rush-prep-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* Multidão em pixel art e flashes */
+.crowd-mass { position: absolute; left: 0; width: 100%; z-index: 1; pointer-events: none; }
+.mass-row { animation: mass-bob 0.9s steps(2) infinite; }
+.mass-row.r1 { animation-delay: -.3s; animation-duration: 1.1s; }
+.mass-row.r2 { animation-delay: -.6s; animation-duration: .8s; }
+@keyframes mass-bob { 50% { transform: translateY(-0.8px); } }
+.flashes { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.flashes i { position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%; box-shadow: 0 0 6px 3px rgba(255,255,255,.9), 0 0 16px 6px rgba(200,220,255,.5); opacity: 0; animation: cam-flash 4.4s linear infinite; }
+@keyframes cam-flash { 0%, 92%, 100% { opacity: 0; } 94% { opacity: 1; } 96% { opacity: .2; } }
+.venue-bg .bleachers { z-index: 0; }
+.venue-bg.tier0 .crowd { z-index: 0; }
+@media (prefers-reduced-motion: reduce) { .mass-row, .flashes i { animation: none; } }
