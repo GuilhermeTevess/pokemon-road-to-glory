@@ -68,6 +68,10 @@ export interface PlayerDoc {
   /** Para estudar o jogador: rondas jogadas com cada Pokémon e as últimas lutas importantes. */
   usage?: Record<string, number>;
   fights?: CareerFight[];
+  /** Insígnias da temporada (como ganhou), lendas vencidas e o parceiro. */
+  badges?: {gym: string; wave: number; team: string[]; tries: number}[];
+  legends?: string[];
+  partner?: string;
   updatedAt: number;
 }
 

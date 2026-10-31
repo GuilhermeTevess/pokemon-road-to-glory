@@ -10,7 +10,7 @@ import type {Encounter, OwnedMon, RunState} from './types';
 
 export const TRAIL_CAP = 40;
 /** Quanto o rastro sobe com cada coisa. */
-export const TRAIL = {boss: 10, event: 10, traveler: 25};
+export const TRAIL = {boss: 10, event: 10, traveler: 25, news: 15, fan: 15};
 
 export function trailOf(run: RunState, region = run.region): number {
   return region ? (run.trail?.[region] ?? 0) : 0;

@@ -5,7 +5,7 @@ import {getHint} from '../data/hints';
 import {bookName, getGym, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
 import {ACHIEVEMENTS, checkAchievements} from './achievements';
-import {POINTS, addPoints, finishSeason, rollRivalPoints} from './league';
+import {POINTS, addPoints, finishSeason, leagueOf, legendsBeaten, rollRivalPoints} from './league';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
@@ -26,7 +26,7 @@ import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid, withSeed} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards, shopPrice, travelBlocked} from './rewards';
-import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent, tutorMoves, tutorPrice} from './events';
+import {cheapestHeal, getPlace, rivalEncounter, rollEvent, shouldRollEvent, tutorMoves, tutorPrice} from './events';
 import {START_LEVELS, applyPerks, buyUpgrade, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {
@@ -40,7 +40,8 @@ import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveT
 import type {TrainerCareer} from './trainers';
 import {careerBoost, enforceRules, fromSnap, groupLog, playerId, roundBlockers, snapMon, waveStep} from './career';
 import type {CareerDoc, CareerFight, PlayerDoc} from './career';
-import {cacheCareer, cachedCareer, cloud, cloudMatches, cloudTours} from './cloud';
+import {cacheCareer, cachedCareer, cloud, cloudMatches, cloudTours, cloudWorld} from './cloud';
+import {listPt, newWorld, nextSeasonWorld, stepWorld, worldTournament} from './world';
 import {seasonPoints} from './league';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
@@ -196,6 +197,8 @@ interface Store {
   tourFinish(): void;
   /** Carreira online: busca os resultados das partidas com jogadores e avança a chave. */
   tourSync(): Promise<void>;
+  /** Carreira: usa o mundo (bots) da nuvem nesta ronda, igual para todos. */
+  worldSync(): Promise<void>;
   /** Torneio da carreira: pega (ou grava) a chave na nuvem para todo mundo jogar a mesma. */
   tourLoad(): Promise<void>;
   /** Resultado da partida ao vivo contra outro jogador. */
@@ -281,8 +284,11 @@ export const useGame = create<Store>((set, get) => {
       cleared: live ? live.cleared ?? 0 : 0,
       out: !!run?.career && run.career.season === t.career.season && (ended || run.phase === 'gameOver'),
       log: live ? groupLog(live.pointLog ?? []) : [],
-      usage: live?.career?.usage ?? {},
-      fights: live?.career?.fights ?? [],
+      usage: live ? (live.usage ?? live.career?.usage ?? {}) : {},
+      fights: live ? (live.fights ?? live.career?.fights ?? []) : [],
+      badges: live ? (live.badges ?? []).map(id => ({gym: id, ...(live.badgeInfo?.[id] ?? {wave: 0, team: [], tries: 1})})) : [],
+      legends: live ? legendsBeaten(live) : [],
+      partner: (live ?? run)?.party.find(m => m.partner)?.species,
       updatedAt: Date.now(),
     };
   };
@@ -369,6 +375,7 @@ export const useGame = create<Store>((set, get) => {
         : {at: Date.now(), wave: run.wave, turns, team: run.party.map(m => m.species), leaderTeam: team.map(m => m.species), leaderLevel: Math.max(...team.map(m => m.level)), wins: 1, merit},
     };
     if (run.badges?.includes(gym.id)) return;
+    run.badgeInfo = {...run.badgeInfo, [gym.id]: {wave: run.wave, team: run.party.map(m => m.species), tries: (run.gymTries?.[gym.id] ?? 0) + 1}};
     run.badgeWon = gym.id;
     run.badgeMerit = merit;
     run.badges = [...(run.badges ?? []), gym.id];
@@ -389,6 +396,21 @@ export const useGame = create<Store>((set, get) => {
     return {name: get().trainer?.name ?? 'Você', fame: c.fame, worlds: c.titles.worlds ?? 0, titles: Object.values(c.titles).reduce((a, b) => a + (b ?? 0), 0)};
   };
 
+  /** Notícias dos amigos da carreira (insígnias e lendas) para o jornal. */
+  const peerNews = (run: RunState) => {
+    if (!run.career) return [];
+    const me = get().trainer ? playerId(get().trainer!.id) : '';
+    return get()
+      .careerPeers.filter(p => p.id !== me && p.season === run.career!.season)
+      .flatMap(p => [
+        ...(p.badges ?? []).map(b => {
+          const g = getGym(b.gym);
+          return {wave: b.wave, who: p.name, weight: 3, text: `${p.name} ganhou a ${g?.badge ?? 'insígnia'} de ${g?.leader ?? '?'}${b.tries > 1 ? ` na ${b.tries}ª tentativa` : ''}, com ${listPt(b.team.slice(0, 3))}.`};
+        }),
+        ...(p.legends ?? []).map(l => ({wave: p.cleared ?? run.wave, who: p.name, weight: 6, text: `${p.name} venceu ${l}! Todo mundo está falando disso.`})),
+      ]);
+  };
+
   const startWave = (run: RunState) => {
     // Carreira online: a próxima ronda só começa quando todo mundo terminou esta.
     if (run.career && waitingFor(run).length) {
@@ -397,6 +419,7 @@ export const useGame = create<Store>((set, get) => {
     }
     run.wave += waveStep(run);
     run.event = undefined;
+    if (run.world) stepWorld(run.world, run.wave, waveStep(run));
     // Runs antigas, de antes das regiões, começam em Kanto.
     if (!run.region) Object.assign(run, {region: REGIONS[0].id, regionLeft: REGION_STAY, biomeLeft: BIOME_STAY});
     // Estadias contam em rondas de jogo: numa carreira curta, cada ronda gasta mais.
@@ -416,8 +439,8 @@ export const useGame = create<Store>((set, get) => {
           .map(p => ({name: p.name, avatar: p.avatar, titles: {}, runnerUps: 0, fame: p.banked + p.points, pid: p.id, team: p.team.slice(0, info.teamSize).map(fromSnap)}));
         const tid = `s${run.career.season}-${info.kind}`;
         const region = withSeed(`${run.career.code}-${tid}`, () => pick(REGIONS).id);
-        run.tournament = createSharedTournament(info, [...humans, {...meE, pid: myId, team: run.party.slice(0, info.teamSize).map(m => structuredClone(m))}], myId, `${run.career.code}-${tid}`, region);
-      } else run.tournament = createTournament(info, meE, run.region);
+        run.tournament = createSharedTournament(info, [...humans, {...meE, pid: myId, team: run.party.slice(0, info.teamSize).map(m => structuredClone(m))}], myId, `${run.career.code}-${tid}`, region, run.world);
+      } else run.tournament = createTournament(info, meE, run.region, [], run.world);
       run.encounter = undefined;
       run.upcoming = undefined;
       run.phase = 'tournament';
@@ -543,7 +566,7 @@ export const useGame = create<Store>((set, get) => {
     if (run.regionMapReady) run.phase = 'regionChoice';
     else if (run.mapReady) run.phase = 'biomeChoice';
     else if (shouldRollEvent(run) && !run.gyms?.some(g => g.wave === run.wave + waveStep(run))) {
-      run.event = rollEvent(run);
+      run.event = rollEvent(run, {fame: careerOf(get().collection).fame, news: peerNews(run)});
       run.lastEventWave = run.wave;
       if (run.event.kind === 'seer') run.upcoming = run.event.upcoming;
       run.phase = 'event';
@@ -846,6 +869,13 @@ export const useGame = create<Store>((set, get) => {
       applyPerks(run, perksOf(col));
       run.regionLeft = regionStay(run);
       run.rivalPoints = rollRivalPoints(col);
+      // Os rivais jogam a temporada junto. Na carreira, a temporada seguinte continua com os mesmos.
+      const prevRun = get().run;
+      run.world = run.career
+        ? prevRun?.career?.code === run.career.code && prevRun.world && prevRun.career.season < run.career.season
+          ? nextSeasonWorld(prevRun.world)
+          : newWorld()
+        : newWorld(leagueOf(col).npcs);
       const unlockNotes: string[] = [];
       run.party = picked.map(name => {
         const mon = createMon(name, {
@@ -1053,6 +1083,61 @@ export const useGame = create<Store>((set, get) => {
             break;
           case 'seer':
             break;
+          case 'news':
+            if (choice === 'read') {
+              addTrail(run, TRAIL.news);
+              if (trailOf(run) > 0) message = `Uma das notícias falava de pistas de uma lenda em ${getRegion(run.region).name}. Rastro: ${Math.min(trailOf(run), 40)}%`;
+            }
+            break;
+          case 'place': {
+            if (choice !== 'yes') break;
+            const t = getPlace(ev.theme);
+            addTrail(run, TRAIL.event);
+            if (ev.mon) {
+              const name = species(ev.mon.species).name;
+              join(ev.mon, HEART_STEPS[0]);
+              message = `${name} gostou de você e entrou no time!`;
+            } else if (ev.item) {
+              run.bag[ev.item] = (run.bag[ev.item] ?? 0) + 1;
+              message = `No fundo do navio você achou ${getItem(ev.item).name}!`;
+            } else if (t.reward === 'heal') {
+              healAll(run);
+              for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.win);
+              message = 'O time inteiro descansou na água quentinha: todos curados e mais felizes.';
+            } else if (t.reward === 'exp') {
+              run.bag.rarecandy = (run.bag.rarecandy ?? 0) + 1;
+              for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.win);
+              message = 'O mestre gostou do treino e te deu um Doce Raro.';
+            }
+            break;
+          }
+          case 'life': {
+            if (ev.theme === 'mom') {
+              const gift = 200 + run.wave * 15;
+              run.money += gift;
+              run.bag.potion = (run.bag.potion ?? 0) + 2;
+              message = `A mãe mandou ₽ ${gift} e 2 Poções. "Se cuida, viu?"`;
+            } else if (ev.theme === 'center') {
+              healAll(run);
+              message = 'Noite bem dormida no Centro Pokémon: time curado.';
+            } else if (ev.theme === 'birthday') {
+              const mon = run.party.find(m => m.uid === ev.uid);
+              if (mon) {
+                addHeartPts(col, mon.species, HEART_PTS.stageClear);
+                addCandies(col, mon.species, 5);
+                message = `Festa para ${displayName(mon)}! +corações e +5 doces.`;
+              }
+            }
+            break;
+          }
+          case 'fan':
+            if (choice === 'sign') {
+              addTrail(run, TRAIL.fan);
+              const gift = 100 + run.wave * 10;
+              run.money += gift;
+              message = `O fã ficou radiante e te deu ₽ ${gift}. Ele contou um boato de lenda: rastro ${Math.min(trailOf(run), 40)}%.`;
+            }
+            break;
           case 'traveler':
             if (choice === 'help') {
               if (ev.ask === 'money') {
@@ -1128,15 +1213,15 @@ export const useGame = create<Store>((set, get) => {
         ctl?.syncParty(run.party);
         battle = null;
         const events: PendingEvent[] = [];
-        if (run.career && ctl) {
-          // Para os amigos estudarem você: quem jogou cada ronda e as lutas importantes.
+        if (ctl && !run.quick) {
+          // Para o seu perfil (e para os amigos estudarem você): quem jogou cada ronda e as lutas importantes.
           const used = run.party.filter(m => ctl.participants.has(m.uid)).map(m => m.species);
-          const usage = {...run.career.usage};
+          const usage = {...run.usage};
           for (const sp of used) usage[sp] = (usage[sp] ?? 0) + 1;
-          run.career.usage = usage;
+          run.usage = usage;
           const kind: CareerFight['kind'] | null = enc.gym ? 'gym' : enc.tournament ? 'tour' : enc.legend ? 'legend' : enc.trainer ? 'rival' : enc.boss ? 'boss' : null;
           if (kind && outcome !== 'fled')
-            run.career.fights = [{vs: enc.trainer ?? species(enc.mon.species).name, won: outcome === 'won' || outcome === 'caught', seen: used, kind, wave: run.wave}, ...(run.career.fights ?? [])].slice(0, 12);
+            run.fights = [{vs: enc.trainer ?? species(enc.mon.species).name, won: outcome === 'won' || outcome === 'caught', seen: used, kind, wave: run.wave}, ...(run.fights ?? [])].slice(0, 12);
         }
         if (enc.tournament && run.tournament && ctl) {
           // Partida de torneio: perder não acaba a run, só tira você do torneio.
@@ -1161,6 +1246,7 @@ export const useGame = create<Store>((set, get) => {
           }
         } else if (outcome === 'lost' && enc.gym) {
           healAll(run);
+          run.gymTries = {...run.gymTries, [enc.gym]: (run.gymTries?.[enc.gym] ?? 0) + 1};
           // Muito raro, como no anime: o líder dá a insígnia por mérito mesmo com a derrota
           // (só se você derrubou pelo menos metade do time dele).
           const gymLost = getGym(enc.gym);
@@ -1345,6 +1431,22 @@ export const useGame = create<Store>((set, get) => {
       set({run, screen: 'run'});
     },
 
+    async worldSync() {
+      const run = get().run;
+      const w = run?.world;
+      if (!run?.career || !w) return;
+      const {code, season} = run.career;
+      try {
+        const doc = await cloudWorld.createOnce(code, season, w.wave, w);
+        if (JSON.stringify(doc) === JSON.stringify(w)) return;
+        mutate(r => {
+          if (r.career?.season === season && r.world?.wave === doc.wave) r.world = doc;
+        });
+      } catch {
+        // Sem internet agora: fica com o mundo daqui e tenta na próxima ronda.
+      }
+    },
+
     async tourLoad() {
       const run = get().run;
       const t = run?.tournament;
@@ -1427,6 +1529,7 @@ export const useGame = create<Store>((set, get) => {
         const info = tourInfo(t.kind);
         const i = prizeIndex(t.placement ?? 5);
         applyToCareer(careerOf(col), t);
+        if (run.world) worldTournament(run.world, t, tourName(t), info.fame);
         const tc = get().trainer?.career;
         if (run.career && tc) patchCareer({results: [...tc.results, {season: run.career.season, kind: t.kind, placement: t.placement ?? 5}]});
         addPoints(run, col, 'tournaments', info.fame[i], false, `${tourName(t)}: ${placementLabel(t.placement ?? 5)}`);

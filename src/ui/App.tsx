@@ -30,6 +30,11 @@ export function App() {
     const id = setInterval(() => void useGame.getState().refreshCareer(), 20000);
     return () => clearInterval(id);
   }, [careerCode]);
+  // Carreira: o mundo (rivais) de cada ronda é o mesmo para todos (vem da nuvem).
+  const worldWave = useGame(s => (s.run?.career ? s.run.world?.wave : undefined));
+  useEffect(() => {
+    if (worldWave !== undefined) void useGame.getState().worldSync();
+  }, [worldWave]);
   const [sound, setSound] = useState(soundEnabled());
   const [fastOn, setFastOn] = useState(fast);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
