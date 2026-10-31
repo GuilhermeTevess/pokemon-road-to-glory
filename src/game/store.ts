@@ -1264,6 +1264,12 @@ export const useGame = create<Store>((set, get) => {
           const kind: CareerFight['kind'] | null = enc.gym ? 'gym' : enc.tournament ? 'tour' : enc.legend ? 'legend' : enc.trainer ? 'rival' : enc.boss ? 'boss' : null;
           if (kind && outcome !== 'fled')
             run.fights = [{vs: enc.trainer ?? species(enc.mon.species).name, won: outcome === 'won' || outcome === 'caught', seen: used, kind, wave: run.wave}, ...(run.fights ?? [])].slice(0, 12);
+          if (enc.trainer) {
+            // O que você viu do adversário nesta luta (quem entrou em campo): o PokéPC lembra disso.
+            const shown = ctl.battle.p2.pokemon.filter(p => p.previouslySwitchedIn > 0 || p.isActive || p.fainted).map(p => p.set.species || p.species.name);
+            const prev = run.faced?.[enc.trainer] ?? [];
+            run.faced = {...run.faced, [enc.trainer]: [...new Set([...prev, ...shown])]};
+          }
         }
         if (enc.tournament && run.tournament && ctl) {
           // Partida de torneio: perder não acaba a run, só tira você do torneio.

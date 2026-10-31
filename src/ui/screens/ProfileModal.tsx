@@ -5,6 +5,7 @@ import {species} from '../../data/dex';
 import {getGym} from '../../data/gyms';
 import {getRegion} from '../../data/regions';
 import {waveStep} from '../../game/career';
+import {glimpse, playerScoutFromFights} from '../../game/scout';
 import type {Profile} from '../../game/profile';
 import {useGame} from '../../game/store';
 import {Modal, Sprite} from '../components';
@@ -24,6 +25,10 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
   const round = (w: number) => Math.ceil(w / step);
   const usage = Object.entries(p.usage).sort((a, b) => b[1] - a[1]);
   const most = usage[0]?.[1] ?? 1;
+  // Perfil dos outros tem névoa: só o que saiu no noticiário e o que você já enfrentou.
+  const mine = p.kind === 'me';
+  const faced = useGame(s => s.run?.faced?.[p.name]);
+  const known = mine ? null : playerScoutFromFights(p.fights, faced);
   const byRegion = new Map<string, Profile['badges']>();
   for (const b of p.badges) {
     const g = getGym(b.gym);
@@ -52,7 +57,7 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
                 <small>Parceiro: {name(p.partner)}</small>
               </span>
             )}
-            {p.favorite && p.favorite !== p.partner && (
+            {mine && p.favorite && p.favorite !== p.partner && (
               <span>
                 <Sprite name={p.favorite} size={64} />
                 <small>Mais jogado: {name(p.favorite)}</small>
@@ -105,8 +110,8 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
             </p>
             {open.team.length > 0 && (
               <div className="row">
-                <small>Levou:</small>
-                {open.team.map((s, i) => (
+                <small>{mine ? 'Levou:' : 'Destaques:'}</small>
+                {(mine ? open.team : glimpse(open.team, `gym|${openGym.leader}|${open.wave}`)).map((s, i) => (
                   <Sprite key={i} name={s} size={40} still />
                 ))}
               </div>
@@ -121,22 +126,41 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
           </>
         )}
 
-        <h3>Pokémon que mais jogou</h3>
-        {!usage.length && <p className="hint">Ainda sem estatísticas.</p>}
-        <div className="scout-usage">
-          {usage.slice(0, 6).map(([s, n]) => (
-            <div key={s} className="scout-use">
-              <Sprite name={s} size={32} still />
-              <span>{name(s)}</span>
-              <span className="scout-bar">
-                <i style={{width: `${Math.round((n / most) * 100)}%`}} />
-              </span>
-              <small>{n} rondas</small>
+        {mine ? (
+          <>
+            <h3>Pokémon que mais jogou</h3>
+            {!usage.length && <p className="hint">Ainda sem estatísticas.</p>}
+            <div className="scout-usage">
+              {usage.slice(0, 6).map(([s, n]) => (
+                <div key={s} className="scout-use">
+                  <Sprite name={s} size={32} still />
+                  <span>{name(s)}</span>
+                  <span className="scout-bar">
+                    <i style={{width: `${Math.round((n / most) * 100)}%`}} />
+                  </span>
+                  <small>{n} rondas</small>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <>
+            <h3>Pokémon conhecidos</h3>
+            {!known!.seen.length && <p className="hint">Nenhuma luta de {p.name} saiu no noticiário ainda.</p>}
+            <div className="scout-usage">
+              {known!.seen.map(u => (
+                <div key={u.species} className="scout-use">
+                  <Sprite name={u.species} size={32} still />
+                  <span>{name(u.species)}</span>
+                  <small className={u.faced ? 'win-tag' : 'muted'}>{u.faced ? 'Você já enfrentou' : u.news > 1 ? `Nas notícias ${u.news}×` : 'Saiu numa notícia'}</small>
+                </div>
+              ))}
+            </div>
+            <p className="hint small">Só aparece o que saiu no noticiário (2 destaques por luta) e o que você já enfrentou.</p>
+          </>
+        )}
 
-        {p.fights.length > 0 && (
+        {mine && p.fights.length > 0 && (
           <>
             <h3>Lutas importantes</h3>
             {p.fights.slice(0, 8).map((f, i) => (
@@ -144,6 +168,24 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
                 <span className={f.won ? 'win-tag' : 'lose-tag'}>{f.won ? 'Venceu' : 'Perdeu'}</span>
                 <span>
                   {FIGHT[f.kind]}: {f.vs} <small className="muted">· ronda {round(f.wave)}</small>
+                </span>
+                <span className="row">
+                  {f.seen.map((s, j) => (
+                    <Sprite key={j} name={s} size={28} still />
+                  ))}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+        {!mine && known!.matches.length > 0 && (
+          <>
+            <h3>Últimas lutas no noticiário</h3>
+            {known!.matches.map((f, i) => (
+              <div key={i} className="scout-row">
+                <span className={f.won ? 'win-tag' : 'lose-tag'}>{f.won ? 'Venceu' : 'Perdeu'}</span>
+                <span>
+                  {f.label}: {f.vs}
                 </span>
                 <span className="row">
                   {f.seen.map((s, j) => (
