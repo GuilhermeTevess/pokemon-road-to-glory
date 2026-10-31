@@ -1,0 +1,1419 @@
+// Estado global da run (zustand). Toda regra de jogo passa por aqui; a UI só chama ações.
+import {create} from 'zustand';
+import {BIOMES, getBiome} from '../data/biomes';
+import {getHint} from '../data/hints';
+import {bookName, getGym, gymsOf} from '../data/gyms';
+import type {Gym} from '../data/gyms';
+import {ACHIEVEMENTS, checkAchievements} from './achievements';
+import {POINTS, addPoints, finishSeason, rollRivalPoints} from './league';
+import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
+import {hintHere, rollBiome, rollHintLegendary} from './travelers';
+import {dex, species, teachableMoves} from '../data/dex';
+import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
+import {BattleController} from './battle';
+import {HEAL_EVERY, SEASON_LENGTH, generateEncounter, isBossWave} from './encounters';
+import {TRAIL, addTrail, legendEncounter, legendPrize, rollLegend, trailOf} from './legend';
+import type {Fame} from './legend';
+import {getLegend} from '../data/legends';
+import {BIOME_STAY, REGIONS, REGION_STAY, getRegion, regionStay} from '../data/regions';
+import {
+  CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
+  HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
+  addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
+  careerOf, registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
+} from './meta';
+import type {Collection, TutorPlan} from './meta';
+import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
+import {pick, shuffle, uid} from './rng';
+import {moneyReward, moneyValue, rerollCost, rollRewards, shopPrice, travelBlocked} from './rewards';
+import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
+import {START_LEVELS, applyPerks, buyUpgrade, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
+import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
+import {
+  applyToCareer, createTournament, currentRound, highlightsFromLog, placementLabel, playerIndex, playerMatch,
+  prizeIndex, recordPlayerResult, tourAt, tourInfo,
+  tourName,
+} from './tournament';
+import type {TourKind, Tournament} from './tournament';
+import {introLines} from './narration';
+import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
+import type {Trainer} from './trainers';
+import {STAT_LABEL} from './types';
+import type {Encounter, OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
+
+export const PARTY_SIZE = 6;
+export const STARTER_LEVEL = 5;
+
+function loadRun(trainerId: string | null): RunState | null {
+  if (!trainerId) return null;
+  try {
+    const raw = localStorage.getItem(runKey(trainerId));
+    if (raw) {
+      const run = JSON.parse(raw) as RunState;
+      if (run.version === 1) return run;
+    }
+  } catch {
+    /* sem storage */
+  }
+  return null;
+}
+
+function saveRun(trainerId: string | null, run: RunState | null): void {
+  if (!trainerId) return;
+  try {
+    if (run) localStorage.setItem(runKey(trainerId), JSON.stringify(run));
+    else localStorage.removeItem(runKey(trainerId));
+  } catch {
+    /* ignora */
+  }
+}
+
+// O controlador da batalha não é serializável, então fica fora do estado persistido.
+let battle: BattleController | null = null;
+let battleFor: string | null = null;
+
+export function getBattle(run: RunState): BattleController | null {
+  if (run.phase !== 'battle' || !run.encounter) return null;
+  if (!battle || battleFor !== run.encounter.mon.uid) {
+    const col = useGame.getState().collection;
+    const hearts: Record<string, number> = {};
+    // Buffs de batalha (curar status, aguentar com 1 HP, crítico) são só do parceiro.
+    for (const m of run.party) hearts[m.uid] = m.partner ? heartsOf(col.entries[lineRoot(m.species)]) : 0;
+    battle = new BattleController(run.party, run.encounter, hearts, 1 + 0.15 * (run.perks?.catch ?? 0));
+    battleFor = run.encounter.mon.uid;
+  }
+  return battle;
+}
+
+export type Screen = 'title' | 'run' | 'quickplay' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
+
+export interface Toast {
+  id: string;
+  text: string;
+}
+
+interface Store {
+  trainers: Trainer[];
+  /** Treinador jogando agora; null mostra a tela de escolha de treinador. */
+  trainer: Trainer | null;
+  selectTrainer(id: string | null): void;
+  createTrainer(name: string, avatar: string): void;
+  /** Muda nome e/ou visual de um treinador. */
+  updateTrainer(id: string, patch: {name?: string; avatar?: string}): void;
+  removeTrainer(id: string): void;
+  screen: Screen;
+  run: RunState | null;
+  collection: Collection;
+  toasts: Toast[];
+  /** Conquistas recém-desbloqueadas (aparecem na lateral da tela). */
+  achievePops: {id: string; name: string; icon: string; desc: string}[];
+  /** Último repetido capturado: IVs antes/depois (teia de IVs). */
+  ivGain: {species: string; before: StatTable; after: StatTable} | null;
+  clearIvGain(): void;
+  /** Calculadora de tipos aberta (tipos selecionados) ou null. */
+  typeCalc: string[] | null;
+  openTypeCalc(types: string[] | null): void;
+  setScreen(s: Screen): void;
+  toast(text: string): void;
+  /** Começa a run com o time escolhido (o primeiro é quem abre). */
+  newRun(team: string[], partner?: string, eggId?: string): void;
+  /** Creche: faz um ovo com dois Pokémon da coleção. Devolve a mensagem. */
+  breed(mother: string, father: string, items: [string | null, string | null]): string;
+  discardEgg(id: string): void;
+  /** Apelido de um Pokémon da run (também vira o apelido da linha na coleção). */
+  renameMon(monUid: string, name: string): void;
+  setNickname(line: string, name: string): void;
+  /** Ações da ficha da coleção (gastam doces). */
+  unlockMove(line: string, move: string): void;
+  equipMove(line: string, move: string | null): void;
+  equipNature(line: string, nature: string | null): void;
+  equipAbility(line: string, ability: string | null): void;
+  buyCostCut(line: string): void;
+  buyShiny(line: string): void;
+  setFavorite(line: string | null): void;
+  buyUpgrade(id: keyof RunPerks): void;
+  /** Compra a Mega Pedra própria da linha (ou troca qual pedra usar, se já comprou). */
+  buyMegaStone(line: string, stone: string): void;
+  /** Resolve o evento atual (a escolha depende do tipo do evento). */
+  resolveEvent(choice: string | null): void;
+  /** Aula do Tutor; devolve a mensagem do resultado. */
+  tutor(line: string, kind: 'nature' | 'ability', target: string, plan: TutorPlan): string;
+  allocateEv(line: string, stat: StatId, n: number): void;
+  resetLineEvs(line: string): void;
+  presetEvs(line: string, preset: number): void;
+  abandonRun(): void;
+  chooseStartBiome(id: string, region?: string): void;
+  finishBattle(outcome: 'won' | 'caught' | 'fled' | 'lost'): void;
+  resolvePending(choice: string | number | null): void;
+  /** Pega a recompensa; com `target`, já usa/equipa o item nesse Pokémon. */
+  pickReward(itemId: string, target?: string): void;
+  reroll(): void;
+  buy(itemId: string): void;
+  skipReward(): void;
+  chooseNextBiome(id: string | null): void;
+  /** Mapa de Região: escolhe a próxima região (null = ficar). */
+  chooseNextRegion(id: string | null): void;
+  /** Depois da roleta de viagem, segue para a próxima ronda. */
+  continueTravel(): void;
+  /** Fim da estadia: escolhe a região (e depois o bioma) entre as opções sorteadas. */
+  travelPick(id: string): void;
+  /** Encontro com a lenda: aceitar (vai para a arena) ou deixar para outra hora. */
+  answerLegend(accept: boolean): void;
+  /** Fecha a conversa de depois da luta com a lenda. */
+  closeLegendAfter(): void;
+  /** Ginásio: sai da conversa com o líder e começa a luta. */
+  startGymBattle(): void;
+  closeBadgeWon(): void;
+  /** Compra o ingresso e marca a ronda da luta de ginásio. */
+  scheduleGym(id: string, wave: number): void;
+  useItem(itemId: string, monUid: string): void;
+  takeItem(monUid: string): void;
+  setLead(monUid: string): void;
+  swapWithBox(boxUid: string, partyUid: string | null): void;
+  /** Consome um item da mochila (usado pela batalha). */
+  consume(itemId: string): boolean;
+  /** Torneio: avança a tela (explicação → sorteio → chave). */
+  tourStage(stage: Tournament['stage']): void;
+  /** Torneio: começa a partida do jogador (time curado). */
+  tourFight(): void;
+  /** Torneio acabou: prêmios, carreira e segue a run. */
+  tourFinish(): void;
+  /** Quickplay: começa um campeonato avulso com o time escolhido. */
+  startQuickTour(kind: TourKind, team: string[]): void;
+  /** Atualiza o run atual após mexer no controlador de batalha. */
+  touch(): void;
+}
+
+function emptyRun(): RunState {
+  return {
+    version: 1,
+    id: uid(),
+    startedAt: Date.now(),
+    wave: 0,
+    biome: BIOMES[0].id,
+    region: REGIONS[0].id,
+    regionLeft: REGION_STAY,
+    biomeLeft: BIOME_STAY,
+    phase: 'starter',
+    party: [],
+    box: [],
+    bag: {pokeball: 5, potion: 3},
+    money: 500,
+    mapReady: false,
+    incenseWaves: 0,
+    pending: [],
+    rewardOptions: [],
+    rerolls: 0,
+    log: [],
+    stats: {defeated: 0, caught: 0, fled: 0},
+  };
+}
+
+/** Chance de dois selvagens aparecerem juntos (batalha em dupla). */
+/** Quantas opções sorteadas aparecem no fim da estadia (a atual pode ou não estar entre elas). */
+const TRAVEL_OPTIONS = 4;
+/** Chance de ganhar a insígnia por mérito mesmo perdendo (raro, como no anime). */
+const MERIT_CHANCE = 0.03;
+const TOUR_HYPE = {cup: 0, regional: 1, international: 2, worlds: 3} as const;
+const DOUBLE_CHANCE = 0.05;
+
+const boot = loadTrainers();
+const bootTrainer = boot.list.find(t => t.id === boot.current) ?? null;
+
+export const useGame = create<Store>((set, get) => {
+  const tid = () => get().trainer?.id ?? null;
+  /** Aplica uma mudança numa cópia do run e salva. */
+  const mutate = (fn: (run: RunState, col: Collection) => void) => {
+    const cur = get().run;
+    if (!cur) return;
+    const run = structuredClone(cur);
+    const col = structuredClone(get().collection);
+    fn(run, col);
+    if (run.quick) {
+      // Campeonato rápido: nada vai para a coleção nem para o save da run de verdade.
+      set({run});
+      return;
+    }
+    const fresh = tid() ? checkAchievements(col, run) : [];
+    saveRun(tid(), run);
+    saveCollection(tid(), col);
+    set({run, collection: col});
+    fresh.forEach((name, i) => {
+      const a = ACHIEVEMENTS.find(x => x.name === name);
+      const pop = {id: uid(), name, icon: a?.icon ?? 'star', desc: a?.desc ?? ''};
+      // Uma de cada vez, com um respiro entre elas.
+      setTimeout(() => {
+        set({achievePops: [...get().achievePops, pop]});
+        setTimeout(() => set({achievePops: get().achievePops.filter(x => x.id !== pop.id)}), 5200);
+      }, i * 900);
+    });
+  };
+
+  /** Mexe só na coleção (tela da coleção, fora da run). */
+  const editCollection = (fn: (col: Collection) => boolean | void) => {
+    const col = structuredClone(get().collection);
+    if (fn(col) === false) return;
+    saveCollection(tid(), col);
+    set({collection: col});
+  };
+
+  const findMon = (run: RunState, monUid: string): OwnedMon | undefined =>
+    run.party.find(m => m.uid === monUid) ?? run.box.find(m => m.uid === monUid);
+
+  const healAll = (run: RunState) => {
+    for (const m of run.party) m.hp = maxHp(m);
+  };
+
+  /** Cola a insígnia: caderneta (registro da vitória), pontos e Glória. `merit`: dada mesmo com a derrota. */
+  const awardBadge = (run: RunState, col: Collection, gym: Gym, enc: Encounter, turns: number, merit: boolean) => {
+    const prev = col.badgeLog?.[gym.id];
+    const team = enc.team ?? [enc.mon];
+    col.badgeLog = {
+      ...col.badgeLog,
+      [gym.id]: prev
+        ? {...prev, wins: prev.wins + 1}
+        : {at: Date.now(), wave: run.wave, turns, team: run.party.map(m => m.species), leaderTeam: team.map(m => m.species), leaderLevel: Math.max(...team.map(m => m.level)), wins: 1, merit},
+    };
+    if (run.badges?.includes(gym.id)) return;
+    run.badgeWon = gym.id;
+    run.badgeMerit = merit;
+    run.badges = [...(run.badges ?? []), gym.id];
+    addPoints(run, col, 'gyms', POINTS.badge, true, `${gym.badge} (${gym.leader})${merit ? ' por mérito' : ''}`);
+    col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
+    run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
+    if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
+      col.glory += GYM_PRIZE.book;
+      run.tourGlory += GYM_PRIZE.book;
+      addPoints(run, col, 'books', POINTS.book, true, `${bookName(gym.region)} de ${getRegion(gym.region).name} completa`);
+      col.badgeBooks = {...col.badgeBooks, [gym.region]: (col.badgeBooks?.[gym.region] ?? 0) + 1};
+    }
+  };
+
+  /** Você aos olhos das lendas: nome, fama e títulos. */
+  const fameOf = (): Fame => {
+    const c = careerOf(get().collection);
+    return {name: get().trainer?.name ?? 'Você', fame: c.fame, worlds: c.titles.worlds ?? 0, titles: Object.values(c.titles).reduce((a, b) => a + (b ?? 0), 0)};
+  };
+
+  const startWave = (run: RunState) => {
+    run.wave++;
+    run.event = undefined;
+    // Runs antigas, de antes das regiões, começam em Kanto.
+    if (!run.region) Object.assign(run, {region: REGIONS[0].id, regionLeft: REGION_STAY, biomeLeft: BIOME_STAY});
+    run.regionLeft = (run.regionLeft ?? REGION_STAY) - 1;
+    run.biomeLeft = (run.biomeLeft ?? BIOME_STAY) - 1;
+    const info = tourAt(run.wave);
+    if (info) {
+      const t = get().trainer;
+      const c = careerOf(get().collection);
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, run.region);
+      run.encounter = undefined;
+      run.upcoming = undefined;
+      run.phase = 'tournament';
+      battle = null;
+      return;
+    }
+    // Ginásio marcado para esta ronda.
+    const booked = run.gyms?.find(g => g.wave === run.wave);
+    if (booked) {
+      run.gyms = run.gyms!.filter(g => g !== booked);
+      const gym = getGym(booked.id);
+      if (gym && gym.region === run.region) {
+        run.encounter = gymEncounter(gym, run, fameOf());
+        run.phase = 'gymIntro';
+        run.rerolls = 0;
+        battle = null;
+        return;
+      }
+      run.money += booked.paid ?? 0;
+      get().toast('Você saiu da região do ginásio: o ingresso foi devolvido.');
+    }
+    run.encounter = run.upcoming?.shift();
+    const hinted = !run.encounter && !isBossWave(run.wave) ? rollHintLegendary(run) : null;
+    if (hinted) {
+      const h = hintHere(run)!;
+      run.encounter = hinted;
+      run.diary = run.diary?.filter(id => id !== h.id);
+      run.found = [...(run.found ?? []), h.id];
+    }
+    const legend = !run.encounter && !isBossWave(run.wave) ? rollLegend(run) : null;
+    if (legend) {
+      // Antes da luta tem o encontro: a lenda te acha (e desafia) ou você a acha.
+      run.legendMeet = {id: legend.id, kind: Math.random() < 0.5 ? 'approach' : 'found'};
+      run.phase = 'legend';
+      battle = null;
+      return;
+    }
+    fillEncounter(run);
+  };
+
+  /** Encontro normal da ronda (selvagem, às vezes em dupla). */
+  const fillEncounter = (run: RunState) => {
+    if (!run.encounter) {
+      // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
+      for (let i = 0; i < 4; i++) {
+        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0 || !!getBiome(run.biome).region, run.perks?.luck, run.region);
+        if (!run.recent?.includes(run.encounter.mon.species)) break;
+      }
+    }
+    // Amuleto Brilhante: chance extra de shiny (fica ~3x mais comum).
+    if (run.bag.shinycharm && !run.encounter!.trainer && !run.encounter!.mon.shiny && Math.random() < 2 / 256) run.encounter!.mon.shiny = true;
+    // Dupla: às vezes (5%) dois selvagens aparecem juntos. Nunca com chefes, lendas ou ginásios.
+    const enc0 = run.encounter!;
+    if (!enc0.boss && !enc0.trainer && !enc0.team && run.wave >= 5 && run.party.filter(m => m.hp > 0).length >= 2 && Math.random() < DOUBLE_CHANCE) {
+      const second = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region).mon;
+      run.encounter = {...enc0, team: [enc0.mon, second], double: true};
+    }
+    if (!run.encounter!.legend) run.recent = [run.encounter!.mon.species, ...(run.recent ?? [])].slice(0, 8);
+    if (!run.upcoming?.length) run.upcoming = undefined;
+    if (run.incenseWaves > 0) run.incenseWaves--;
+    run.phase = 'battle';
+    run.rerolls = 0;
+    battle = null;
+  };
+
+  const goToReward = (run: RunState) => {
+    run.rewardTaken = undefined;
+    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0, run.bag);
+    run.phase = 'reward';
+  };
+
+  const afterReward = (run: RunState) => {
+    if (run.wave >= SEASON_LENGTH) {
+      run.phase = 'stageClear';
+      return;
+    }
+    if (run.wave % HEAL_EVERY === 0) {
+      for (const m of run.party) m.hp = maxHp(m);
+      run.log.push('Centro Pokémon: seu time foi curado!');
+    }
+    // Fim da estadia: sorteia 4 opções entre todas (a atual pode ou não aparecer) e o jogador escolhe.
+    const fromRegion = run.region;
+    const fromBiome = run.biome;
+    if ((run.regionLeft ?? 1) <= 0) {
+      const regionOptions = shuffle(REGIONS.map(r => r.id)).slice(0, TRAVEL_OPTIONS + (run.perks?.regions ?? 0));
+      run.travel = {fromRegion, fromBiome, regionOptions};
+      run.phase = 'travel';
+      return;
+    }
+    if ((run.biomeLeft ?? 1) <= 0) {
+      run.travel = {fromBiome, biomeOptions: travelBiomes(run)};
+      run.phase = 'travel';
+      return;
+    }
+    nextStop(run);
+  };
+
+  /** Opções de bioma da viagem: 4 sorteados entre todos; o oculto da região às vezes entra no lugar de um. */
+  const travelBiomes = (run: RunState): string[] => {
+    const options = shuffle(BIOMES.map(b => b.id)).slice(0, TRAVEL_OPTIONS + (run.perks?.biomes ?? 0));
+    const special = rollBiome(run);
+    if (getBiome(special).region && !options.includes(special)) options[Math.floor(Math.random() * options.length)] = special;
+    return options;
+  };
+
+  /** Troca o bioma e reinicia a estadia nele. */
+  const setBiome = (run: RunState, id: string) => {
+    if (id !== run.biome) run.visited = [run.biome, ...(run.visited ?? [])].slice(0, 4);
+    run.biome = id;
+    run.biomeLeft = BIOME_STAY;
+    run.biomePass = false;
+    run.upcoming = undefined;
+  };
+
+  /** Mapas abertos primeiro, depois um evento ou a próxima ronda. */
+  const nextStop = (run: RunState) => {
+    run.travel = undefined;
+    if (run.regionMapReady) run.phase = 'regionChoice';
+    else if (run.mapReady) run.phase = 'biomeChoice';
+    else if (shouldRollEvent(run) && !run.gyms?.some(g => g.wave === run.wave + 1)) {
+      run.event = rollEvent(run);
+      run.lastEventWave = run.wave;
+      if (run.event.kind === 'seer') run.upcoming = run.event.upcoming;
+      run.phase = 'event';
+    } else startWave(run);
+  };
+
+  const endRun = (run: RunState, col: Collection, result: 'lost' | 'stageClear' | 'abandoned') => {
+    const t = get().trainer;
+    run.season = finishSeason(col, run, {name: t?.name ?? 'Você', avatar: t?.avatar});
+    const st = statsOf(col);
+    st.runs++;
+    const glory = gloryFor(run.wave, result);
+    col.glory = (col.glory ?? 0) + glory;
+    run.gloryEarned = glory + (run.tourGlory ?? 0);
+    st.bestWave = Math.max(st.bestWave, run.wave);
+    if (result === 'stageClear') {
+      st.stageClears++;
+      for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+    }
+    // O que sobrou para a creche volta para a coleção: itens Power e o ovo que não chocou.
+    for (const m of [...run.party, ...run.box]) {
+      if (m.item && DAYCARE_ITEMS.includes(m.item)) col.items = {...col.items, [m.item]: (col.items?.[m.item] ?? 0) + 1};
+    }
+    for (const [id, n] of Object.entries(run.bag)) {
+      if (n > 0 && DAYCARE_ITEMS.includes(id)) col.items = {...col.items, [id]: (col.items?.[id] ?? 0) + n};
+    }
+    if (run.egg && (col.eggs?.length ?? 0) < MAX_EGGS) {
+      const {left: _left, ...egg} = run.egg;
+      col.eggs = [...(col.eggs ?? []), egg];
+    }
+    col.runs.unshift({
+      endedAt: Date.now(),
+      wave: run.wave,
+      starter: run.party[0]?.species ?? '?',
+      result,
+      party: run.party.map(m => m.species),
+    });
+    col.runs = col.runs.slice(0, 30);
+  };
+
+  const flushPending = (run: RunState) => {
+    if (run.pending.length) return;
+    if (run.phase !== 'postBattle') return;
+    if (run.tournament) run.phase = 'tournament';
+    else goToReward(run);
+  };
+
+  /** Usa um item da mochila (fora da batalha). Devolve a mensagem para o jogador. */
+  const applyItem = (run: RunState, col: Collection, itemId: string, monUid: string): string => {
+    if (!run.bag[itemId]) return '';
+    const item = getItem(itemId);
+    const mon = findMon(run, monUid);
+    let used = false;
+    let message = '';
+    if (item.kind === 'map') {
+      if (travelBlocked(run, {...item, id: '_'})) return '';
+      used = true;
+      switch (item.travel) {
+        case 'region':
+          run.regionMapReady = true;
+          message = 'Você vai escolher a próxima região depois da próxima vitória.';
+          break;
+        case 'biomeStay':
+          run.biomePass = true;
+          run.biomeLeft = (run.biomeLeft ?? 0) + BIOME_STAY;
+          message = `Estadia dobrada: mais ${BIOME_STAY} rondas neste bioma.`;
+          break;
+        case 'regionStay':
+          run.regionPass = true;
+          run.regionLeft = (run.regionLeft ?? 0) + regionStay(run);
+          message = `Estadia dobrada: mais ${regionStay(run)} rondas em ${getRegion(run.region).name}.`;
+          break;
+        default:
+          run.mapReady = true;
+          message = 'Você vai escolher o bioma depois da próxima vitória.';
+      }
+    } else if (item.kind === 'incense') {
+      run.incenseWaves += 5;
+      used = true;
+      message = 'Pokémon raros vão aparecer mais pelas próximas 5 rondas!';
+    } else if (mon) {
+      const max = maxHp(mon);
+      switch (item.kind) {
+        case 'heal':
+          if (mon.hp > 0 && mon.hp < max) {
+            mon.hp = item.power === 1 ? max : Math.min(max, mon.hp + (item.power ?? 20));
+            used = true;
+            message = `${mon.species} recuperou HP.`;
+          }
+          break;
+        case 'revive':
+          if (mon.hp <= 0) {
+            mon.hp = Math.max(1, Math.floor(max * (item.power ?? 0.5)));
+            used = true;
+            message = `${mon.species} foi revivido!`;
+          }
+          break;
+        case 'candy':
+          if (mon.level < 100) {
+            for (let i = 0; i < (item.power ?? 1) && mon.level < 100; i++) levelUp(mon, run.pending);
+            message = `${mon.species} subiu para o nível ${mon.level}!`;
+            used = true;
+          }
+          break;
+        case 'evolution': {
+          const into = itemEvolutions(mon);
+          if (into.length) {
+            run.pending.push({kind: 'evolve', uid: mon.uid, into});
+            used = true;
+          } else message = `${mon.species} não evolui com esse item.`;
+          break;
+        }
+        case 'tm': {
+          const options = shuffle(teachableMoves(species(mon.species)).filter(m => !mon.moves.includes(m)));
+          if (options.length) {
+            const move = pick(options.slice(0, 20));
+            if (mon.moves.length < 4) {
+              mon.moves.push(move);
+              message = `${mon.species} aprendeu ${move}!`;
+            } else run.pending.push({kind: 'learnMove', uid: mon.uid, move});
+            used = true;
+          }
+          break;
+        }
+        case 'mint':
+          if (item.nature && mon.nature !== item.nature) {
+            mon.nature = item.nature;
+            used = true;
+            message = `${mon.species} agora tem natureza ${item.nature}.`;
+          } else message = `${mon.species} já tem essa natureza.`;
+          break;
+        case 'ability': {
+          const abilities = Object.entries(species(mon.species).abilities)
+            .filter(([slot]) => slot !== 'H' && slot !== 'S')
+            .map(([, a]) => a as string);
+          const other = abilities.find(a => a !== mon.ability);
+          if (other) {
+            mon.ability = other;
+            used = true;
+            message = `${mon.species} agora tem a habilidade ${other}: ${dex.abilities.get(other).shortDesc}`;
+          } else message = `${mon.species} só tem uma habilidade comum.`;
+          break;
+        }
+        case 'vitamin': {
+          const stat = item.evStat!;
+          const total = Object.values(mon.evs).reduce((a, b) => a + b, 0);
+          const add = Math.min(VITAMIN_EVS, EV_MAX_STAT - mon.evs[stat], EV_MAX_TOTAL - total);
+          if (add > 0) {
+            mon.evs[stat] += add;
+            addStatEvs(col, mon.species, stat, add);
+            used = true;
+            message = `${displayName(mon)} ganhou ${add} EVs de ${STAT_LABEL[stat]} (também na ficha da coleção).`;
+          } else message = `${displayName(mon)} já está no máximo de EVs aí.`;
+          break;
+        }
+        case 'mega': {
+          const stones = megaStonesFor(species(mon.species).name);
+          const other = [...run.party, ...run.box].find(m => m.uid !== mon.uid && m.item && getItem(m.item).megaFor);
+          if (!stones.length) message = `${displayName(mon)} não tem mega evolução.`;
+          else if (other) message = `Só 1 mega por time: ${displayName(other)} já segura uma Mega Pedra.`;
+          else {
+            const stone = pick(stones);
+            if (mon.item) run.bag[mon.item] = (run.bag[mon.item] ?? 0) + 1;
+            mon.item = stone.id;
+            used = true;
+            message = `${displayName(mon)} agora segura ${stone.name} e vai mega-evoluir nas batalhas!`;
+          }
+          break;
+        }
+        case 'held':
+          if (item.megaFor) {
+            const other = [...run.party, ...run.box].find(m => m.uid !== mon.uid && m.item && getItem(m.item).megaFor);
+            if (item.megaFor !== species(mon.species).name) {
+              message = `${item.name} só serve em ${item.megaFor}.`;
+              break;
+            }
+            if (other) {
+              message = `Só 1 mega por time: ${displayName(other)} já segura uma Mega Pedra.`;
+              break;
+            }
+          }
+          if (mon.item) run.bag[mon.item] = (run.bag[mon.item] ?? 0) + 1;
+          mon.item = itemId;
+          used = true;
+          message = `${mon.species} agora segura ${item.name}.`;
+          break;
+        default:
+          break;
+      }
+    }
+    if (used) {
+      run.bag[itemId]--;
+      if (!run.bag[itemId]) delete run.bag[itemId];
+    } else if (!message) message = 'Não teria efeito.';
+    return message;
+  };
+
+  return {
+    trainers: boot.list,
+    trainer: bootTrainer,
+    selectTrainer(id) {
+      const trainer = get().trainers.find(t => t.id === id) ?? null;
+      saveTrainers(get().trainers, trainer?.id ?? null);
+      battle = null;
+      set({trainer, run: loadRun(trainer?.id ?? null), collection: loadCollection(trainer?.id ?? null), screen: 'title'});
+    },
+    createTrainer(name, avatar) {
+      if (get().trainers.length >= MAX_TRAINERS) return;
+      const t = newTrainer(name, avatar);
+      set({trainers: [...get().trainers, t]});
+      get().selectTrainer(t.id);
+    },
+    updateTrainer(id, patch) {
+      const trainers = get().trainers.map(t =>
+        t.id === id ? {...t, avatar: patch.avatar ?? t.avatar, name: patch.name?.trim().slice(0, 16) || t.name} : t,
+      );
+      saveTrainers(trainers, tid());
+      set({trainers, trainer: trainers.find(t => t.id === get().trainer?.id) ?? null});
+    },
+    removeTrainer(id) {
+      deleteTrainerData(id);
+      const trainers = get().trainers.filter(t => t.id !== id);
+      set({trainers});
+      if (get().trainer?.id === id) get().selectTrainer(null);
+      else saveTrainers(trainers, tid());
+    },
+    screen: 'title',
+    run: loadRun(bootTrainer?.id ?? null),
+    collection: loadCollection(bootTrainer?.id ?? null),
+    toasts: [],
+    achievePops: [],
+    ivGain: null,
+    clearIvGain: () => set({ivGain: null}),
+    typeCalc: null,
+    openTypeCalc: types => set({typeCalc: types}),
+
+    setScreen: screen => {
+      // Sair de um campeonato rápido no meio encerra ele e volta para a run de verdade.
+      if (screen !== 'run' && get().run?.quick) {
+        battle = null;
+        return set({screen, run: loadRun(tid())});
+      }
+      set({screen});
+    },
+
+    toast(text) {
+      const t = {id: uid(), text};
+      set({toasts: [...get().toasts, t]});
+      setTimeout(() => set({toasts: get().toasts.filter(x => x.id !== t.id)}), 3500);
+    },
+
+    newRun(team, partner, eggId) {
+      const col = structuredClone(get().collection);
+      const picked = team.slice(0, PARTY_SIZE);
+      if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > teamBudget(col)) return;
+      const run = emptyRun();
+      applyPerks(run, perksOf(col));
+      run.regionLeft = regionStay(run);
+      run.rivalPoints = rollRivalPoints(col);
+      run.party = picked.map(name => {
+        const mon = createMon(name, {
+          level: START_LEVELS[perksOf(col).level ?? 0] ?? STARTER_LEVEL,
+          ivs: starterIvs(col, name),
+          ivMin: 10,
+          hiddenAbilityChance: 0,
+          shinyChance: shinyChance(col, name),
+        });
+        applyEntry(col, mon);
+        mon.metWave = 0;
+        if (name === (partner ?? picked[0])) {
+          mon.partner = true;
+          col.favorite = lineRoot(name);
+        }
+        // Garante a ficha da linha para ela ganhar doces e corações nesta run.
+        entryOf(col, name);
+        return mon;
+      });
+      // Mega Pedra própria: só 1 por time, no primeiro da ordem que tiver.
+      const megaMon = run.party.find(m => col.entries[lineRoot(m.species)]?.megaStone);
+      if (megaMon) {
+        if (megaMon.item) run.bag[megaMon.item] = (run.bag[megaMon.item] ?? 0) + 1;
+        megaMon.item = col.entries[lineRoot(megaMon.species)]!.megaStone;
+      }
+      const egg = eggId ? col.eggs?.find(e => e.id === eggId) : undefined;
+      if (egg) {
+        run.egg = {...egg, left: Math.max(1, Math.ceil(egg.waves * (1 - 0.2 * (run.perks?.hatch ?? 0))))};
+        col.eggs = col.eggs!.filter(e => e.id !== egg.id);
+      }
+      run.phase = 'biome';
+      battle = null;
+      saveRun(tid(), run);
+      saveCollection(tid(), col);
+      set({run, collection: col, screen: 'run'});
+    },
+
+    renameMon(monUid, name) {
+      mutate((run, col) => {
+        const mon = findMon(run, monUid);
+        if (!mon) return;
+        mon.nickname = cleanNickname(name);
+        entryOf(col, mon.species).nickname = mon.nickname;
+      });
+    },
+    setNickname(line, name) {
+      editCollection(col => {
+        entryOf(col, line).nickname = cleanNickname(name);
+      });
+    },
+
+    unlockMove(line, move) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (e.moves.includes(move) || !spendCandies(col, line, movePrice(move))) return false;
+        e.moves.push(move);
+        e.startMove = move;
+      });
+    },
+    equipMove(line, move) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        e.startMove = move && e.moves.includes(move) ? move : undefined;
+      });
+    },
+    equipNature(line, nature) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        e.nature = nature && e.natures.includes(nature) ? nature : undefined;
+      });
+    },
+    equipAbility(line, ability) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        e.ability = ability && e.abilities.includes(ability) ? ability : undefined;
+      });
+    },
+    buyCostCut(line) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (e.costCut >= MAX_COST_CUT || !spendCandies(col, line, COST_CUT_PRICE[e.costCut])) return false;
+        e.costCut++;
+      });
+    },
+    buyShiny(line) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (e.shinyLv >= SHINY_PRICE.length || !spendCandies(col, line, SHINY_PRICE[e.shinyLv])) return false;
+        e.shinyLv++;
+      });
+    },
+    tutor(line, kind, target, plan) {
+      let msg = '';
+      editCollection(col => {
+        const r = tutorRoll(col, line, kind, target, plan);
+        if (!r) return false;
+        const what = kind === 'nature' ? 'nature' : 'habilidade';
+        msg = r.wanted ? `Deu certo! ${what} ${r.got} desbloqueada.` : `Não saiu ${target}, mas você desbloqueou a ${what} ${r.got}.`;
+      });
+      return msg;
+    },
+    allocateEv(line, stat, n) {
+      editCollection(col => allocateEvs(entryOf(col, line), stat, n));
+    },
+    resetLineEvs(line) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (!evTotal(e.evs) || !spendCandies(col, line, EV_RESET_PRICE)) return false;
+        resetEvs(e);
+      });
+    },
+    presetEvs(line, preset) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        const p = EV_PRESETS[preset];
+        if (!p) return false;
+        if (evTotal(e.evs)) {
+          if (!spendCandies(col, line, EV_RESET_PRICE)) return false;
+          resetEvs(e);
+        }
+        for (const [k, v] of Object.entries(p.evs)) allocateEvs(e, k as StatId, v);
+      });
+    },
+    resolveEvent(choice) {
+      let message = '';
+      mutate((run, col) => {
+        const ev = run.event;
+        if (run.phase !== 'event' || !ev) return;
+        const join = (mon: OwnedMon, hearts: number) => {
+          mon.uid = uid();
+          mon.metWave = run.wave;
+          mon.metBiome = run.biome;
+          run.stats.caught++;
+          const reg = registerCatch(col, mon);
+          addHeartPts(col, mon.species, hearts);
+          if (run.party.length < PARTY_SIZE) run.party.push(mon);
+          else run.box.push(mon);
+          message = `${species(mon.species).name} entrou no seu time! (+${reg.candies} doces)`;
+        };
+        switch (ev.kind) {
+          case 'house':
+            if (choice === 'care') {
+              addTrail(run, TRAIL.event);
+              ev.mon.hp = maxHp(ev.mon);
+              join(ev.mon, HEART_STEPS[1]);
+            } else {
+              const gift = rollRewards(run.wave, 1, 0, run.bag).find(id => getItem(id).kind !== 'money') ?? 'potion';
+              run.bag[gift] = (run.bag[gift] ?? 0) + 1;
+              message = `${species(ev.mon.species).name} deixou um presente: ${getItem(gift).name}.`;
+            }
+            break;
+          case 'hurt':
+            if (choice === 'heal') {
+              const heal = cheapestHeal(run);
+              if (!heal) return;
+              run.bag[heal]--;
+              if (!run.bag[heal]) delete run.bag[heal];
+              addTrail(run, TRAIL.event);
+              ev.mon.hp = maxHp(ev.mon);
+              join(ev.mon, HEART_STEPS[0]);
+            }
+            break;
+          case 'berries':
+            if (choice && ev.options.includes(choice)) {
+              run.bag[choice] = (run.bag[choice] ?? 0) + 1;
+              message = `Você pegou ${getItem(choice).name}.`;
+            }
+            break;
+          case 'merchant':
+            if (choice === 'trade' && run.bag[ev.give]) {
+              run.bag[ev.give]--;
+              if (!run.bag[ev.give]) delete run.bag[ev.give];
+              run.bag[ev.get] = (run.bag[ev.get] ?? 0) + 1;
+              message = `Troca feita: você ganhou ${getItem(ev.get).name}!`;
+            }
+            break;
+          case 'rival':
+            if (choice === 'fight') {
+              run.encounter = rivalEncounter(run, ev.name);
+              run.event = undefined;
+              run.phase = 'battle';
+              battle = null;
+              return;
+            }
+            break;
+          case 'seer':
+            break;
+          case 'traveler':
+            if (choice === 'help') {
+              if (ev.ask === 'money') {
+                if (run.money < (ev.cost ?? 0)) return;
+                run.money -= ev.cost ?? 0;
+              } else {
+                const id = ev.ask === 'heal' ? cheapestHeal(run) : ev.item;
+                if (!id || !run.bag[id]) return;
+                run.bag[id]--;
+                if (!run.bag[id]) delete run.bag[id];
+              }
+              run.diary = [...(run.diary ?? []), ev.hint];
+              addPoints(run, col, 'travelers', POINTS.traveler, true, `Viajante ajudado (${getRegion(run.region).name})`);
+              addTrail(run, TRAIL.traveler);
+              const h = getHint(ev.hint);
+              message = `Dica anotada no diário!${h ? ` (${getRegion(h.region).name} · ${getBiome(h.biome).name})` : ''}`;
+            }
+            break;
+        }
+        run.event = undefined;
+        startWave(run);
+      });
+      if (message) get().toast(message);
+    },
+
+    buyMegaStone(line, stone) {
+      editCollection(col => {
+        const e = entryOf(col, line);
+        if (!lineMegaStones(line).some(i => i.id === stone)) return false;
+        if (!e.megaStone && !spendCandies(col, line, MEGA_STONE_PRICE)) return false;
+        e.megaStone = stone;
+      });
+    },
+    buyUpgrade(id) {
+      editCollection(col => buyUpgrade(col, id));
+    },
+    setFavorite(line) {
+      editCollection(col => {
+        col.favorite = line ?? undefined;
+      });
+    },
+
+    abandonRun() {
+      const cur = get().run;
+      if (cur && cur.phase !== 'gameOver' && cur.party.length) {
+        mutate((run, col) => endRun(run, col, cur.phase === 'stageClear' ? 'stageClear' : 'abandoned'));
+      }
+      battle = null;
+      saveRun(tid(), null);
+      set({run: null, screen: 'title'});
+    },
+
+    chooseStartBiome(id, region) {
+      mutate(run => {
+        run.biome = id;
+        if (region) run.region = region;
+        startWave(run);
+      });
+    },
+
+    finishBattle(outcome) {
+      const ctl = battle;
+      mutate((run, col) => {
+        const enc = run.encounter;
+        if (!enc) return;
+        ctl?.syncParty(run.party);
+        battle = null;
+        const events: PendingEvent[] = [];
+        if (enc.tournament && run.tournament && ctl) {
+          // Partida de torneio: perder não acaba a run, só tira você do torneio.
+          const t = run.tournament;
+          const won = outcome === 'won';
+          const me = get().trainer?.name ?? 'Você';
+          const foe = enc.trainer ?? '?';
+          const left = won ? ctl.battle.p1.pokemon.filter(p => !p.fainted).length : ctl.battle.p2.pokemon.filter(p => !p.fainted).length;
+          recordPlayerResult(t, won, run.party.map(m => m.species), highlightsFromLog(ctl.battle.log, me, foe, won ? me : foe, left), left);
+          if (!won) {
+            healAll(run);
+            run.phase = 'tournament';
+            get().toast(`${foe} venceu. Fim do torneio para você, mas a temporada continua!`);
+            return;
+          }
+        } else if (outcome === 'lost' && enc.gym) {
+          healAll(run);
+          // Muito raro, como no anime: o líder dá a insígnia por mérito mesmo com a derrota
+          // (só se você derrubou pelo menos metade do time dele).
+          const gymLost = getGym(enc.gym);
+          const downed = ctl ? ctl.battle.p2.pokemon.filter(p => p.fainted).length : 0;
+          if (gymLost && !run.badges?.includes(gymLost.id) && downed * 2 >= (enc.team?.length ?? 1) && Math.random() < MERIT_CHANCE) {
+            awardBadge(run, col, gymLost, enc, ctl?.battle.turn ?? 0, true);
+          } else get().toast(`${enc.trainer} venceu. Seu time foi curado; dá para tentar de novo com outro ingresso.`);
+          afterReward(run);
+          return;
+        } else if (outcome === 'lost' && enc.legend) {
+          // Perder para uma lenda não acaba a run: o time é curado e a jornada segue.
+          healAll(run);
+          run.legendAfter = {id: enc.legend, won: false};
+          get().toast(`${enc.trainer} venceu desta vez. Seu time foi curado: a jornada continua!`);
+          afterReward(run);
+          return;
+        } else if (outcome === 'lost') {
+          run.phase = 'gameOver';
+          endRun(run, col, 'lost');
+          return;
+        }
+        if (outcome === 'fled') {
+          run.stats.fled++;
+          afterReward(run);
+          return;
+        }
+        // Descanso: quem não desmaiou recupera 20% do HP depois de cada ronda.
+        const rest = 0.2 + 0.1 * (run.perks?.rest ?? 0);
+        for (const m of run.party) if (m.hp > 0) m.hp = Math.min(maxHp(m), m.hp + Math.ceil(maxHp(m) * rest));
+        const gained = new Map<string, number>();
+        const candy = (name: string, n: number) => {
+          addCandies(col, name, n);
+          const k = species(lineRoot(name)).name;
+          gained.set(k, (gained.get(k) ?? 0) + n);
+        };
+        const newHearts: string[] = [];
+        for (const m of run.party) {
+          if (m.hp <= 0) continue;
+          const pts = (ctl?.participants.has(m.uid) ? HEART_PTS.win : HEART_PTS.inParty) * (m.partner ? 2 : 1);
+          if (addHeartPts(col, m.species, pts) > 0) newHearts.push(displayName(m));
+        }
+        if (outcome === 'won') {
+          run.stats.defeated++;
+          statsOf(col).defeated++;
+          // Em dupla, a EXP soma os dois selvagens.
+          const exp = enc.double ? (enc.team ?? [enc.mon]).reduce((a, m) => a + expYield(m, false), 0) : expYield(enc.mon, enc.boss || !!enc.trainer);
+          for (const m of run.party) {
+            if (m.hp <= 0) continue;
+            const fought = ctl?.participants.has(m.uid);
+            if (fought) {
+              const big = enc.boss || !!enc.trainer;
+              candy(m.species, (big ? CANDY.boss : CANDY.defeat) + (run.perks?.candy ?? 0));
+              const evBoost = 1 + 0.5 * (run.perks?.evs ?? 0);
+              bankEvs(col, m.species, Math.round(evYield(enc.mon.species).amount * EV_MULT * (big ? 2 : 1) * evBoost));
+            }
+            const power = m.item ? getItem(m.item).evStat : undefined;
+            if (power) {
+              const total = Object.values(m.evs).reduce((a, b) => a + b, 0);
+              const add = Math.min(POWER_EVS, EV_MAX_STAT - m.evs[power], EV_MAX_TOTAL - total);
+              if (add > 0) m.evs[power] += add;
+              addStatEvs(col, m.species, power, POWER_EVS);
+            }
+            const share = (fought ? 1 : run.bag.expall ? 0.8 : 0.5) * (run.bag.luckyegg ? 1.5 : 1);
+            const bonus = expBonus(heartsOf(col.entries[lineRoot(m.species)]));
+            const r = gainExp(m, Math.floor(exp * share * bonus));
+            if (r.levelsGained) run.log.push(`${m.species} subiu para o nível ${m.level}!`);
+            events.push(...r.events);
+          }
+        }
+        if (outcome === 'caught') {
+          run.stats.caught++;
+          // Em dupla, captura o selvagem que sobrou em campo.
+          const mon = structuredClone(enc.double && ctl ? enc.team?.[ctl.caughtIndex] ?? enc.mon : enc.mon);
+          if (ctl) mon.hp = Math.max(1, ctl.wildActive.hp);
+          mon.uid = uid();
+          mon.metWave = run.wave;
+          mon.metBiome = run.biome;
+          const reg = registerCatch(col, mon);
+          gained.set(species(lineRoot(mon.species)).name, reg.candies);
+          if (reg.duplicate) set({ivGain: {species: mon.species, before: reg.before, after: reg.after}});
+          if (reg.newNature || reg.newAbility) {
+            const what = [reg.newNature && `nature ${mon.nature}`, reg.newAbility && `habilidade ${mon.ability}`].filter(Boolean).join(' e ');
+            get().toast(`Ficha de ${species(lineRoot(mon.species)).name}: ${what} desbloqueada!`);
+          }
+          if (run.party.length < PARTY_SIZE) run.party.push(mon);
+          else {
+            run.box.push(mon);
+            get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
+          }
+        }
+        const money = enc.tournament ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1));
+        run.money += money;
+        // Chefe vencido ou capturado deixa a lenda da região de olho em você.
+        if ((outcome === 'won' || outcome === 'caught') && enc.boss && !enc.trainer && !enc.hinted) {
+          const before = trailOf(run);
+          addTrail(run, TRAIL.boss);
+          if (trailOf(run) > before) get().toast(`Rastro da lenda de ${getRegion(run.region).name}: ${Math.min(trailOf(run), 40)}%`);
+        }
+        if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary, true, `Lendário pela dica: ${species(enc.mon.species).name}`);
+        const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
+        if (gym) awardBadge(run, col, gym, enc, ctl?.battle.turn ?? 0, false);
+        if (outcome === 'won' && enc.legend) {
+          run.legendAfter = {id: enc.legend, won: true};
+          const prize = legendPrize(run.wave);
+          col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
+          addPoints(run, col, 'legends', POINTS.legend, true, `Vitória sobre ${enc.trainer}`);
+          col.glory = (col.glory ?? 0) + prize.glory;
+          run.tourGlory = (run.tourGlory ?? 0) + prize.glory;
+          run.money += prize.money;
+          statsOf(col).moneyEarned += prize.money;
+          for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+          get().toast(`Você venceu ${enc.trainer}! +₽ ${prize.money} · +${prize.glory} Glória`);
+        }
+        statsOf(col).moneyEarned += money;
+        if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
+        for (const n of newHearts) get().toast(`❤ ${n} ganhou um coração de amizade!`);
+        if (run.egg && (outcome === 'won' || outcome === 'caught')) {
+          run.egg.left--;
+          if (run.egg.left <= 0) {
+            const baby = hatch(run.egg, Math.max(5, Math.floor(run.wave * 0.9)));
+            baby.metWave = run.wave;
+            baby.metBiome = run.biome;
+            run.egg = undefined;
+            const reg = registerCatch(col, baby);
+            addHeartPts(col, baby.species, HEART_STEPS[0]);
+            if (run.party.length < PARTY_SIZE) run.party.push(baby);
+            else run.box.push(baby);
+            get().toast(`O ovo chocou! Nasceu um ${baby.species}${baby.shiny ? ' shiny' : ''}! (+${reg.candies} doces)`);
+          }
+        }
+        if (enc.tournament) healAll(run);
+        run.pending.push(...events);
+        run.phase = 'postBattle';
+        flushPending(run);
+      });
+    },
+
+    tourStage(stage) {
+      mutate(run => {
+        if (run.tournament) run.tournament.stage = stage;
+      });
+    },
+
+    tourFight() {
+      mutate((run, col) => {
+        const t = run.tournament;
+        const m = t && playerMatch(t);
+        if (!t || !m) return;
+        healAll(run);
+        const me = t.entrants[playerIndex(t)];
+        const foe = t.entrants[m.a === playerIndex(t) ? m.b : m.a];
+        const c = careerOf(col);
+        const info = tourInfo(t.kind);
+        run.encounter = {
+          mon: foe.team[0],
+          team: foe.team,
+          rarity: 'rare',
+          boss: true,
+          trainer: foe.name,
+          tournament: true,
+          // Palco do torneio: arena improvisada na League Cup, estádio lotado no Mundial.
+          venue: TOUR_HYPE[t.kind],
+          hype: TOUR_HYPE[t.kind],
+          intro: introLines({...me, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, foe, info.name, currentRound(t), !!c.defending[t.kind], TOUR_HYPE[t.kind]),
+        };
+        run.phase = 'battle';
+        battle = null;
+      });
+    },
+
+    startQuickTour(kind, team) {
+      const info = tourInfo(kind);
+      const run = emptyRun();
+      run.quick = true;
+      run.wave = info.wave;
+      const level = Math.max(5, Math.round(info.wave * 0.9) + 1);
+      run.party = team.map(name => createMon(name, {level, ivMin: 15, shinyChance: 0.01, hiddenAbilityChance: 0.1}));
+      const t = get().trainer;
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: {}, runnerUps: 0, fame: 0}, run.region);
+      run.phase = 'tournament';
+      battle = null;
+      set({run, screen: 'run'});
+    },
+
+    tourFinish() {
+      const quick = get().run;
+      if (quick?.quick) {
+        const t = quick.tournament;
+        if (t) get().toast(`${tourName(t)}: ${placementLabel(t.placement ?? 5)}! Fim do campeonato rápido.`);
+        // Volta para a run de verdade (que ficou guardada).
+        set({run: loadRun(tid()), screen: 'quickplay'});
+        battle = null;
+        return;
+      }
+      mutate((run, col) => {
+        const t = run.tournament;
+        if (!t || t.stage !== 'done') return;
+        const info = tourInfo(t.kind);
+        const i = prizeIndex(t.placement ?? 5);
+        applyToCareer(careerOf(col), t);
+        addPoints(run, col, 'tournaments', info.fame[i], false, `${tourName(t)}: ${placementLabel(t.placement ?? 5)}`);
+        col.glory = (col.glory ?? 0) + info.glory[i];
+        run.tourGlory = (run.tourGlory ?? 0) + info.glory[i];
+        run.money += info.money[i];
+        statsOf(col).moneyEarned += info.money[i];
+        if (t.placement === 1) for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+        get().toast(`${tourName(t)}: ${placementLabel(t.placement ?? 5)}! +₽ ${info.money[i]} · +${info.glory[i]} Glória${info.cp[i] ? ` · +${info.cp[i]} CP` : ''}`);
+        run.tournament = undefined;
+        run.encounter = undefined;
+        healAll(run);
+        goToReward(run);
+      });
+    },
+
+    resolvePending(choice) {
+      mutate((run, col) => {
+        const ev = run.pending.shift();
+        if (!ev) return;
+        const mon = findMon(run, ev.uid);
+        if (mon && choice !== null) {
+          if (ev.kind === 'learnMove' && typeof choice === 'number') {
+            mon.moves[choice] = ev.move;
+          } else if (ev.kind === 'evolve' && typeof choice === 'string' && ev.into.includes(choice)) {
+            const from = mon.species;
+            evolve(mon, choice);
+            addCandies(col, mon.species, CANDY.evolve);
+            run.log.push(`${from} evoluiu para ${mon.species}! (+${CANDY.evolve} doces)`);
+          }
+        }
+        flushPending(run);
+      });
+    },
+
+    pickReward(itemId, target) {
+      let message = '';
+      mutate((run, col) => {
+        if (!run.rewardOptions.includes(itemId)) return;
+        const item = getItem(itemId);
+        if (item.kind === 'money') {
+          const v = moneyValue(item, run.wave);
+          run.money += v;
+          statsOf(col).moneyEarned += v;
+          message = `+₽ ${v}`;
+        } else if (item.kind === 'breed') {
+          col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
+          message = `${item.name} foi guardado na Creche.`;
+        } else {
+          run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
+          if (target !== undefined) message = applyItem(run, col, itemId, target);
+        }
+        // Fica na tela da recompensa para dar tempo de passar na loja.
+        run.rewardOptions = [];
+        run.rewardTaken = itemId;
+        run.skipStreak = 0;
+      });
+      if (message) get().toast(message);
+    },
+
+    skipReward() {
+      mutate(run => {
+        // Pular sem pegar nada melhora um pouco as próximas recompensas (até 2 vezes seguidas).
+        if (run.rewardOptions.length && !run.rewardTaken) run.skipStreak = Math.min(2, (run.skipStreak ?? 0) + 1);
+        run.rewardOptions = [];
+        run.rewardTaken = undefined;
+        afterReward(run);
+      });
+    },
+
+    reroll() {
+      mutate(run => {
+        const cost = rerollPrice(run, rerollCost(run.rerolls, run.wave));
+        if (run.money < cost) return;
+        run.money -= cost;
+        run.rerolls++;
+        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0, run.bag);
+      });
+    },
+
+    buy(itemId) {
+      mutate((run, col) => {
+        const item = getItem(itemId);
+        const price = shopPrice(run, item);
+        if (!item.price || run.money < price || travelBlocked(run, item)) return;
+        run.money -= price;
+        if (item.kind === 'breed') col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
+        else run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
+      });
+    },
+
+    breed(mother, father, items) {
+      let msg = '';
+      editCollection(col => {
+        if ((col.eggs?.length ?? 0) >= MAX_EGGS) return false;
+        const store = {...col.items};
+        for (const it of items) {
+          if (!it) continue;
+          if (!store[it]) return false;
+          store[it]--;
+        }
+        if (!spendCandies(col, mother, EGG_PRICE)) return false;
+        const egg = makeEgg(col, mother, father, items);
+        if (!egg) return false;
+        col.items = store;
+        col.eggs = [...(col.eggs ?? []), egg];
+        msg = `Um ovo de ${egg.species} apareceu! Ele choca depois de ${egg.waves} rondas vencidas numa run.`;
+      });
+      return msg;
+    },
+    discardEgg(id) {
+      editCollection(col => {
+        col.eggs = col.eggs?.filter(e => e.id !== id);
+      });
+    },
+
+    chooseNextBiome(id) {
+      mutate(run => {
+        if (id && id !== run.biome) setBiome(run, id);
+        run.mapReady = false;
+        nextStop(run);
+      });
+    },
+    chooseNextRegion(id) {
+      mutate(run => {
+        if (id && id !== run.region) {
+          run.region = id;
+          run.regionLeft = regionStay(run);
+          run.regionPass = false;
+          run.upcoming = undefined;
+        }
+        run.regionMapReady = false;
+        nextStop(run);
+      });
+    },
+    scheduleGym(id, wave) {
+      mutate(run => {
+        const gym = getGym(id);
+        const price = ticketPrice(run);
+        if (!gym || gym.region !== run.region || gymStatus(run, gym) !== 'open') return;
+        if (!gymWaves(run).includes(wave) || run.money < price) return;
+        run.money -= price;
+        run.gyms = [...(run.gyms ?? []), {id, wave, paid: price}].sort((a, b) => a.wave - b.wave);
+      });
+    },
+    continueTravel() {
+      mutate(run => {
+        if (run.phase === 'travel') nextStop(run);
+      });
+    },
+    travelPick(id) {
+      mutate(run => {
+        const t = run.travel;
+        if (run.phase !== 'travel' || !t) return;
+        if (t.regionOptions && !t.region) {
+          if (!t.regionOptions.includes(id)) return;
+          run.region = id;
+          run.regionLeft = regionStay(run);
+          run.regionPass = false;
+          t.region = id;
+          t.biomeOptions = travelBiomes(run);
+          return;
+        }
+        if (!t.biomeOptions?.includes(id)) return;
+        setBiome(run, id);
+        nextStop(run);
+      });
+    },
+    answerLegend(accept) {
+      mutate(run => {
+        const legend = run.legendMeet && getLegend(run.legendMeet.id);
+        if (run.phase !== 'legend' || !legend) return;
+        run.legendMeet = undefined;
+        battle = null;
+        if (accept) {
+          run.trail = {...run.trail, [run.region!]: 0};
+          run.encounter = legendEncounter(legend, run.party, fameOf(), getRegion(run.region).name);
+          run.phase = 'battle';
+          run.rerolls = 0;
+          return;
+        }
+        // Deixou para depois: o rastro cai pela metade e a ronda segue normal.
+        run.trail = {...run.trail, [run.region!]: Math.floor(trailOf(run) / 2)};
+        fillEncounter(run);
+      });
+    },
+    startGymBattle() {
+      mutate(run => {
+        if (run.phase !== 'gymIntro') return;
+        run.phase = 'battle';
+        run.rerolls = 0;
+        battle = null;
+      });
+    },
+    closeBadgeWon() {
+      mutate(run => {
+        run.badgeWon = undefined;
+        run.badgeMerit = undefined;
+      });
+    },
+    closeLegendAfter() {
+      mutate(run => {
+        run.legendAfter = undefined;
+      });
+    },
+
+    consume(itemId) {
+      const run = get().run;
+      if (!run || !run.bag[itemId]) return false;
+      mutate(r => {
+        r.bag[itemId]--;
+        if (!r.bag[itemId]) delete r.bag[itemId];
+      });
+      return true;
+    },
+
+    useItem(itemId, monUid) {
+      if (!get().run?.bag[itemId]) return;
+      let message = '';
+      mutate((run, col) => {
+        message = applyItem(run, col, itemId, monUid);
+      });
+      if (message) get().toast(message);
+    },
+
+    takeItem(monUid) {
+      mutate(run => {
+        const mon = findMon(run, monUid);
+        if (!mon?.item) return;
+        run.bag[mon.item] = (run.bag[mon.item] ?? 0) + 1;
+        mon.item = undefined;
+      });
+    },
+
+    setLead(monUid) {
+      mutate(run => {
+        const i = run.party.findIndex(m => m.uid === monUid);
+        if (i > 0) [run.party[0], run.party[i]] = [run.party[i], run.party[0]];
+      });
+    },
+
+    swapWithBox(boxUid, partyUid) {
+      mutate(run => {
+        const bi = run.box.findIndex(m => m.uid === boxUid);
+        if (bi < 0) return;
+        if (partyUid === null) {
+          if (run.party.length >= PARTY_SIZE) return;
+          run.party.push(...run.box.splice(bi, 1));
+          return;
+        }
+        const pi = run.party.findIndex(m => m.uid === partyUid);
+        if (pi < 0) return;
+        [run.party[pi], run.box[bi]] = [run.box[bi], run.party[pi]];
+      });
+    },
+
+    touch() {
+      set({run: get().run ? {...get().run!} : null});
+    },
+  };
+});
+
