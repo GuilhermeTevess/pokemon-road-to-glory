@@ -28,7 +28,7 @@ export function introLines(me: NarratorCtx, foe: NarratorCtx, tournamentName: st
   else if (me.runnerUps === 2 && round === 2) out.push(`🎙️ ${me.name} já perdeu duas finais. A torcida pede: dessa vez vai!`);
   else if (titles >= 3) out.push(`🎙️ ${me.name} chega com ${titles} títulos na bagagem. Respeito!`);
   else if (titles >= 1) out.push(`🎙️ ${me.name} já sabe o que é levantar um troféu.`);
-  else if (me.fame < 20) out.push(pick([`🎙️ Uma cara nova no circuito: ${me.name}! Vamos ver do que é capaz.`, `🎙️ ${me.name}, ninguém conhece ainda... por enquanto!`]));
+  else if (me.fame < 100) out.push(pick([`🎙️ Uma cara nova no circuito: ${me.name}! Vamos ver do que é capaz.`, `🎙️ ${me.name}, ninguém conhece ainda... por enquanto!`]));
   else out.push(`🎙️ ${me.name}, nome que já está ficando conhecido por aqui.`);
   if (foe.titles.worlds) out.push(`🎙️ Do outro lado, ${foe.name}, com título mundial. Que pedreira!`);
   else if (foe.runnerUps >= 2) out.push(`🎙️ Do outro lado, ${foe.name}, que vive batendo na trave.`);

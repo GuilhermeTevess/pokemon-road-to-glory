@@ -43,6 +43,13 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   região, fora de torneio e chefe). O time cresce com as insígnias que você já tem. Cada
   insígnia dá Glória uma vez por temporada; a caderneta completa dá um bônus grande. Perder
   não acaba a run.
+- **Fama e Ranking** (menu inicial): cada run é uma temporada. Pontos de fama vêm dos torneios
+  (Mundial 1000, International 400, Regional 200, League Cup 80 para o campeão), lendas (150),
+  cadernetas (300), insígnias (30), lendários das dicas (50) e viajantes (10). Ranking da
+  temporada contra 15 rivais do circuito, ranking geral e histórico. No fim da temporada:
+  pódio, sua posição e de onde vieram os pontos. (No online, o host vai escolher quantas
+  temporadas.)
+- **Conquistas** (menu inicial): 37 objetivos permanentes, sem bônus.
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,

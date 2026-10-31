@@ -12,6 +12,7 @@ import type {Screen} from '../../game/store';
 import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
 import {REGIONS, getRegion} from '../../data/regions';
+import {ACHIEVEMENTS} from '../../game/achievements';
 import type {Region} from '../../data/regions';
 import {FX} from '../fx';
 import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter} from '../components';
@@ -130,6 +131,8 @@ export function TitleScreen() {
     {icon: 'trophy', label: 'Torneios', sub: `${careerOf(structuredClone(collection)).cp} CP`, go: 'tournaments'},
     {icon: 'candy', label: 'Glória', sub: `${collection.glory ?? 0} para gastar`, go: 'glory'},
     {icon: 'egg', label: 'Creche', sub: collection.eggs?.length ? `${collection.eggs.length} ovo(s)` : 'fazer ovos', go: 'daycare'},
+    {icon: 'map', label: 'Ranking', sub: `${careerOf(structuredClone(collection)).fame} de fama`, go: 'ranking'},
+    {icon: 'heart', label: 'Conquistas', sub: `${ACHIEVEMENTS.filter(a => collection.achievements?.[a.id]).length}/${ACHIEVEMENTS.length}`, go: 'achievements'},
   ];
   return (
     <div className="screen title-screen">
