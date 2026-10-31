@@ -60,6 +60,8 @@ export interface Encounter {
   team?: OwnedMon[];
   /** Partida de torneio: tem narrador e não acaba a run se perder. */
   tournament?: boolean;
+  /** Desafio de treinador lendário (id): perder não acaba a run. */
+  legend?: string;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
@@ -119,6 +121,8 @@ export interface RunState {
   /** Passes já usados nesta estadia (cada um dobra a estadia uma vez). */
   biomePass?: boolean;
   regionPass?: boolean;
+  /** Rastro da lenda de cada região (0 a 100): chance de a lenda aparecer a cada ronda. */
+  trail?: Record<string, number>;
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
   travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
   incenseWaves: number;

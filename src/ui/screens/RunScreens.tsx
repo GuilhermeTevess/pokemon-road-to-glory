@@ -9,6 +9,7 @@ import {REGIONS, getRegion} from '../../data/regions';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game/rewards';
 import {gloryFor, rerollPrice} from '../../game/glory';
+import {TRAIL, TRAIL_CAP, trailOf} from '../../game/legend';
 import {EV_MAX_STAT} from '../../game/meta';
 import {tourAt} from '../../game/tournament';
 import {useGame} from '../../game/store';
@@ -442,6 +443,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
             <br />
             <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, run.biomeLeft ?? 0)} rondas
           </div>}
+          {run.wave > 0 && <TrailMeter value={trailOf(run)} />}
         </div>
       </div>
       <div className="panel sb-team">
@@ -793,6 +795,20 @@ export function TravelScreen() {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/** Medidor do Rastro da lenda (no painel lateral). */
+function TrailMeter({value}: {value: number}) {
+  const help = `Uma lenda da região pode te desafiar a cada ronda, com chance igual ao rastro (até ${TRAIL_CAP}%). Sobe vencendo chefes (+${TRAIL.boss}%) e ajudando Pokémon nos eventos (+${TRAIL.event}%). Zera depois do desafio.`;
+  return (
+    <div className="trail" title={help}>
+      <span className="muted">Rastro da lenda</span>
+      <span className="trail-bar">
+        <i style={{width: `${Math.min(100, (value / TRAIL_CAP) * 100)}%`}} />
+      </span>
+      <b>{Math.min(value, TRAIL_CAP)}%</b>
     </div>
   );
 }

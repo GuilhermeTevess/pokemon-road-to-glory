@@ -225,6 +225,8 @@ export function BattleScreen() {
   const tour = run.tournament;
   const header = enc.tournament && tour
     ? `${tourName(tour)} · ${ROUND_NAMES[tour.rounds.length - 1]} · contra ${enc.trainer}`
+    : enc.legend
+    ? `Lenda de ${getRegion(run.region).name} · ${enc.trainer}`
     : enc.trainer
     ? `Desafio do rival ${enc.trainer}`
     : isMilestoneWave(run.wave)

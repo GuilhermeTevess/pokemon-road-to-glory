@@ -28,6 +28,10 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **20 biomas**, cada um com seus tipos de Pokémon. Novo bioma sorteado a cada 10 rondas.
   Na loja: **Mapa de Bioma** e **Mapa de Região** (você escolhe) e **Passes** que dobram a
   estadia. O preço deles sobe com a ronda e com o seu dinheiro.
+- **Lendas**: cada região tem treinadores lendários (Ash e Red, Lance, Steven, Cynthia, Alder,
+  Diantha, Kukui, Leon, Geeta). O **Rastro da lenda** sobe vencendo chefes e ajudando Pokémon
+  nos eventos; a cada ronda a chance de a lenda te desafiar é o rastro (até 40%). O time dela
+  tem o tamanho do seu (mínimo 3) e nível do seu mais forte +3. Perder não acaba a run.
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,
