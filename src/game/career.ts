@@ -24,6 +24,9 @@ export interface CareerRules {
   boost: 1 | 1.5 | 2;
 }
 
+/** Máximo de jogadores numa carreira (a chave dos torneios tem 8 lugares). */
+export const MAX_PLAYERS = 8;
+
 export const DEFAULT_RULES: CareerRules = {allowCollection: false, rounds: 120, seasons: 3, legendCap: 1, levelCap: 100, megas: true, boost: 1};
 
 export interface CareerDoc {

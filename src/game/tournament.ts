@@ -419,7 +419,9 @@ export function createSharedTournament(
   world?: World,
 ): Tournament {
   return withSeed(tid, () => {
-    const humans = [...players].sort((a, b) => a.pid.localeCompare(b.pid)).slice(0, 8);
+    // No máximo 8 na chave (a carreira aceita até 8 jogadores); você sempre entra na sua.
+    const others = players.filter(p => p.pid !== me).sort((a, b) => a.pid.localeCompare(b.pid));
+    const humans = [...players.filter(p => p.pid === me), ...others].slice(0, 8).sort((a, b) => a.pid.localeCompare(b.pid));
     const bots = createTournament(info, {name: '_', titles: {}, runnerUps: 0, fame: 0}, region, [], world).entrants.filter(e => !e.player);
     const slots: Entrant[] = new Array(8);
     humans.forEach((p, i) => (slots[SPREAD[i]] = {...p, player: p.pid === me, friend: p.pid !== me}));
@@ -439,6 +441,11 @@ export function adoptShared(t: Tournament, doc: {region?: string; entrants: Entr
   t.region = doc.region;
   t.entrants = doc.entrants.map(e => (e.pid === me && mine ? {...e, ...mine, pid: me, player: true, friend: false} : {...e, player: e.pid === me, friend: !!e.pid && e.pid !== me}));
   t.shared!.ready = true;
+  // Ficou fora da chave (mais de 8 jogadores ao mesmo tempo): não segura ninguém.
+  if (!t.entrants.some(e => e.player)) {
+    t.stage = 'done';
+    t.placement = 5;
+  }
 }
 
 /** Partidas entre bots da rodada atual que ainda não têm resultado. */
