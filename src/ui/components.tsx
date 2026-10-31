@@ -143,29 +143,62 @@ export function MatchupPanel({types, title}: {types: readonly string[]; title?: 
 }
 
 export function StatsTable({mon}: {mon: OwnedMon}) {
+  const [help, setHelp] = useState(false);
   const stats = calcStats(mon);
   const base = species(mon.species).baseStats;
+  const nat = dex.natures.get(mon.nature);
   return (
-    <table className="stats">
-      <thead>
-        <tr>
-          <th />
-          <th>Base</th>
-          <th>IV</th>
-          <th>Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {STAT_IDS.map(s => (
-          <tr key={s}>
-            <td>{STAT_LABEL[s]}</td>
-            <td>{base[s]}</td>
-            <td className={mon.ivs[s] === 31 ? 'perfect' : ''}>{mon.ivs[s]}</td>
-            <td>{stats[s]}</td>
+    <div className="stats-wrap">
+      <table className="stats">
+        <thead>
+          <tr>
+            <th>
+              <button className="move-info-btn" onClick={() => setHelp(h => !h)} title="O que é isso?">
+                ?
+              </button>
+            </th>
+            <th>Base</th>
+            <th>IV</th>
+            <th>EV</th>
+            <th>Atual</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {STAT_IDS.map(s => (
+            <tr key={s}>
+              <td>
+                {STAT_LABEL[s]}
+                {nat.plus === s && <span className="nat-up" title="A nature aumenta 10%"> ▲</span>}
+                {nat.minus === s && <span className="nat-down" title="A nature diminui 10%"> ▼</span>}
+              </td>
+              <td>{base[s]}</td>
+              <td className={mon.ivs[s] === 31 ? 'perfect' : ''}>{mon.ivs[s]}</td>
+              <td>{mon.evs[s]}</td>
+              <td>
+                <b>{stats[s]}</b>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {help && (
+        <div className="stats-help">
+          <p>
+            <b>Base:</b> a força da espécie (igual pra todo {species(mon.species).name}).
+          </p>
+          <p>
+            <b>IV:</b> o talento deste Pokémon, de 0 a 31 (verde = 31, perfeito).
+          </p>
+          <p>
+            <b>EV:</b> o treino, de 0 a 252 por atributo.
+          </p>
+          <p>
+            <b>Atual:</b> o número que vale na batalha. Não é média: a Base pesa o dobro, depois somam o IV e um quarto do EV, tudo
+            multiplicado pelo nível. A nature dá +10% (▲) num atributo e −10% (▼) em outro.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
