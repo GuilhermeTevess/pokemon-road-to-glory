@@ -9,6 +9,8 @@ import {getBattle, useGame} from '../../game/store';
 import {ROUND_NAMES, tourName} from '../../game/tournament';
 import {getRegion} from '../../data/regions';
 import {getGym} from '../../data/gyms';
+import {venueName} from '../../game/legend';
+import {ArenaBackdrop} from './LegendScreens';
 import {
   CategoryIcon,
   HpBar,
@@ -242,7 +244,7 @@ export function BattleScreen() {
     : enc.gym
     ? `Ginásio · Líder ${enc.trainer} · ${getGym(enc.gym)?.badge ?? ''}`
     : enc.legend
-    ? `Lenda de ${getRegion(run.region).name} · ${enc.trainer}`
+    ? `${enc.trainer} · Lenda de ${getRegion(run.region).name}`
     : enc.trainer
     ? `Desafio do rival ${enc.trainer}`
     : isMilestoneWave(run.wave)
@@ -268,11 +270,19 @@ export function BattleScreen() {
         </div>
       )}
       <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
-        <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+        {enc?.venue != null ? (
+          <ArenaBackdrop tier={enc.venue} color={biome.color} />
+        ) : (
+          <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+        )}
         <div className="fx-layer" ref={fxRef} />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
-          {run.region ? `${getRegion(run.region).name} · ` : ''}
-          {enc?.gym ? `Ginásio de ${enc.trainer}` : biome.name}
+          {enc?.venue != null ? venueName(enc.venue, getRegion(run.region).name) : (
+            <>
+              {run.region ? `${getRegion(run.region).name} · ` : ''}
+              {enc?.gym ? `Ginásio de ${enc.trainer}` : biome.name}
+            </>
+          )}
         </div>
         {wilds.map((wild, i) =>
           wild ? (

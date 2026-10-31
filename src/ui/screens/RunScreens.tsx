@@ -1,11 +1,11 @@
 import {useEffect, useState} from 'react';
+import type {ReactNode} from 'react';
 import {TYPE_COLORS, dex, species} from '../../data/dex';
 import {moveDescPt} from '../../data/movesPt';
 import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {HEAL_EVERY, SEASON_LENGTH} from '../../game/encounters';
-import {BIOMES} from '../../data/biomes';
-import {REGIONS, getRegion, regionStay} from '../../data/regions';
+import {getRegion, regionStay} from '../../data/regions';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game/rewards';
 import {gloryFor, rerollPrice} from '../../game/glory';
@@ -449,7 +449,8 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <div className="muted">
             Ronda {run.wave}/{SEASON_LENGTH} · {seasonPoints(run)} pts
           </div>
-          {run.wave > 0 && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
+          {run.wave > 0 && run.phase === 'travel' && <div className="sb-where muted">🎲 Sorteando o destino...</div>}
+          {run.wave > 0 && run.phase !== 'travel' && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
             <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, run.regionLeft ?? 0)} rondas
             <br />
             <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, run.biomeLeft ?? 0)} rondas
@@ -772,47 +773,99 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
 }
 
 /** Roleta da viagem: fim da estadia sorteia nova região (e bioma) ou só um novo bioma. */
+/** Roleta de cartões: a luz passa pelas opções e para no sorteado. */
+function Roulette<T extends {id: string}>({items, result, current, render, onDone}: {
+  items: T[];
+  result: string;
+  current?: string;
+  render: (item: T) => ReactNode;
+  onDone: () => void;
+}) {
+  const target = Math.max(0, items.findIndex(i => i.id === result));
+  const total = items.length * 3 + target;
+  const [step, setStep] = useState(fast() ? total : 0);
+  useEffect(() => {
+    if (step >= total) {
+      playJingle('levelUp');
+      onDone();
+      return;
+    }
+    const t = setTimeout(() => setStep(n => n + 1), 70 + Math.max(0, step - total + 6) * 70);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+  const lit = step % items.length;
+  return (
+    <div className="travel-cards roulette">
+      {items.map((it, i) => (
+        <div key={it.id} className={`roulette-slot ${i === lit ? 'lit' : ''} ${step >= total && i === lit ? 'won' : ''}`}>
+          {it.id === current && <span className="roulette-here">Você está aqui</span>}
+          {render(it)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function TravelScreen() {
   const {run, continueTravel} = useGame();
   const travel = run?.travel;
-  const [spin, setSpin] = useState(fast() ? -1 : 0);
-  useEffect(() => {
-    if (spin < 0) return;
-    if (spin >= 14) {
-      setSpin(-1);
-      playJingle('levelUp');
-      return;
-    }
-    const t = setTimeout(() => setSpin(n => n + 1), 60 + spin * 12);
-    return () => clearTimeout(t);
-  }, [spin]);
+  const [stage, setStage] = useState<'region' | 'biome'>(travel?.region ? 'region' : 'biome');
+  const [done, setDone] = useState(false);
   if (!run || !travel) return null;
-  const done = spin < 0;
   const region = getRegion(travel.region ?? run.region);
   const biome = getBiome(travel.biome);
-  const rolling = done ? '' : travel.region ? REGIONS[spin % REGIONS.length].name : BIOMES[(spin * 7) % BIOMES.length].name;
-  const same = travel.region ? travel.region === travel.fromRegion : travel.biome === travel.fromBiome;
+  const regions = (travel.regionOptions ?? [travel.region ?? run.region!]).map(getRegion);
+  const biomes = (travel.biomeOptions ?? [travel.biome]).map(getBiome);
+  const sameRegion = travel.region === travel.fromRegion;
+  const sameBiome = travel.biome === travel.fromBiome;
+  const noop = () => undefined;
   return (
     <div className="screen biome-screen travel-screen">
-      <h2>{travel.region ? 'Hora de mudar de região!' : 'Hora de mudar de bioma!'}</h2>
-      {!done ? (
-        <div className="travel-roll">{rolling}</div>
+      {stage === 'region' ? (
+        <>
+          <h2>Hora de sortear a próxima região!</h2>
+          <p className="hint">A roleta passa pelas opções, e a região atual também está no sorteio.</p>
+          <Roulette
+            key="region"
+            items={regions}
+            result={region.id}
+            current={travel.fromRegion}
+            render={r => <RegionCard region={r} onClick={noop} />}
+            onDone={() => setDone(true)}
+          />
+          {done && (
+            <>
+              <p className="note">{sameRegion ? `Deu ${region.name} de novo: você continua por aqui mais ${regionStay(run)} rondas!` : `Bem-vindo a ${region.name}! Você fica ${regionStay(run)} rondas aqui.`}</p>
+              <button className="btn primary big" onClick={() => (setDone(false), setStage('biome'))}>
+                Sortear o bioma
+              </button>
+            </>
+          )}
+        </>
       ) : (
         <>
-          <p className="note">
-            {same
-              ? `Deu ${travel.region ? region.name : biome.name} de novo: você continua por aqui!`
-              : travel.region
-                ? `Bem-vindo a ${region.name}! Você fica ${regionStay(run)} rondas aqui.`
-                : `Próxima parada: ${biome.name}. Você fica 10 rondas aqui.`}
-          </p>
-          <div className="travel-cards">
-            {travel.region && <RegionCard region={region} onClick={continueTravel} />}
-            <BiomeCard biome={biome} onClick={continueTravel} />
-          </div>
-          <button className="btn primary big" onClick={continueTravel}>
-            Partiu!
-          </button>
+          <h2>{travel.region ? `${region.name}: qual vai ser o bioma?` : 'Hora de sortear o próximo bioma!'}</h2>
+          {!travel.region && <p className="hint">O bioma atual também está no sorteio.</p>}
+          <Roulette
+            key="biome"
+            items={biomes}
+            result={biome.id}
+            current={travel.region ? undefined : travel.fromBiome}
+            render={b => <BiomeCard biome={b} onClick={noop} />}
+            onDone={() => setDone(true)}
+          />
+          {done && (
+            <>
+              <p className="note">
+                {!travel.region && sameBiome ? `Deu ${biome.name} de novo: mais 10 rondas por aqui!` : `Próxima parada: ${biome.name}. Você fica 10 rondas aqui.`}
+                {biome.region && ' É um bioma oculto!'}
+              </p>
+              <button className="btn primary big" onClick={continueTravel}>
+                Partiu!
+              </button>
+            </>
+          )}
         </>
       )}
     </div>
