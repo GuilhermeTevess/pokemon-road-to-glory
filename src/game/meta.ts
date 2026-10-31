@@ -15,6 +15,18 @@ import type {Egg} from './daycare';
 import {emptyCareer} from './tournament';
 import type {Career} from './tournament';
 
+export interface BadgeRecord {
+  at: number;
+  wave: number;
+  turns: number;
+  /** Seu time na luta (espécies). */
+  team: string[];
+  /** Time do líder (espécies). */
+  leaderTeam: string[];
+  leaderLevel: number;
+  wins: number;
+}
+
 export interface CollectionEntry {
   /** Quantas vezes foi capturado (0 = só foi usado como inicial). */
   caught: number;
@@ -89,6 +101,8 @@ export interface Collection {
   legends?: Record<string, number>;
   /** Cadernetas completas por região (região → vezes). */
   badgeBooks?: Record<string, number>;
+  /** Insígnias da caderneta (ginásio → como foi a primeira vitória e quantas vezes venceu). */
+  badgeLog?: Record<string, BadgeRecord>;
   /** Ranking: rivais do circuito e temporadas passadas. */
   league?: League;
   /** Conquistas desbloqueadas (id → quando). */

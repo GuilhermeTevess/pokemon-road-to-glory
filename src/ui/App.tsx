@@ -1,3 +1,4 @@
+import {BadgeCeremony, GymIntroScreen} from './screens/GymScreens';
 import {LegendAfterModal, LegendMeetScreen} from './screens/LegendScreens';
 import {useState} from 'react';
 import {useGame} from '../game/store';
@@ -38,6 +39,7 @@ export function App() {
   else if (run.phase === 'regionChoice') body = <RegionSelect />;
   else if (run.phase === 'travel') body = <TravelScreen />;
   else if (run.phase === 'legend') body = <LegendMeetScreen />;
+  else if (run.phase === 'gymIntro') body = <GymIntroScreen />;
   else if (run.phase === 'event') body = <EventScreen />;
   else if (run.phase === 'tournament') body = <TournamentScreen />;
   else if (run.phase === 'reward' || run.phase === 'postBattle') body = <RewardScreen />;
@@ -93,7 +95,8 @@ export function App() {
       )}
       {partyOpen && <PartyPanel key={`${partyOpen.tab}-${partyOpen.mon}`} initialTab={partyOpen.tab} initialMon={partyOpen.mon} onClose={() => setPartyOpen(null)} />}
       {screen === 'run' && <PendingModal />}
-      {screen === 'run' && run?.legendAfter && run.phase !== 'battle' && !run.pending.length && <LegendAfterModal />}
+      {screen === 'run' && run?.badgeWon && run.phase !== 'battle' && !run.pending.length && <BadgeCeremony />}
+      {screen === 'run' && !run?.badgeWon && run?.legendAfter && run.phase !== 'battle' && !run.pending.length && <LegendAfterModal />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
       {typeCalc && <TypeCalc initial={typeCalc} onClose={() => openTypeCalc(null)} />}
       {ivGain && (

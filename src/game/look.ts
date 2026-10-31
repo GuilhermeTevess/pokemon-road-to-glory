@@ -143,3 +143,11 @@ export function lookPixels(l: Look): (string | null)[][] {
   };
   return g.map(r => r.map(c => pal[c] ?? null));
 }
+
+/** Visual fixo a partir de um nome (para quem não tem sprite). */
+export function lookFromName(name: string): Look {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let s = h || 1;
+  return randomLook(() => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648));
+}

@@ -46,6 +46,7 @@ export type Phase =
   | 'regionChoice'
   | 'travel'
   | 'legend'
+  | 'gymIntro'
   | 'event'
   | 'tournament'
   | 'gameOver'
@@ -158,6 +159,8 @@ export interface RunState {
   travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string; regionOptions?: string[]; biomeOptions?: string[]};
   /** Encontro com a lenda antes da luta: ela te acha ou você a acha. */
   legendMeet?: {id: string; kind: 'approach' | 'found'};
+  /** Insígnia que acabou de ganhar (para a animação). */
+  badgeWon?: string;
   /** Fala da lenda depois da luta. */
   legendAfter?: {id: string; won: boolean};
   incenseWaves: number;

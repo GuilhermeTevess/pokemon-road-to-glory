@@ -156,6 +156,9 @@ interface Store {
   answerLegend(accept: boolean): void;
   /** Fecha a conversa de depois da luta com a lenda. */
   closeLegendAfter(): void;
+  /** Ginásio: sai da conversa com o líder e começa a luta. */
+  startGymBattle(): void;
+  closeBadgeWon(): void;
   /** Compra o ingresso e marca a ronda da luta de ginásio. */
   scheduleGym(id: string, wave: number): void;
   useItem(itemId: string, monUid: string): void;
@@ -269,8 +272,8 @@ export const useGame = create<Store>((set, get) => {
       run.gyms = run.gyms!.filter(g => g !== booked);
       const gym = getGym(booked.id);
       if (gym && gym.region === run.region) {
-        run.encounter = gymEncounter(gym, run);
-        run.phase = 'battle';
+        run.encounter = gymEncounter(gym, run, fameOf());
+        run.phase = 'gymIntro';
         run.rerolls = 0;
         battle = null;
         return;
@@ -1005,12 +1008,24 @@ export const useGame = create<Store>((set, get) => {
         }
         if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary);
         const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
+        if (gym) {
+          const prev = col.badgeLog?.[gym.id];
+          col.badgeLog = {
+            ...col.badgeLog,
+            [gym.id]: prev
+              ? {...prev, wins: prev.wins + 1}
+              : {
+                  at: Date.now(), wave: run.wave, turns: ctl?.battle.turn ?? 0, team: run.party.map(m => m.species),
+                  leaderTeam: (enc.team ?? [enc.mon]).map(m => m.species), leaderLevel: Math.max(...(enc.team ?? [enc.mon]).map(m => m.level)), wins: 1,
+                },
+          };
+        }
         if (gym && !run.badges?.includes(gym.id)) {
+          run.badgeWon = gym.id;
           run.badges = [...(run.badges ?? []), gym.id];
           addPoints(run, col, 'gyms', POINTS.badge);
           col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
           run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
-          get().toast(`Você ganhou a ${gym.badge}! +${GYM_PRIZE.glory} Glória`);
           if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
             col.glory += GYM_PRIZE.book;
             run.tourGlory += GYM_PRIZE.book;
@@ -1256,6 +1271,19 @@ export const useGame = create<Store>((set, get) => {
         // Deixou para depois: o rastro cai pela metade e a ronda segue normal.
         run.trail = {...run.trail, [run.region!]: Math.floor(trailOf(run) / 2)};
         fillEncounter(run);
+      });
+    },
+    startGymBattle() {
+      mutate(run => {
+        if (run.phase !== 'gymIntro') return;
+        run.phase = 'battle';
+        run.rerolls = 0;
+        battle = null;
+      });
+    },
+    closeBadgeWon() {
+      mutate(run => {
+        run.badgeWon = undefined;
       });
     },
     closeLegendAfter() {
