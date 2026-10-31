@@ -334,7 +334,11 @@ export function shinyChance(c: Collection, name: string): number {
 
 /** Preço para liberar um golpe inicial, pelo poder. */
 export function movePrice(move: string): number {
-  const bp = dex.moves.get(move).basePower;
+  const m = dex.moves.get(move);
+  const bp = m.basePower;
+  // Golpes de preparar (Swords Dance, Dragon Dance...) valem tanto quanto um golpe forte.
+  const setup = m.category === 'Status' && m.target === 'self' && Object.values(m.boosts ?? {}).reduce((x, y) => x + Math.max(0, y ?? 0), 0) >= 2;
+  if (setup) return 20;
   return bp >= 95 ? 20 : bp >= 65 ? 10 : 5;
 }
 
@@ -344,7 +348,8 @@ export function startMoveOptions(name: string): {id: string; how: 'level' | 'tm'
   const level = new Set(levelUpMoves(root).map(([, m]) => m));
   const all = new Map<string, 'level' | 'tm'>();
   for (const m of level) all.set(m, 'level');
-  for (const m of teachableMoves(root)) if (!all.has(m)) all.set(m, 'tm');
+  // Inclui golpes de status (Swords Dance, Dragon Dance...): como golpe inicial eles valem muito.
+  for (const m of teachableMoves(root, true)) if (!all.has(m)) all.set(m, 'tm');
   return [...all]
     .map(([id, how]) => ({id, how}))
     .sort((a, b) => dex.moves.get(b.id).basePower - dex.moves.get(a.id).basePower || a.id.localeCompare(b.id));
