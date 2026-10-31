@@ -271,21 +271,19 @@ export function BattleScreen() {
   return (
     <div className="screen battle-screen">
       {moveInfo && <MoveInfo move={moveInfo} onClose={() => setMoveInfo(null)} />}
-      <div className="battle-top">
-        <span>{header}</span>
-        <span>₽ {run.money}</span>
-      </div>
       <div className="battle-sub">
-        {partner && (
-          <div className="partner-corner" title="Seu parceiro nesta run">
-            <Sprite name={partner.species} shiny={partner.shiny} size={36} still />
-            <span>
-              <MonName mon={partner} />
-              <Hearts entry={collection.entries[lineRoot(partner.species)]} small />
-            </span>
-          </div>
-        )}
-        <span className="battle-sub-spacer" />
+        <div className="battle-left">
+          <span className="battle-tag">{header}</span>
+          {partner && (
+            <div className="partner-corner" title="Seu parceiro nesta run">
+              <Sprite name={partner.species} shiny={partner.shiny} size={36} still />
+              <span>
+                <MonName mon={partner} />
+                <Hearts entry={collection.entries[lineRoot(partner.species)]} small />
+              </span>
+            </div>
+          )}
+        </div>
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
           {enc?.tournament && run.tournament ? tourName(run.tournament) : enc?.venue != null ? venueName(enc.venue, getRegion(run.region).name) : (
             <>
@@ -294,7 +292,7 @@ export function BattleScreen() {
             </>
           )}
         </div>
-        <span className="battle-sub-spacer" />
+        <span className="battle-tag money">₽ {run.money}</span>
       </div>
       <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
         {enc?.venue != null ? (
@@ -454,6 +452,11 @@ export function BattleScreen() {
                       >
                         ?
                       </span>
+                      {eff && (
+                        <span className={`eff ${eff.cls}`} title={eff.text}>
+                          {eff.text.replace('Super efetivo', 'Super').replace('Pouco efetivo', 'Fraco').replace('Efeito normal', 'Normal')}
+                        </span>
+                      )}
                     </span>
                     <span className="move-meta">
                       <TypeBadge type={m.type} small />
@@ -464,7 +467,6 @@ export function BattleScreen() {
                       </span>
                     </span>
                     <span className="move-desc">{moveDescPt(m.name)}</span>
-                    {eff && <span className={`eff ${eff.cls}`}>{eff.text}</span>}
                   </button>
                 );
               })}

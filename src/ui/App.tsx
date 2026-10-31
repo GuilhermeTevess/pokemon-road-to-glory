@@ -37,6 +37,7 @@ export function App() {
   }, [worldWave]);
   const [sound, setSound] = useState(soundEnabled());
   const [fastOn, setFastOn] = useState(fast);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
 
   let body;
@@ -68,16 +69,17 @@ export function App() {
   return (
     <div className={`app ${inRun ? 'wide' : ''}`}>
       <nav className="topnav">
-        <button className="btn small ghost" onClick={() => setScreen('title')}>
-          <PixelIcon name="home" /> Início
+        <button className="btn small ghost" onClick={() => setScreen('title')} aria-label="Início">
+          <PixelIcon name="home" /> <span className="nav-label">Início</span>
         </button>
         {inRun && (
-          <button className="btn small nav-bag" onClick={() => setPartyOpen({tab: 'bag'})}>
-            <img className="nav-icon" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/explorer-kit.png" alt="" /> Time, mochila e PC
+          <button className="btn small nav-bag" onClick={() => setPanelOpen(true)}>
+            <img className="nav-icon" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/explorer-kit.png" alt="" /> <span className="bag-long">Time, mochila e PC</span>
+            <span className="bag-short">Painel</span>
           </button>
         )}
         <button className="btn small ghost" onClick={() => openTypeCalc([])} title="Calculadora de tipos">
-          <PixelIcon name="dice" /> Tipos
+          <PixelIcon name="dice" /> <span className="nav-label">Tipos</span>
         </button>
         <button
           className={`btn small ghost ${fastOn ? 'on' : ''}`}
@@ -87,10 +89,10 @@ export function App() {
           }}
           title="Pular animações: batalhas, capturas, evoluções e sorteios mais rápidos"
         >
-          {fastOn ? '⏩ Rápido' : '▶ Animações'}
+          {fastOn ? '⏩' : '▶'} <span className="nav-label">{fastOn ? 'Rápido' : 'Animações'}</span>
         </button>
         <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
-          <PixelIcon name="help" /> Ajuda
+          <PixelIcon name="help" /> <span className="nav-label">Ajuda</span>
         </button>
         <button
           className="btn small ghost"
@@ -100,13 +102,20 @@ export function App() {
           }}
           title="Som"
         >
-          <PixelIcon name={sound ? 'sound' : 'mute'} /> {sound ? 'Som' : 'Mudo'}
+          <PixelIcon name={sound ? 'sound' : 'mute'} /> <span className="nav-label">{sound ? 'Som' : 'Mudo'}</span>
         </button>
       </nav>
       {inRun ? (
         <div className="run-layout">
           <main>{body}</main>
-          <RunSidebar onOpen={(tab, mon) => setPartyOpen({tab, mon})} />
+          <RunSidebar
+            open={panelOpen}
+            onClose={() => setPanelOpen(false)}
+            onOpen={(tab, mon) => {
+              setPanelOpen(false);
+              setPartyOpen({tab, mon});
+            }}
+          />
         </div>
       ) : (
         <main>{body}</main>
