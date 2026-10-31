@@ -3,17 +3,18 @@ import {useState} from 'react';
 import {getRegion} from '../../data/regions';
 import {ACHIEVEMENTS} from '../../game/achievements';
 import {SOURCE_LABEL, overallRanking, seasonPoints, seasonRanking} from '../../game/league';
-import type {PointSource, RankRow, SeasonRec} from '../../game/league';
+import type {PointEntry, PointSource, RankRow, SeasonRec} from '../../game/league';
 import {careerOf} from '../../game/meta';
 import {fameLabel} from '../../game/tournament';
 import {useGame} from '../../game/store';
 import type {RunState} from '../../game/types';
-import {PixelIcon, Sprite} from '../components';
+import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
-export function RankTable({rows, limit}: {rows: RankRow[]; limit?: number}) {
+export function RankTable({rows, limit, log}: {rows: RankRow[]; limit?: number; log?: PointEntry[]}) {
+  const [open, setOpen] = useState(false);
   const meIdx = rows.findIndex(r => r.player);
   const shown = limit && meIdx >= limit ? [...rows.slice(0, limit), rows[meIdx]] : rows.slice(0, limit ?? rows.length);
   return (
@@ -29,25 +30,64 @@ export function RankTable({rows, limit}: {rows: RankRow[]; limit?: number}) {
               {r.region && <small className="muted">{getRegion(r.region).name}</small>}
             </span>
             {r.fav && <Sprite name={r.fav} size={36} still />}
-            <span className="rank-pts">{r.points}</span>
+            {r.player && log ? (
+              <button className="rank-pts link" title="Ver de onde vieram os pontos" onClick={() => setOpen(true)}>
+                {r.points} ▸
+              </button>
+            ) : (
+              <span className="rank-pts">{r.points}</span>
+            )}
           </div>
         );
       })}
+      {open && log && (
+        <Modal onClose={() => setOpen(false)}>
+          <h2>De onde vieram seus pontos</h2>
+          <PointLog log={log} />
+        </Modal>
+      )}
     </div>
   );
 }
 
-export function Breakdown({points}: {points: Partial<Record<PointSource, number>>}) {
+/** Extrato: cada ponto com o motivo, o mais novo primeiro. */
+export function PointLog({log}: {log: PointEntry[]}) {
+  if (!log.length) return <p className="muted">Nenhum ponto ainda. Torneios, lendas, ginásios e viajantes dão pontos.</p>;
+  return (
+    <div className="point-log">
+      {[...log].reverse().map((e, i) => (
+        <div key={i} className="point-row">
+          <b>+{e.pts}</b>
+          <span>{e.label}</span>
+          <small className="muted">ronda {e.wave}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Breakdown({points, log}: {points: Partial<Record<PointSource, number>>; log?: PointEntry[]}) {
+  const [open, setOpen] = useState<PointSource | null>(null);
   const rows = (Object.keys(SOURCE_LABEL) as PointSource[]).filter(k => points[k]);
   if (!rows.length) return <p className="muted">Nenhum ponto ainda. Torneios, lendas, ginásios e viajantes dão pontos.</p>;
   return (
     <div className="breakdown">
-      {rows.map(k => (
-        <div key={k} className="breakdown-row">
-          <span>{SOURCE_LABEL[k]}</span>
-          <b>{points[k]}</b>
-        </div>
-      ))}
+      {rows.map(k => {
+        const items = log?.filter(e => e.source === k) ?? [];
+        return (
+          <div key={k}>
+            <button className="breakdown-row" disabled={!items.length} onClick={() => setOpen(open === k ? null : k)}>
+              <span>
+                {items.length ? (open === k ? '▾ ' : '▸ ') : ''}
+                {SOURCE_LABEL[k]}
+              </span>
+              <b>{points[k]}</b>
+            </button>
+            {open === k && <PointLog log={items} />}
+          </div>
+        );
+      })}
+      {log && <p className="hint small">Toque numa linha para ver cada ponto.</p>}
     </div>
   );
 }
@@ -73,7 +113,7 @@ export function SeasonSummary({run}: {run: RunState}) {
           </div>
         ))}
       </div>
-      <Breakdown points={rec.breakdown} />
+      <Breakdown points={rec.breakdown} log={run.season?.log ?? run.pointLog} />
     </div>
   );
 }
@@ -114,9 +154,9 @@ export function RankingScreen() {
       {tab === 'season' && active && run && (
         <>
           <p className="muted">Ronda {run.wave}/120. Os rivais também vão somando pontos ao longo da temporada.</p>
-          <RankTable rows={seasonRanking(col, run, me)} />
+          <RankTable rows={seasonRanking(col, run, me)} log={run.pointLog ?? []} />
           <h3>Seus pontos nesta temporada</h3>
-          <Breakdown points={run.points ?? {}} />
+          <Breakdown points={run.points ?? {}} log={run.pointLog ?? []} />
         </>
       )}
       {tab === 'all' && <RankTable rows={overallRanking(col, me)} />}
@@ -132,6 +172,7 @@ export function RankingScreen() {
                   {s.region ? ` · ${getRegion(s.region).name}` : ''} · {new Date(s.at).toLocaleDateString('pt-BR')}
                 </span>
                 <span className="muted">Campeão: {s.top[0]?.name}</span>
+                {s.log && s.log.length > 0 && <SeasonLog log={s.log} />}
               </div>
             ))}
           </div>
@@ -171,5 +212,22 @@ export function AchievementsScreen() {
         ))}
       </div>
     </div>
+  );
+}
+
+function SeasonLog({log}: {log: PointEntry[]}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="link" onClick={() => setOpen(true)}>
+        Ver de onde vieram os pontos
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)}>
+          <h2>Pontos da temporada</h2>
+          <PointLog log={log} />
+        </Modal>
+      )}
+    </>
   );
 }

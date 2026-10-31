@@ -534,7 +534,7 @@ export class BattleController {
         out.push(...ev);
       }
     }
-    if (this.encounter.tournament || this.encounter.legend) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length);
+    if (this.encounter.tournament || this.encounter.legend) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length, this.encounter.hype);
     return out;
   }
 

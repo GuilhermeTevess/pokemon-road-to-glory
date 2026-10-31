@@ -6,7 +6,8 @@ import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
-import {CLOTHES, DEFAULT_LOOK, EYES, HAIR_COLORS, HAIR_STYLES, HATS, SKINS, decodeLook, encodeLook, isCustom, lookFromName, lookPixels, randomLook} from '../../game/look';
+import {decodeLook, isCustom, lookFromName, lookPixels} from '../../game/look';
+import {CHARACTERS, CLASSES, PROTAGONISTS} from '../../data/trainerSprites';
 import type {Look} from '../../game/look';
 import type {Trainer} from '../../game/trainers';
 import {PARTY_SIZE, useGame} from '../../game/store';
@@ -41,97 +42,53 @@ export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: 
   return <img className="trainer-avatar" src={avatarUrl(avatar)} alt={name} width={size} height={size} onError={() => setFailed(true)} draggable={false} />;
 }
 
-function Swatches({colors, value, onPick}: {colors: string[]; value: number; onPick: (i: number) => void}) {
-  return (
-    <div className="swatches">
-      {colors.map((c, i) => (
-        <button key={c} className={`swatch ${value === i ? 'selected' : ''}`} style={{background: c}} onClick={() => onPick(i)} aria-label={c} />
-      ))}
-    </div>
-  );
-}
+const GALLERY_TABS = [
+  {id: 'p', label: 'Protagonistas', list: PROTAGONISTS},
+  {id: 'n', label: 'Personagens', list: CHARACTERS},
+  {id: 'c', label: 'Classes de treinador', list: CLASSES},
+] as const;
+const PAGE = 60;
 
-function Choices({names, value, onPick}: {names: string[]; value: number; onPick: (i: number) => void}) {
-  return (
-    <div className="look-choices">
-      {names.map((n, i) => (
-        <button key={n} className={`chip ${value === i ? 'active' : ''}`} onClick={() => onPick(i)}>
-          {n}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Editor de visual: monte seu treinador ou escolha um protagonista dos jogos. */
+/** Galeria com os sprites oficiais de treinador: abas, busca e "mostrar mais". */
 function AvatarEditor({avatar, onChange}: {avatar: string; onChange: (a: string) => void}) {
-  const [tab, setTab] = useState<'custom' | 'classic'>(isCustom(avatar) ? 'custom' : 'classic');
-  // Guarda o último visual montado para não perder ao olhar os clássicos.
-  const [look, setLook] = useState<Look>(isCustom(avatar) ? decodeLook(avatar) : DEFAULT_LOOK);
-  const put = (l: Look) => {
-    setLook(l);
-    onChange(encodeLook(l));
-  };
-  const set = (k: keyof Look) => (i: number) => put({...look, [k]: i});
+  const [tab, setTab] = useState<'p' | 'n' | 'c'>('p');
+  const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(PAGE);
+  const q = query.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const list = q ? [...PROTAGONISTS, ...CHARACTERS, ...CLASSES].filter(n => n.replace(/-/g, '').includes(q)) : GALLERY_TABS.find(t => t.id === tab)!.list;
   return (
     <div className="avatar-editor">
-      <div className="tabs">
-        <button className={`tab ${tab === 'custom' ? 'active' : ''}`} onClick={() => (setTab('custom'), onChange(encodeLook(look)))}>
-          Montar o meu
-        </button>
-        <button className={`tab ${tab === 'classic' ? 'active' : ''}`} onClick={() => setTab('classic')}>
-          Protagonistas
-        </button>
+      <div className="avatar-current">
+        <TrainerAvatar avatar={avatar} name={avatar} size={120} />
+        <span className="muted">{spriteLabel(avatar)}</span>
       </div>
-      {tab === 'custom' ? (
-        <div className="look-editor">
-          <div className="look-preview">
-            <PixelTrainer look={look} size={168} />
-            <button className="btn small" onClick={() => put(randomLook())}>
-              🎲 Aleatório
-            </button>
-          </div>
-          <div className="look-rows">
-            <label>Pele</label>
-            <Swatches colors={SKINS} value={look.skin} onPick={set('skin')} />
-            <label>Cabelo</label>
-            <Choices names={HAIR_STYLES} value={look.hair} onPick={set('hair')} />
-            {look.hair !== HAIR_STYLES.indexOf('Careca') && (
-              <>
-                <label>Cor do cabelo</label>
-                <Swatches colors={HAIR_COLORS} value={look.hairColor} onPick={set('hairColor')} />
-              </>
-            )}
-            <label>Olhos</label>
-            <Swatches colors={EYES} value={look.eyes} onPick={set('eyes')} />
-            <label>Chapéu</label>
-            <Choices names={HATS} value={look.hat} onPick={set('hat')} />
-            {look.hat > 0 && (
-              <>
-                <label>Cor do chapéu</label>
-                <Swatches colors={CLOTHES} value={look.hatColor} onPick={set('hatColor')} />
-              </>
-            )}
-            <label>Camisa</label>
-            <Swatches colors={CLOTHES} value={look.shirt} onPick={set('shirt')} />
-            <label>Calça</label>
-            <Swatches colors={CLOTHES} value={look.pants} onPick={set('pants')} />
-            <label>Sapato</label>
-            <Swatches colors={CLOTHES} value={look.shoes} onPick={set('shoes')} />
-          </div>
-        </div>
-      ) : (
-        <div className="avatar-pick">
-          {AVATARS.map(a => (
-            <button key={a} className={`avatar-opt ${avatar === a ? 'selected' : ''}`} onClick={() => onChange(a)} title={a}>
-              <TrainerAvatar avatar={a} name={a} size={64} />
-            </button>
-          ))}
-        </div>
+      <div className="row center wrap">
+        {GALLERY_TABS.map(t => (
+          <button key={t.id} className={`tab ${tab === t.id && !q ? 'active' : ''}`} onClick={() => (setTab(t.id), setQuery(''), setShown(PAGE))}>
+            {t.label} · {t.list.length}
+          </button>
+        ))}
+      </div>
+      <input className="avatar-search" value={query} onChange={e => (setQuery(e.target.value), setShown(PAGE))} placeholder="Buscar (ex.: misty, ash, nurse, gen3...)" />
+      <div className="avatar-pick">
+        {list.slice(0, shown).map(a => (
+          <button key={a} className={`avatar-opt ${avatar === a ? 'selected' : ''}`} onClick={() => onChange(a)} title={spriteLabel(a)}>
+            <img className="trainer-avatar" src={avatarUrl(a)} alt={a} width={64} height={64} loading="lazy" draggable={false} />
+          </button>
+        ))}
+      </div>
+      {!list.length && <p className="muted">Nada encontrado.</p>}
+      {list.length > shown && (
+        <button className="btn small" onClick={() => setShown(n => n + PAGE * 2)}>
+          Mostrar mais ({list.length - shown})
+        </button>
       )}
     </div>
   );
 }
+
+/** "acetrainerf-gen3" → "acetrainerf (gen3)". */
+const spriteLabel = (a: string) => (isCustom(a) ? 'Visual montado' : a.replace(/-(.+)$/, ' ($1)'));
 
 function trainerStats(t: Trainer) {
   const col = loadCollection(t.id);
@@ -144,7 +101,7 @@ export function TrainerSelect() {
   const {trainers, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer} = useGame();
   const [creating, setCreating] = useState(trainers.length === 0);
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState(() => encodeLook(randomLook()));
+  const [avatar, setAvatar] = useState(() => AVATARS[Math.floor(Math.random() * AVATARS.length)]);
   /** Treinador cujo visual está sendo editado. */
   const [editing, setEditing] = useState<Trainer | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);

@@ -974,3 +974,54 @@ table.move-info td { padding: 3px 0; }
 .book-cell .gym-when { color: var(--butter); }
 .travel-slot { position: relative; display: flex; }
 .travel-slot .biome-card { width: 190px; }
+.avatar-current { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.avatar-search { font: inherit; padding: 8px 10px; border: var(--px) solid var(--line); background: var(--panel); width: 100%; box-sizing: border-box; }
+.avatar-editor .avatar-pick { max-height: 360px; overflow: auto; }
+.point-log { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow: auto; margin: 4px 0 8px; }
+.point-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; align-items: center; padding: 4px 8px; background: var(--panel-2); }
+.point-row b { color: var(--green-d, #2c8a3c); }
+.breakdown-row { font: inherit; color: inherit; width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
+.breakdown-row:disabled { cursor: default; }
+.rank-pts.link { font: inherit; font-weight: bold; }
+
+/* Fala em linha de chat */
+.dialogue { font: inherit; color: var(--ink); width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--panel); border: var(--px) solid var(--line); box-shadow: 3px 3px 0 rgba(0,0,0,.2); padding: 6px 12px 6px 6px; cursor: pointer; min-height: 76px; }
+.dialogue.me { flex-direction: row-reverse; text-align: right; }
+.dialogue.scene .dialogue-text { font-style: italic; color: var(--muted, #666); }
+.dialogue.narrator { background: #fff3c4; }
+.dialogue-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.dialogue-body b { font-size: 12px; }
+.dialogue-text { font-size: 15px; line-height: 1.35; min-height: 2.7em; }
+.dialogue-next { width: 16px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.bust { width: 72px; height: 64px; overflow: hidden; flex: none; display: grid; justify-items: center; align-items: start; background: var(--panel-2); border: 2px solid var(--line); }
+.bust > * { margin-top: -6px; }
+.narrator-bust { font-size: 30px; align-items: center; }
+.dialogue-end { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* Plateia com sprites */
+.crowd { position: absolute; left: 0; right: 0; overflow: hidden; pointer-events: none; }
+.crowd-person { position: absolute; width: 9%; max-width: 64px; image-rendering: pixelated; animation: crowdbob 1.1s steps(2) infinite; }
+.crowd.silhouette .crowd-person { opacity: .85; }
+@keyframes crowdbob { 50% { translate: 0 -3px; } }
+.stands { position: absolute; left: 0; right: 0; top: 0; height: 56%; }
+.venue-bg svg { z-index: 1; }
+.venue-bg .crowd { z-index: 0; }
+.venue-bg.tier1 svg, .venue-bg.tier2 svg, .venue-bg.tier3 svg { z-index: 2; }
+.venue-bg .crowd { z-index: 1; }
+.gym-bg .crowd { z-index: 3; }
+.gym-bg svg { z-index: 2; }
+.gym-statue { position: absolute; bottom: 8%; z-index: 3; filter: grayscale(1) brightness(.9) contrast(1.2); }
+.gym-statue.s0 { left: 5%; }
+.gym-statue.s1 { right: 5%; transform: scaleX(-1); }
+.legend-people { z-index: 4; }
+.legend-people.close { justify-content: center; gap: 4%; }
+.cheer-loop { display: inline-block; animation: cheerhop .5s steps(2) infinite; }
+@keyframes cheerhop { 50% { transform: translateY(-14px); } }
+
+/* Cerimônia no ginásio */
+.ceremony-scene { width: 100%; }
+.ceremony-badge2 { position: absolute; z-index: 6; width: 44px; height: 44px; object-fit: contain; left: 57%; top: 76%; transform: translate(-50%, -50%); filter: drop-shadow(0 0 10px #fff6a0); transition: left 1s ease-in-out, top 1s ease-in-out, width 1s, height 1s; }
+.ceremony-badge2.give { animation: badgeglow .6s ease-in-out infinite; }
+.ceremony-badge2.cheer { left: 44%; top: 60%; width: 64px; height: 64px; animation: badgeglow .6s ease-in-out infinite; }
+.ceremony-scene .ceremony-book { position: absolute; z-index: 6; left: 58%; right: 4%; top: 10%; bottom: auto; height: 46%; }

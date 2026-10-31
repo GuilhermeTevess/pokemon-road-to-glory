@@ -25,6 +25,8 @@ export interface BadgeRecord {
   leaderTeam: string[];
   leaderLevel: number;
   wins: number;
+  /** Ganha por mérito, mesmo perdendo a luta. */
+  merit?: boolean;
 }
 
 export interface CollectionEntry {
