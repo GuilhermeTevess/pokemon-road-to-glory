@@ -78,17 +78,21 @@ export function CrowdLayer({rows, density, seed = 1, silhouette, top = 0, height
  * Multidão em pixel art: fileiras de cabeças e ombros (silhuetas), com gente de braço
  * levantado. Fileiras de trás menores e mais escuras. Usada quando a plateia é grande.
  */
-export function CrowdMass({rows, seed = 1, top = 0, height = 45, tone = '#2a2540', arms = 0.15}: {
+export function CrowdMass({rows, seed = 1, top = 0, height = 45, tone = '#2a2540', arms = 0.15, density = 1, aspect}: {
   rows: number;
   seed?: number;
   top?: number;
   height?: number;
   tone?: string;
   arms?: number;
+  /** 0–1: quanto da arquibancada está ocupada. */
+  density?: number;
+  /** Largura/altura da área (para as pessoas saírem do tamanho certo). */
+  aspect?: number;
 }) {
-  const W = 320;
   // Cada fileira tem ~11 unidades de altura; o SVG escala por igual (sem esticar as pessoas).
   const H = rows * 11 + 3;
+  const W = aspect ? Math.round(H * aspect) : 320;
   const shapes = useMemo(() => {
     const rand = seeded(seed * 131 + rows);
     const out: {row: number; y: number; gap: number; els: ReactNode[]}[] = [];
@@ -104,10 +108,11 @@ export function CrowdMass({rows, seed = 1, top = 0, height = 45, tone = '#2a2540
         const head = 3.6 * scale;
         const body = 6.2 * scale;
         // Cada pessoa com um tom um pouco diferente, para dar para separar uma da outra.
-        const shade = 0.75 + rand() * 0.5;
+        const shade = 0.8 + rand() * 0.45;
+        if (rand() > density) continue;
         const key = `${r}-${Math.round(x * 10)}`;
         els.push(
-          <g key={key} style={{opacity: shade > 1 ? 1 : shade}}>
+          <g key={key} fill={shadeHex(tone, shade)}>
             <rect x={hx - body / 2} y={hy + head + 0.3 * scale} width={body} height={gap + 2} rx={1.5 * scale} />
             <rect x={hx - 0.8 * scale} y={hy + head - 0.2} width={1.6 * scale} height={1} />
             <rect x={hx - head / 2} y={hy} width={head} height={head} rx={head * 0.45} />
@@ -120,7 +125,7 @@ export function CrowdMass({rows, seed = 1, top = 0, height = 45, tone = '#2a2540
       out.push({row: r, y, gap, els});
     }
     return out;
-  }, [rows, seed, arms]);
+  }, [rows, seed, arms, density, W, H]);
   return (
     <svg className="crowd-mass" style={{top: `${top}%`, height: `${height}%`}} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMax slice" aria-hidden>
       {shapes.map(({row, y, gap, els}) => (
@@ -134,6 +139,71 @@ export function CrowdMass({rows, seed = 1, top = 0, height = 45, tone = '#2a2540
         </g>
       ))}
     </svg>
+  );
+}
+
+function shadeHex(hex: string, k: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return `rgb(${c(n >> 16)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`;
+}
+
+/** Curiosos em pé na calçada, em tamanho de gente (silhuetas dos sprites de treinador). */
+function Bystanders({seed, spots}: {seed: number; spots: number[]}) {
+  const people = useMemo(() => {
+    const r = seeded(seed * 53 + 7);
+    return spots.map(x => ({x: x + r() * 3, name: PEOPLE[Math.floor(r() * PEOPLE.length)], flip: r() < 0.5, d: r()}));
+  }, [seed, spots]);
+  return (
+    <div className="bystanders" aria-hidden>
+      {people.map((p, i) => (
+        <img
+          key={i}
+          src={avatarUrl(p.name)}
+          alt=""
+          draggable={false}
+          style={{left: `${p.x}%`, transform: p.flip ? 'scaleX(-1)' : undefined, animationDelay: `${p.d}s`}}
+          onError={e => (e.currentTarget.style.display = 'none')}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Plateia sentada numa arquibancada de madeira: silhuetas dos sprites de treinador,
+ * cada fileira escondendo a cintura de quem está atrás (só cabeça e tronco aparecem).
+ */
+function SeatedCrowd({rows, density, seed, top, rowH}: {rows: number; density: number; seed: number; top: number; rowH: number}) {
+  const people = useMemo(() => {
+    const r = seeded(seed * 71 + rows);
+    return Array.from({length: rows}, (_, row) => {
+      const out: {x: number; name: string; flip: boolean; d: number; o: number}[] = [];
+      for (let x = -2 + (row % 2) * 3; x < 98; x += 6 + r() * 2) {
+        if (r() > density) continue;
+        out.push({x, name: PEOPLE[Math.floor(r() * PEOPLE.length)], flip: r() < 0.5, d: r(), o: 0.72 + r() * 0.2});
+      }
+      return out;
+    });
+  }, [rows, density, seed]);
+  return (
+    <>
+      {people.map((list, row) => (
+        <div key={row} className="seated-row" style={{top: `${top + row * rowH}%`, height: `${rowH}%`, zIndex: 1 + row}}>
+          {list.map((p, i) => (
+            <img
+              key={i}
+              src={avatarUrl(p.name)}
+              alt=""
+              draggable={false}
+              style={{left: `${p.x}%`, opacity: p.o, transform: p.flip ? 'scaleX(-1)' : undefined, animationDelay: `${p.d}s`}}
+              onError={e => (e.currentTarget.style.display = 'none')}
+            />
+          ))}
+          <span className="seated-bench" />
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -216,11 +286,30 @@ export function DialogueBar({lines, other, me, onDone, end}: {
  * meia dúzia de curiosos), 1: arena pequena (arquibancada de madeira), 2: estádio cheio
  * (multidão, faixas, flashes), 3: grande estádio (multidão gigante, telão, holofotes, confete).
  */
-export function ArenaBackdrop({tier, color}: {tier: number; color: string}) {
+export function ArenaBackdrop({tier, color, bg, filter}: {tier: number; color: string; bg?: string; filter?: string}) {
+  if (tier <= 0 && bg && bg !== 'city') {
+    // Fora da cidade: um campinho de terra no meio da paisagem do lugar.
+    return (
+      <div className="arena-bg venue-bg tier0" style={{backgroundImage: `url(${FX(`bg/${bg}.png`)})`, filter}}>
+        <svg viewBox="0 0 160 90" preserveAspectRatio="none" shapeRendering="crispEdges">
+          <rect x="6" y="50" width="148" height="38" fill="#b89868" opacity=".85" />
+          <rect x="16" y="54" width="128" height="31" fill="none" stroke="#f4f4ec" strokeWidth="0.8" strokeDasharray="3 1" />
+          <line x1="80" y1="54" x2="80" y2="85" stroke="#f4f4ec" strokeWidth="0.8" strokeDasharray="3 1" />
+          <circle cx="80" cy="69.5" r="5" fill="none" stroke="#f4f4ec" strokeWidth="0.8" />
+          {[10, 148].map(x => (
+            <g key={x}>
+              <rect x={x} y="44" width="1.2" height="9" fill="#6a4a28" />
+              <rect x={x + 1.2} y="44" width="5" height="3" fill="#dc4646" />
+            </g>
+          ))}
+        </svg>
+        <Bystanders seed={bg.length} spots={[4, 18, 70, 84]} />
+      </div>
+    );
+  }
   if (tier <= 0) {
     return (
       <div className="arena-bg venue-bg tier0" style={{backgroundImage: `url(${FX('bg/city.png')})`}}>
-        <CrowdLayer rows={1} density={0.22} seed={3} top={22} height={22} />
         <svg viewBox="0 0 160 90" preserveAspectRatio="none" shapeRendering="crispEdges">
           {/* calçada e meio-fio */}
           <rect x="0" y="40" width="160" height="5" fill="#b8b0a0" />
@@ -250,6 +339,7 @@ export function ArenaBackdrop({tier, color}: {tier: number; color: string}) {
           <rect x="7" y="39.5" width="1" height="2" fill="#333" />
           <rect x="18" y="39.5" width="1" height="2" fill="#333" />
         </svg>
+        <Bystanders seed={3} spots={[26, 40, 62, 76]} />
       </div>
     );
   }
@@ -257,15 +347,7 @@ export function ArenaBackdrop({tier, color}: {tier: number; color: string}) {
     return (
       <div className="arena-bg venue-bg tier1">
         <div className="stands" style={{background: 'linear-gradient(#9fc4e8, #cfe3f5 40%, #b98a52 41%, #a37440)'}} />
-        <svg className="bleachers" viewBox="0 0 160 90" preserveAspectRatio="none" shapeRendering="crispEdges">
-          {[0, 1, 2, 3].map(i => (
-            <g key={i}>
-              <rect x="0" y={18 + i * 6} width="160" height="1.4" fill="#7a5228" />
-              <rect x="0" y={19.4 + i * 6} width="160" height="4.6" fill={i % 2 ? '#c8955a' : '#b98448'} />
-            </g>
-          ))}
-        </svg>
-        <CrowdMass rows={3} seed={11} top={12} height={30} tone="#3a3048" arms={0.12} />
+        <SeatedCrowd rows={3} density={0.62} seed={11} top={11} rowH={11} />
         <svg viewBox="0 0 160 90" preserveAspectRatio="none" shapeRendering="crispEdges">
           {/* cerca */}
           <rect x="0" y="40" width="160" height="4" fill="#e8dcc0" />
