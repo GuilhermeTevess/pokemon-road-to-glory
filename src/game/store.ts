@@ -11,7 +11,9 @@ import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
 import {HEAL_EVERY, SEASON_LENGTH, generateEncounter, isBossWave} from './encounters';
-import {TRAIL, addTrail, legendEncounter, legendPrize, rollLegend} from './legend';
+import {TRAIL, addTrail, legendEncounter, legendPrize, rollLegend, trailOf} from './legend';
+import type {Fame} from './legend';
+import {getLegend} from '../data/legends';
 import {BIOME_STAY, REGIONS, REGION_STAY, getRegion, regionStay} from '../data/regions';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
@@ -150,6 +152,10 @@ interface Store {
   chooseNextRegion(id: string | null): void;
   /** Depois da roleta de viagem, segue para a próxima ronda. */
   continueTravel(): void;
+  /** Encontro com a lenda: aceitar (vai para a arena) ou deixar para outra hora. */
+  answerLegend(accept: boolean): void;
+  /** Fecha a conversa de depois da luta com a lenda. */
+  closeLegendAfter(): void;
   /** Compra o ingresso e marca a ronda da luta de ginásio. */
   scheduleGym(id: string, wave: number): void;
   useItem(itemId: string, monUid: string): void;
@@ -194,6 +200,8 @@ function emptyRun(): RunState {
 }
 
 /** Chance de dois selvagens aparecerem juntos (batalha em dupla). */
+/** Quantas opções aparecem na roleta de viagem (a atual é uma delas). */
+const TRAVEL_OPTIONS = 4;
 const DOUBLE_CHANCE = 0.05;
 
 const boot = loadTrainers();
@@ -229,6 +237,12 @@ export const useGame = create<Store>((set, get) => {
 
   const healAll = (run: RunState) => {
     for (const m of run.party) m.hp = maxHp(m);
+  };
+
+  /** Você aos olhos das lendas: nome, fama e títulos. */
+  const fameOf = (): Fame => {
+    const c = careerOf(get().collection);
+    return {name: get().trainer?.name ?? 'Você', fame: c.fame, worlds: c.titles.worlds ?? 0, titles: Object.values(c.titles).reduce((a, b) => a + (b ?? 0), 0)};
   };
 
   const startWave = (run: RunState) => {
@@ -274,9 +288,17 @@ export const useGame = create<Store>((set, get) => {
     }
     const legend = !run.encounter && !isBossWave(run.wave) ? rollLegend(run) : null;
     if (legend) {
-      run.encounter = legendEncounter(legend, run.party);
-      run.trail = {...run.trail, [run.region!]: 0};
+      // Antes da luta tem o encontro: a lenda te acha (e desafia) ou você a acha.
+      run.legendMeet = {id: legend.id, kind: Math.random() < 0.5 ? 'approach' : 'found'};
+      run.phase = 'legend';
+      battle = null;
+      return;
     }
+    fillEncounter(run);
+  };
+
+  /** Encontro normal da ronda (selvagem, às vezes em dupla). */
+  const fillEncounter = (run: RunState) => {
     if (!run.encounter) {
       // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
       for (let i = 0; i < 4; i++) {
@@ -313,25 +335,43 @@ export const useGame = create<Store>((set, get) => {
       for (const m of run.party) m.hp = maxHp(m);
       run.log.push('Centro Pokémon: seu time foi curado!');
     }
-    // Fim da estadia: sorteia nova região (a cada 20 rondas) ou novo bioma (a cada 10). Pode repetir.
+    // Fim da estadia: a roleta mostra algumas opções com a atual no meio delas.
+    // Quem der sorte pode cair de novo onde já está.
     const fromRegion = run.region;
     const fromBiome = run.biome;
     if ((run.regionLeft ?? 1) <= 0) {
-      run.region = pick(REGIONS).id;
+      const regionOptions = shuffle([fromRegion!, ...shuffle(REGIONS.map(r => r.id).filter(id => id !== fromRegion)).slice(0, TRAVEL_OPTIONS - 1)]);
+      run.region = pick(regionOptions);
       run.regionLeft = regionStay(run);
       run.regionPass = false;
-      setBiome(run, rollBiome(run));
-      run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome};
+      const [biomeOptions, biome] = travelBiomes(run, fromBiome);
+      setBiome(run, biome);
+      run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome, regionOptions, biomeOptions};
       run.phase = 'travel';
       return;
     }
     if ((run.biomeLeft ?? 1) <= 0) {
-      setBiome(run, rollBiome(run));
-      run.travel = {biome: run.biome, fromBiome};
+      const [biomeOptions, biome] = travelBiomes(run, fromBiome);
+      setBiome(run, biome);
+      run.travel = {biome: run.biome, fromBiome, biomeOptions};
       run.phase = 'travel';
       return;
     }
     nextStop(run);
+  };
+
+  /** Roleta de biomas: o atual e outros comuns, e o sorteado. O bioma oculto entra no lugar de um deles. */
+  const travelBiomes = (run: RunState, current: string): [string[], string] => {
+    // Bioma oculto de outra região não vem junto na viagem.
+    const keep = !getBiome(current).region || getBiome(current).region === run.region;
+    const others = shuffle(BIOMES.map(b => b.id).filter(id => id !== current)).slice(0, TRAVEL_OPTIONS - (keep ? 1 : 0));
+    const special = rollBiome(run);
+    const options = shuffle(keep ? [current, ...others] : others);
+    if (getBiome(special).region && special !== current) {
+      options[Math.floor(Math.random() * options.length)] = special;
+      return [options, special];
+    }
+    return [options, pick(options)];
   };
 
   /** Troca o bioma e reinicia a estadia nele. */
@@ -877,6 +917,7 @@ export const useGame = create<Store>((set, get) => {
         } else if (outcome === 'lost' && enc.legend) {
           // Perder para uma lenda não acaba a run: o time é curado e a jornada segue.
           healAll(run);
+          run.legendAfter = {id: enc.legend, won: false};
           get().toast(`${enc.trainer} venceu desta vez. Seu time foi curado: a jornada continua!`);
           afterReward(run);
           return;
@@ -956,7 +997,12 @@ export const useGame = create<Store>((set, get) => {
         }
         const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
-        if (outcome === 'won' && enc.boss && !enc.trainer) addTrail(run, TRAIL.boss);
+        // Chefe vencido ou capturado deixa a lenda da região de olho em você.
+        if ((outcome === 'won' || outcome === 'caught') && enc.boss && !enc.trainer && !enc.hinted) {
+          const before = trailOf(run);
+          addTrail(run, TRAIL.boss);
+          if (trailOf(run) > before) get().toast(`Rastro da lenda de ${getRegion(run.region).name}: ${Math.min(trailOf(run), 40)}%`);
+        }
         if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary);
         const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
         if (gym && !run.badges?.includes(gym.id)) {
@@ -974,6 +1020,7 @@ export const useGame = create<Store>((set, get) => {
           }
         }
         if (outcome === 'won' && enc.legend) {
+          run.legendAfter = {id: enc.legend, won: true};
           const prize = legendPrize(run.wave);
           col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
           addPoints(run, col, 'legends', POINTS.legend);
@@ -1191,6 +1238,29 @@ export const useGame = create<Store>((set, get) => {
     continueTravel() {
       mutate(run => {
         if (run.phase === 'travel') nextStop(run);
+      });
+    },
+    answerLegend(accept) {
+      mutate(run => {
+        const legend = run.legendMeet && getLegend(run.legendMeet.id);
+        if (run.phase !== 'legend' || !legend) return;
+        run.legendMeet = undefined;
+        battle = null;
+        if (accept) {
+          run.trail = {...run.trail, [run.region!]: 0};
+          run.encounter = legendEncounter(legend, run.party, fameOf(), getRegion(run.region).name);
+          run.phase = 'battle';
+          run.rerolls = 0;
+          return;
+        }
+        // Deixou para depois: o rastro cai pela metade e a ronda segue normal.
+        run.trail = {...run.trail, [run.region!]: Math.floor(trailOf(run) / 2)};
+        fillEncounter(run);
+      });
+    },
+    closeLegendAfter() {
+      mutate(run => {
+        run.legendAfter = undefined;
       });
     },
 

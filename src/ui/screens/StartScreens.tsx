@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
-import {BIOMES, biomePools, getBiome, hiddenBiomeOf} from '../../data/biomes';
+import {BIOMES, biomePools, hiddenBiomeOf} from '../../data/biomes';
 import {getHint} from '../../data/hints';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
@@ -599,7 +599,7 @@ export function RegionCard({region, onClick, label}: {region: Region; onClick: (
   );
 }
 
-/** Escolha da região: no começo (todas) ou com o Mapa de Região (3 sorteadas + ficar). */
+/** Escolha da região: no começo (todas) ou com o Mapa de Região (3 sorteadas; para ficar, use o Passe de Estadia). */
 export function RegionSelect() {
   const {run, chooseNextRegion} = useGame();
   const options = useMemo(
@@ -608,7 +608,6 @@ export function RegionSelect() {
     [run?.wave],
   );
   if (!run) return null;
-  const current = getRegion(run.region);
   return (
     <div className="screen biome-screen">
       <h2>Mapa de Região: para onde vamos?</h2>
@@ -617,7 +616,6 @@ export function RegionSelect() {
         {options.map(r => (
           <RegionCard key={r.id} region={r} onClick={() => chooseNextRegion(r.id)} />
         ))}
-        <RegionCard region={current} label={`Ficar: ${current.name}`} onClick={() => chooseNextRegion(null)} />
       </div>
     </div>
   );
@@ -642,7 +640,7 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
     return (
       <div className="screen biome-screen">
         <h2>Escolha sua primeira região</h2>
-        <p className="hint">Você fica 20 rondas em cada região. Depois, a próxima é sorteada (pode até repetir).</p>
+        <p className="hint">Você fica 20 rondas em cada região. Depois, uma roleta sorteia a próxima entre algumas opções, e a atual pode cair de novo.</p>
         <div className="biomes">
           {REGIONS.map(r => (
             <RegionCard key={r.id} region={r} onClick={() => setRegion(r.id)} />
@@ -651,7 +649,6 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
       </div>
     );
   }
-  const current = getBiome(run.biome);
   return (
     <div className="screen biome-screen">
       <h2>{mode === 'start' ? `${getRegion(region!).name}: escolha o primeiro bioma` : 'Mapa de Bioma: para onde vamos?'}</h2>
@@ -670,7 +667,6 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
         {options.map(b => (
           <BiomeCard key={b.id} biome={b} onClick={() => (mode === 'start' ? chooseStartBiome(b.id, region!) : chooseNextBiome(b.id))} />
         ))}
-        {mode === 'next' && <BiomeCard biome={current} label={`Ficar: ${current.name}`} onClick={() => chooseNextBiome(null)} />}
       </div>
     </div>
   );

@@ -45,6 +45,7 @@ export type Phase =
   | 'biomeChoice'
   | 'regionChoice'
   | 'travel'
+  | 'legend'
   | 'event'
   | 'tournament'
   | 'gameOver'
@@ -71,6 +72,8 @@ export interface Encounter {
   hinted?: boolean;
   /** Dois selvagens juntos (batalha em dupla): o time é `team`. */
   double?: boolean;
+  /** Luta de lenda: nível do local (0 quadra da cidade ... 3 grande estádio). */
+  venue?: number;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
@@ -151,7 +154,12 @@ export interface RunState {
   /** Resultado da temporada (tela final). */
   season?: SeasonRec;
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
-  travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
+  /** Troca de região/bioma: as opções sorteadas (a atual entre elas) e o resultado. */
+  travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string; regionOptions?: string[]; biomeOptions?: string[]};
+  /** Encontro com a lenda antes da luta: ela te acha ou você a acha. */
+  legendMeet?: {id: string; kind: 'approach' | 'found'};
+  /** Fala da lenda depois da luta. */
+  legendAfter?: {id: string; won: boolean};
   incenseWaves: number;
   encounter?: Encounter;
   pending: PendingEvent[];
