@@ -4,10 +4,10 @@
 // continuam aleatórios e só alimentam a ficha quando capturados.
 import type {League} from './league';
 import type {Species} from '@pkmn/sim';
-import {dex, evolutionLine, isLegendary, levelUpMoves, species, teachableMoves, toID} from '../data/dex';
+import {dex, evolutionLine, isLegendary, levelUpMoves, rarityOf, species, teachableMoves, toID} from '../data/dex';
 import {megaStonesFor} from '../data/items';
 import type {ItemDef} from '../data/items';
-import {zeroStats} from './mon';
+import {randomIvs, zeroStats} from './mon';
 import {collectionKey} from './trainers';
 import {STAT_IDS} from './types';
 import type {OwnedMon, StatId, StatTable} from './types';
@@ -61,9 +61,11 @@ export interface CollectionEntry {
   costCut?: number;
   /** Nível do bônus de shiny (0 a 3). */
   shinyLv?: number;
+  /** Já tem o shiny, mas prefere começar com a cor normal. */
+  shinyOff?: boolean;
 }
 
-type Optional = 'nature' | 'ability' | 'startMove' | 'nickname' | 'megaStone' | 'genders';
+type Optional = 'nature' | 'ability' | 'startMove' | 'nickname' | 'megaStone' | 'genders' | 'shinyOff';
 export type Entry = Required<Omit<CollectionEntry, Optional>> & Pick<CollectionEntry, Optional>;
 
 export interface RunSummary {
@@ -232,10 +234,30 @@ export function registerCatch(c: Collection, mon: OwnedMon): CatchResult {
   return {duplicate, before: duplicate ? before : zeroStats(), after: {...e.bestIvs}, candies, newNature, newAbility};
 }
 
-/** IVs para um inicial: os melhores da coleção ou aleatórios. */
+/**
+ * IVs para um inicial: sorteia como sempre, mas nunca abaixo do melhor que a linha já teve
+ * (capturas e iniciais anteriores). Só melhora com o tempo.
+ */
 export function starterIvs(c: Collection, name: string): StatTable | undefined {
   const e = c.entries[lineRoot(name)];
-  return e && e.caught > 0 ? e.bestIvs : undefined;
+  if (!e || !STAT_IDS.some(s => e.bestIvs[s] > 0)) return undefined;
+  const roll = randomIvs(10, 31);
+  for (const s of STAT_IDS) roll[s] = Math.max(roll[s], e.bestIvs[s]);
+  return roll;
+}
+
+/** O inicial também conta: a nature, a habilidade, os IVs e o shiny que vieram ficam salvos na linha. */
+export function registerStarter(c: Collection, mon: OwnedMon): {newNature: boolean; newAbility: boolean; betterIvs: boolean} {
+  const e = entryOf(c, mon.species);
+  let betterIvs = false;
+  for (const s of STAT_IDS) {
+    if (mon.ivs[s] > e.bestIvs[s]) {
+      e.bestIvs[s] = mon.ivs[s];
+      betterIvs = true;
+    }
+  }
+  e.shiny ||= mon.shiny;
+  return {newNature: unlock(e.natures, mon.nature), newAbility: unlock(e.abilities, mon.ability), betterIvs};
 }
 
 // ---------------------------------------------------------------- Doces
@@ -350,6 +372,16 @@ export function lineMegaStones(name: string): ItemDef[] {
 
 export const SHINY_PRICE = [10, 20, 40];
 export const SHINY_CHANCE = [1 / 256, 1 / 64, 1 / 24, 1 / 8];
+
+/** Peso de cada shiny do time no brilho: comum 0,5 ... lendário 3. */
+const GLOW: Record<string, number> = {common: 0.5, uncommon: 0.75, rare: 1, superRare: 2, legendary: 3};
+export const MAX_GLOW = 8;
+
+/** Chances extras de shiny (em 256) pelos shinies do time. Com 0, a chance é a normal (1 em 256). */
+export function shinyGlow(party: {species: string; shiny: boolean}[]): number {
+  const sum = party.filter(m => m.shiny).reduce((n, m) => n + (GLOW[rarityOf(species(m.species))] ?? 0.5), 0);
+  return Math.min(MAX_GLOW, sum);
+}
 
 export function shinyChance(c: Collection, name: string): number {
   return SHINY_CHANCE[c.entries[lineRoot(name)]?.shinyLv ?? 0];

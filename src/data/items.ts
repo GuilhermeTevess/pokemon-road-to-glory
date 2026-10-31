@@ -110,7 +110,7 @@ export const ITEMS: ItemDef[] = [
   {id: 'expcandyl', name: 'Doce de EXP G', desc: 'Sobe o Pokémon 4 níveis.', kind: 'candy', tier: 'ultra', sprite: 'exp-candy-l', price: 0, power: 4, weight: 0.6},
   {id: 'abilitycapsule', name: 'Cápsula de Habilidade', desc: 'Troca a habilidade do Pokémon pela outra habilidade comum dele.', kind: 'ability', tier: 'ultra', sprite: 'ability-capsule', price: 0, weight: 0.5},
   {id: 'evostone', name: 'Pedra da Evolução', desc: 'Evolui Pokémon que evoluem por pedra, troca, amizade ou condição especial.', kind: 'evolution', tier: 'ultra', sprite: 'moon-stone', price: 0},
-  {id: 'tm', name: 'Disco Técnico', desc: 'Ensina um golpe aleatório que o Pokémon consegue aprender.', kind: 'tm', tier: 'great', sprite: 'tm-normal', price: 0},
+  {id: 'tm', name: 'Disco Técnico', desc: 'Mostra 3 golpes sorteados que o Pokémon consegue aprender: você escolhe 1.', kind: 'tm', tier: 'great', sprite: 'tm-normal', price: 0},
   {id: 'map', name: 'Mapa de Bioma', desc: 'Depois da próxima vitória, você escolhe o bioma entre 3 opções.', kind: 'map', tier: 'great', sprite: 'town-map', price: 400, travel: 'biome', scales: true},
   {id: 'regionmap', name: 'Mapa de Região', desc: 'Depois da próxima vitória, você escolhe a região entre 3 opções.', kind: 'map', tier: 'ultra', sprite: 'explorer-kit', price: 900, travel: 'region', scales: true, weight: 0.4},
   {id: 'staypass', name: 'Passe de Estadia', desc: 'Dobra o tempo no bioma atual (uma vez por bioma).', kind: 'map', tier: 'ultra', sprite: 'tri-pass', price: 700, travel: 'biomeStay', scales: true, weight: 0},

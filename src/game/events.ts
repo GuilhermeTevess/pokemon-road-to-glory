@@ -3,6 +3,9 @@
 import {getItem, ITEMS} from '../data/items';
 import {generateEncounter, isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
 import {waveStep} from './career';
+import {allLearnable, dex, species as speciesOf} from '../data/dex';
+import {movePrice} from './meta';
+import type {OwnedMon} from './types';
 import {chance, pick} from './rng';
 import {travelerEvent} from './travelers';
 import type {Encounter, RunEvent, RunState} from './types';
@@ -29,7 +32,7 @@ export function shouldRollEvent(run: RunState): boolean {
 
 export function rollEvent(run: RunState): RunEvent {
   const tradable = Object.keys(run.bag).filter(id => run.bag[id] > 0 && getItem(id).tier !== 'ultra' && getItem(id).tier !== 'master');
-  const kinds: RunEvent['kind'][] = ['house', 'berries', 'hurt', 'rival', 'seer', 'traveler', 'traveler'];
+  const kinds: RunEvent['kind'][] = ['house', 'berries', 'hurt', 'rival', 'seer', 'traveler', 'traveler', 'tutor'];
   if (tradable.length) kinds.push('merchant');
   const kind = pick(kinds);
   switch (kind) {
@@ -54,6 +57,8 @@ export function rollEvent(run: RunState): RunEvent {
       if (ev) return ev;
       return {kind: 'seer', upcoming: upcomingEncounters(run, 3)};
     }
+    case 'tutor':
+      return {kind};
     case 'seer':
     default:
       return {kind: 'seer', upcoming: upcomingEncounters(run, 3)};
@@ -81,4 +86,16 @@ export function cheapestHeal(run: RunState): string | null {
     .filter(id => run.bag[id] > 0 && getItem(id).kind === 'heal')
     .sort((a, b) => getItem(a).price - getItem(b).price);
   return heals[0] ?? null;
+}
+
+/** Professor de golpes: tudo o que o Pokémon aprende (nível, MT, tutor, ovo), do mais forte ao mais fraco. */
+export function tutorMoves(mon: OwnedMon): string[] {
+  return [...allLearnable(speciesOf(mon.species))]
+    .filter(m => !mon.moves.some(k => dex.moves.get(k).id === dex.moves.get(m).id))
+    .sort((a, b) => dex.moves.get(b).basePower - dex.moves.get(a).basePower || a.localeCompare(b));
+}
+
+/** Preço do professor: golpes fortes e de preparar custam bem mais, e tudo encarece com as rondas. */
+export function tutorPrice(run: RunState, move: string): number {
+  return Math.round(((movePrice(move) / 5) * (300 + run.wave * 20)) / 50) * 50;
 }

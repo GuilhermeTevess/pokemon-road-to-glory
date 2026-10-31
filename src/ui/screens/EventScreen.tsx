@@ -1,12 +1,17 @@
 import {roundOf} from '../../game/career';
 // Eventos entre as rondas: uma cena curta com escolhas.
+import {useState} from 'react';
 import type {ReactNode} from 'react';
+import {dex} from '../../data/dex';
+import {moveDescPt} from '../../data/movesPt';
+import {tutorMoves, tutorPrice} from '../../game/events';
+import {displayName} from '../../game/mon';
 import {species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {cheapestHeal} from '../../game/events';
 import {AVATARS} from '../../game/trainers';
 import {useGame} from '../../game/store';
-import {ItemIcon, Sprite, TypeBadge} from '../components';
+import {ItemIcon, MonName, Sprite, TypeBadge} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
 function Scene({title, art, text, children}: {title: string; art: ReactNode; text: ReactNode; children: ReactNode}) {
@@ -156,6 +161,8 @@ export function EventScreen() {
         </Scene>
       );
     }
+    case 'tutor':
+      return <TutorEvent />;
     case 'traveler': {
       const heal = cheapestHeal(run);
       const can = ev.ask === 'money' ? run.money >= (ev.cost ?? 0) : ev.ask === 'heal' ? !!heal : !!ev.item && !!run.bag[ev.item];
@@ -214,4 +221,70 @@ export function EventScreen() {
         </Scene>
       );
   }
+}
+
+/** Professor de golpes: escolhe um Pokémon do time e qualquer golpe que ele aprende, pagando em dinheiro. */
+function TutorEvent() {
+  const {run, resolveEvent} = useGame();
+  const [monUid, setMonUid] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  if (!run) return null;
+  const mon = run.party.find(m => m.uid === monUid);
+  const q = query.trim().toLowerCase();
+  const moves = mon ? tutorMoves(mon).filter(id => !q || dex.moves.get(id).name.toLowerCase().includes(q)) : [];
+  return (
+    <Scene
+      title="Professor de golpes"
+      art={<TrainerAvatar avatar="scientist" name="Professor" size={96} />}
+      text={
+        <p>
+          "Ensino qualquer golpe que seu Pokémon consiga aprender: de nível, de Disco Técnico ou até de ovo. Mas meu preço não é
+          barato!" <br />
+          <small className="hint">Golpes fortes e de preparar (como Swords Dance) custam mais. Você tem ₽ {run.money}.</small>
+        </p>
+      }
+    >
+      {!mon ? (
+        <div className="tutor-mons">
+          {run.party.map(m => (
+            <button key={m.uid} className="btn tutor-mon" onClick={() => setMonUid(m.uid)}>
+              <Sprite name={m.species} shiny={m.shiny} />
+              <MonName mon={m} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="tutor-pick">
+          <div className="row center">
+            <b>{displayName(mon)}</b>
+            <span className="muted">sabe: {mon.moves.map(id => dex.moves.get(id).name).join(', ')}</span>
+            <button className="btn small ghost" onClick={() => setMonUid(null)}>
+              Trocar Pokémon
+            </button>
+          </div>
+          <input className="tutor-search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar golpe (ex.: Close Combat)" />
+          <div className="tutor-list">
+            {moves.map(id => {
+              const m = dex.moves.get(id);
+              const price = tutorPrice(run, id);
+              return (
+                <button key={id} className="move-chip tutor-move" disabled={run.money < price} onClick={() => resolveEvent(`${mon.uid}|${id}`)}>
+                  <span className="row">
+                    <TypeBadge type={m.type} /> <b>{m.name}</b> · Poder {m.basePower || '—'} ·{' '}
+                    {m.category === 'Physical' ? 'Físico' : m.category === 'Special' ? 'Especial' : 'Status'}
+                    <span className="tutor-price">₽ {price}</span>
+                  </span>
+                  <small className="muted">{moveDescPt(m.name)}</small>
+                </button>
+              );
+            })}
+            {!moves.length && <p className="hint">Nenhum golpe com esse nome.</p>}
+          </div>
+        </div>
+      )}
+      <button className="btn" onClick={() => resolveEvent(null)}>
+        Seguir viagem
+      </button>
+    </Scene>
+  );
 }
