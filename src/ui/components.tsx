@@ -415,6 +415,9 @@ function MultCard({label, cls, types}: {label: string; cls: string; types: strin
 function CalcTable({sel}: {sel: string[]}) {
   const d = defensiveMatchups(sel);
   const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
+  // Com dois tipos de golpe, vale o melhor deles contra cada tipo.
+  const best = (t: string) => Math.max(...sel.map(a => typeMultiplier(a, [t])));
+  const hit = (f: (x: number) => boolean) => ALL_TYPES.filter(t => f(best(t)));
   return (
     <div className="calc-cards">
       <section>
@@ -427,19 +430,15 @@ function CalcTable({sel}: {sel: string[]}) {
           <MultCard label="Imune a" cls="mu-immune" types={d.immune} />
         </div>
       </section>
-      {sel.map(a => {
-        const by = (f: (x: number) => boolean) => ALL_TYPES.filter(t => f(typeMultiplier(a, [t])));
-        return (
-          <section key={a}>
-            <h3>Golpes de {TYPE_PT[a] ?? a}</h3>
-            <div className="mult-cards">
-              <MultCard label="Dá 2x em" cls="mu-x2" types={by(x => x > 1)} />
-              <MultCard label="Dá ½ em" cls="mu-half" types={by(x => x > 0 && x < 1)} />
-              <MultCard label="Não afeta" cls="mu-immune" types={by(x => x === 0)} />
-            </div>
-          </section>
-        );
-      })}
+      <section>
+        <h3>Golpes de {sel.map(t => TYPE_PT[t] ?? t).join(' e ')} causam:</h3>
+        {sel.length > 1 && <p className="hint small">Contando o melhor dos dois golpes contra cada tipo.</p>}
+        <div className="mult-cards">
+          <MultCard label="Dá 2x em" cls="mu-x2" types={hit(x => x > 1)} />
+          <MultCard label="Dá ½ em" cls="mu-half" types={hit(x => x > 0 && x < 1)} />
+          <MultCard label="Não afeta" cls="mu-immune" types={hit(x => x === 0)} />
+        </div>
+      </section>
       <p className="hint small">São 18 tipos. Os que não aparecem num cartão dão ou tomam dano normal (1x).</p>
     </div>
   );

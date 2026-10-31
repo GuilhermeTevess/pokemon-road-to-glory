@@ -6,6 +6,8 @@ import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
+import {CLOTHES, DEFAULT_LOOK, EYES, HAIR_COLORS, HAIR_STYLES, HATS, SKINS, decodeLook, encodeLook, isCustom, lookPixels, randomLook} from '../../game/look';
+import type {Look} from '../../game/look';
 import type {Trainer} from '../../game/trainers';
 import {PARTY_SIZE, useGame} from '../../game/store';
 import type {Screen} from '../../game/store';
@@ -19,9 +21,21 @@ import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter} fro
 import {playCry} from '../audio';
 import {Candies, EvoViewer, Hearts, LineSheet} from './CollectionScreen';
 
+/** Treinador em pixel art feito no editor (16×24, centralizado num quadrado). */
+export function PixelTrainer({look, size = 80}: {look: Look; size?: number}) {
+  const px = useMemo(() => lookPixels(look), [look]);
+  return (
+    <svg className="trainer-avatar pixel-trainer" viewBox="-4 0 24 24" width={size} height={size} shapeRendering="crispEdges" aria-hidden>
+      {px.flatMap((row, y) => row.map((c, x) => (c ? <rect key={`${x}-${y}`} x={x} y={y} width={1.04} height={1.04} fill={c} /> : null)))}
+    </svg>
+  );
+}
+
 export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: string; size?: number}) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [avatar]);
+  const look = useMemo(() => (isCustom(avatar) ? decodeLook(avatar) : null), [avatar]);
+  if (look) return <PixelTrainer look={look} size={size} />;
   if (failed) {
     return (
       <span className="avatar-fallback" style={{width: size, height: size}}>
@@ -32,6 +46,98 @@ export function TrainerAvatar({avatar, name, size = 80}: {avatar: string; name: 
   return <img className="trainer-avatar" src={avatarUrl(avatar)} alt={name} width={size} height={size} onError={() => setFailed(true)} draggable={false} />;
 }
 
+function Swatches({colors, value, onPick}: {colors: string[]; value: number; onPick: (i: number) => void}) {
+  return (
+    <div className="swatches">
+      {colors.map((c, i) => (
+        <button key={c} className={`swatch ${value === i ? 'selected' : ''}`} style={{background: c}} onClick={() => onPick(i)} aria-label={c} />
+      ))}
+    </div>
+  );
+}
+
+function Choices({names, value, onPick}: {names: string[]; value: number; onPick: (i: number) => void}) {
+  return (
+    <div className="look-choices">
+      {names.map((n, i) => (
+        <button key={n} className={`chip ${value === i ? 'active' : ''}`} onClick={() => onPick(i)}>
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Editor de visual: monte seu treinador ou escolha um protagonista dos jogos. */
+function AvatarEditor({avatar, onChange}: {avatar: string; onChange: (a: string) => void}) {
+  const [tab, setTab] = useState<'custom' | 'classic'>(isCustom(avatar) ? 'custom' : 'classic');
+  // Guarda o último visual montado para não perder ao olhar os clássicos.
+  const [look, setLook] = useState<Look>(isCustom(avatar) ? decodeLook(avatar) : DEFAULT_LOOK);
+  const put = (l: Look) => {
+    setLook(l);
+    onChange(encodeLook(l));
+  };
+  const set = (k: keyof Look) => (i: number) => put({...look, [k]: i});
+  return (
+    <div className="avatar-editor">
+      <div className="tabs">
+        <button className={`tab ${tab === 'custom' ? 'active' : ''}`} onClick={() => (setTab('custom'), onChange(encodeLook(look)))}>
+          Montar o meu
+        </button>
+        <button className={`tab ${tab === 'classic' ? 'active' : ''}`} onClick={() => setTab('classic')}>
+          Protagonistas
+        </button>
+      </div>
+      {tab === 'custom' ? (
+        <div className="look-editor">
+          <div className="look-preview">
+            <PixelTrainer look={look} size={168} />
+            <button className="btn small" onClick={() => put(randomLook())}>
+              🎲 Aleatório
+            </button>
+          </div>
+          <div className="look-rows">
+            <label>Pele</label>
+            <Swatches colors={SKINS} value={look.skin} onPick={set('skin')} />
+            <label>Cabelo</label>
+            <Choices names={HAIR_STYLES} value={look.hair} onPick={set('hair')} />
+            {look.hair !== HAIR_STYLES.indexOf('Careca') && (
+              <>
+                <label>Cor do cabelo</label>
+                <Swatches colors={HAIR_COLORS} value={look.hairColor} onPick={set('hairColor')} />
+              </>
+            )}
+            <label>Olhos</label>
+            <Swatches colors={EYES} value={look.eyes} onPick={set('eyes')} />
+            <label>Chapéu</label>
+            <Choices names={HATS} value={look.hat} onPick={set('hat')} />
+            {look.hat > 0 && (
+              <>
+                <label>Cor do chapéu</label>
+                <Swatches colors={CLOTHES} value={look.hatColor} onPick={set('hatColor')} />
+              </>
+            )}
+            <label>Camisa</label>
+            <Swatches colors={CLOTHES} value={look.shirt} onPick={set('shirt')} />
+            <label>Calça</label>
+            <Swatches colors={CLOTHES} value={look.pants} onPick={set('pants')} />
+            <label>Sapato</label>
+            <Swatches colors={CLOTHES} value={look.shoes} onPick={set('shoes')} />
+          </div>
+        </div>
+      ) : (
+        <div className="avatar-pick">
+          {AVATARS.map(a => (
+            <button key={a} className={`avatar-opt ${avatar === a ? 'selected' : ''}`} onClick={() => onChange(a)} title={a}>
+              <TrainerAvatar avatar={a} name={a} size={64} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function trainerStats(t: Trainer) {
   const col = loadCollection(t.id);
   const st = statsOf(col);
@@ -40,10 +146,12 @@ function trainerStats(t: Trainer) {
 
 /** Escolha / criação de treinador. Cada treinador tem coleção e run próprias. */
 export function TrainerSelect() {
-  const {trainers, trainer, selectTrainer, createTrainer, removeTrainer} = useGame();
+  const {trainers, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer} = useGame();
   const [creating, setCreating] = useState(trainers.length === 0);
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState(AVATARS[17]);
+  const [avatar, setAvatar] = useState(() => encodeLook(randomLook()));
+  /** Treinador cujo visual está sendo editado. */
+  const [editing, setEditing] = useState<Trainer | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   return (
     <div className="screen trainer-screen">
@@ -69,6 +177,9 @@ export function TrainerSelect() {
               <button className="btn primary" onClick={() => selectTrainer(t.id)}>
                 Jogar
               </button>
+              <button className="btn small" onClick={() => (setCreating(false), setEditing({...t}))}>
+                Editar visual
+              </button>
               {confirmDel === t.id ? (
                 <button className="btn small danger" onClick={() => removeTrainer(t.id)}>
                   Apagar de vez?
@@ -82,7 +193,7 @@ export function TrainerSelect() {
           );
         })}
         {trainers.length < MAX_TRAINERS && !creating && (
-          <button className="trainer-card panel new" onClick={() => setCreating(true)}>
+          <button className="trainer-card panel new" onClick={() => (setEditing(null), setCreating(true))}>
             <span className="plus">+</span>
             Novo treinador
           </button>
@@ -95,13 +206,7 @@ export function TrainerSelect() {
             Nome
             <input value={name} maxLength={16} onChange={e => setName(e.target.value)} placeholder="Seu nome" autoFocus />
           </label>
-          <div className="avatar-pick">
-            {AVATARS.map(a => (
-              <button key={a} className={`avatar-opt ${avatar === a ? 'selected' : ''}`} onClick={() => setAvatar(a)} title={a}>
-                <TrainerAvatar avatar={a} name={a} size={64} />
-              </button>
-            ))}
-          </div>
+          <AvatarEditor avatar={avatar} onChange={setAvatar} />
           <div className="row center">
             {trainers.length > 0 && (
               <button className="btn" onClick={() => setCreating(false)}>
@@ -110,6 +215,28 @@ export function TrainerSelect() {
             )}
             <button className="btn primary" disabled={!name.trim()} onClick={() => createTrainer(name, avatar)}>
               Criar e jogar
+            </button>
+          </div>
+        </div>
+      )}
+      {editing && (
+        <div className="panel trainer-new">
+          <h3>Visual de {editing.name}</h3>
+          <label className="field">
+            Nome
+            <input value={editing.name} maxLength={16} onChange={e => setEditing({...editing, name: e.target.value})} />
+          </label>
+          <AvatarEditor avatar={editing.avatar} onChange={a => setEditing({...editing, avatar: a})} />
+          <div className="row center">
+            <button className="btn" onClick={() => setEditing(null)}>
+              Cancelar
+            </button>
+            <button
+              className="btn primary"
+              disabled={!editing.name.trim()}
+              onClick={() => (updateTrainer(editing.id, {name: editing.name, avatar: editing.avatar}), setEditing(null))}
+            >
+              Salvar
             </button>
           </div>
         </div>
