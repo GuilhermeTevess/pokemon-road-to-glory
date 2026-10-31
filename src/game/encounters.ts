@@ -22,7 +22,7 @@ export function isMilestoneWave(wave: number): boolean {
   return wave % TOURNAMENT_EVERY === 0;
 }
 
-function rarityWeights(wave: number, incense: boolean, luck: number): [Rarity, number][] {
+export function rarityWeights(wave: number, incense: boolean, luck: number): [Rarity, number][] {
   const boost = (incense ? 3 : 1) * (1 + 0.25 * luck);
   // Pokémon muito fortes (pseudo-lendários, Ultra Beasts, paradoxos, lendários) só depois de algumas rondas.
   return [
@@ -34,7 +34,7 @@ function rarityWeights(wave: number, incense: boolean, luck: number): [Rarity, n
   ];
 }
 
-const ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'superRare', 'legendary'];
+export const ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'superRare', 'legendary'];
 
 function pickFromPools(biomeId: string, rarity: Rarity, region?: Region, boss = false): [Species, Rarity] {
   const pools = biomePools(getBiome(biomeId));

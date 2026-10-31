@@ -47,15 +47,13 @@ function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
   );
 }
 
-/** Estatísticas da temporada de um rival: dá uma ideia do que vem, sem entregar o time de hoje. */
+/** O que o PokéPC sabe de um rival: só lutas públicas (com 2 destaques) e quem você já enfrentou. */
 export function ScoutPanel({name, wave, team, pid}: {name: string; wave: number; team: string[]; pid?: string}) {
   const peer = useGame(s => (pid ? s.careerPeers.find(p => p.id === pid) : undefined));
   const bot = useGame(s => (pid ? undefined : s.run?.world?.bots.find(b => b.name === name)));
+  const faced = useGame(s => s.run?.faced?.[name]);
   const [profile, setProfile] = useState(false);
-  const r = peer ? playerScout(peer) : bot ? botScout(bot) : scoutReport(name, wave, team);
-  if (r && !r.usage.length) return <p className="muted">{name} ainda não jogou nenhuma ronda.</p>;
-  if (!r) return <p className="muted">Ninguém sabe muito sobre {name} ainda.</p>;
-  const top = r.usage[0];
+  const r = peer ? playerScout(peer, faced) : bot ? botScout(bot, faced) : scoutReport(name, wave, team, faced);
   return (
     <div className="scout">
       {(peer || bot) && (
@@ -64,38 +62,40 @@ export function ScoutPanel({name, wave, team, pid}: {name: string; wave: number;
         </button>
       )}
       {profile && (peer || bot) && <ProfileModal profile={peer ? profileOfPeer(peer) : profileOfBot(bot!)} onClose={() => setProfile(false)} />}
-      <p className="scout-top">
-        Pokémon mais jogado: <Sprite name={top.species} size={32} still /> <b>{species(top.species).name}</b> · {top.rounds} rondas
-      </p>
-      {r.lead && (
-        <p className="muted">
-          Costuma abrir com <b>{species(r.lead).name}</b>
-        </p>
-      )}
-      <h4>Uso na temporada ({r.season} rondas)</h4>
-      <div className="scout-usage">
-        {r.usage.map(u => (
-          <div key={u.species} className="scout-use">
-            <Sprite name={u.species} size={32} still />
-            <span>{species(u.species).name}</span>
-            <span className="scout-bar">
-              <i style={{width: `${Math.round((u.rounds / r.season) * 100)}%`}} />
-            </span>
-            <small>{u.rounds} rondas</small>
-            <small className="muted">{u.item}</small>
+      {!r || !r.seen.length ? (
+        <p className="muted">Ninguém sabe muito sobre {name} ainda. Nenhuma luta dele saiu no noticiário.</p>
+      ) : (
+        <>
+          <h4>Pokémon conhecidos</h4>
+          <div className="scout-usage">
+            {r.seen.map(u => (
+              <div key={u.species} className="scout-use">
+                <Sprite name={u.species} size={32} still />
+                <span>{species(u.species).name}</span>
+                <small className={u.faced ? 'win-tag' : 'muted'}>{u.faced ? 'Você já enfrentou' : u.news > 1 ? `Nas notícias ${u.news}×` : 'Saiu numa notícia'}</small>
+              </div>
+            ))}
+            <div className="scout-use fog">
+              <span className="fog-mon">?</span>
+              <span className="muted">Pode ter outros que ninguém viu</span>
+            </div>
           </div>
-        ))}
-      </div>
-      <h4>Últimas batalhas</h4>
-      {r.matches.map((m, i) => (
-        <div key={i} className="scout-row">
-          <span className={m.won ? 'win-tag' : 'lose-tag'}>{m.won ? 'Venceu' : 'Perdeu'}</span>
-          <span>
-            {m.label ? `${m.label}: ` : ''}vs {m.vs}
-          </span>
-          <TeamRow team={m.seen} size={32} />
-        </div>
-      ))}
+        </>
+      )}
+      {r && r.matches.length > 0 && (
+        <>
+          <h4>Últimas lutas no noticiário</h4>
+          {r.matches.map((m, i) => (
+            <div key={i} className="scout-row">
+              <span className={m.won ? 'win-tag' : 'lose-tag'}>{m.won ? 'Venceu' : 'Perdeu'}</span>
+              <span>
+                {m.label ? `${m.label}: ` : ''}vs {m.vs}
+              </span>
+              <TeamRow team={m.seen} size={32} />
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -510,7 +510,7 @@ function ScoutToggle({name, wave, team, pid}: {name: string; wave: number; team:
                 </div>
                 <div className="pc-body">
                   <ScoutPanel name={name} wave={wave} team={team} pid={pid} />
-                  <p className="hint">O elenco dele é maior que o time: quem joga hoje deve sair dos mais usados, mas não dá para ter certeza.</p>
+                  <p className="hint">O PC só sabe o que saiu no noticiário (Ginásios, Torneios e Lendas, com 2 destaques por luta) e o que você mesmo já enfrentou. O resto é surpresa.</p>
                 </div>
               </div>
             </div>

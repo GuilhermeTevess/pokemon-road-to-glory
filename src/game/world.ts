@@ -2,6 +2,7 @@
 // Eles treinam o time, viajam, desafiam ginásios, enfrentam lendas e jogam os torneios.
 // Tudo o que fazem vira estatística (para estudar) e notícia (para o jornal).
 // Na carreira online o mundo fica na nuvem: todo mundo vê os mesmos bots.
+import {glimpse} from './scout';
 import {GYMS, getGym, gymsOf} from '../data/gyms';
 import {legendsOf} from '../data/legends';
 import {REGIONS, getRegion} from '../data/regions';
@@ -128,7 +129,7 @@ function tick(w: World, b: WorldBot, wave: number, boost: number) {
       delete b.tries[next.id];
       b.badges.push({gym: next.id, wave, team: [...b.team], tries});
       addPts(b, POINTS.badge, `${next.badge} (${next.leader})`, wave);
-      news(w, {wave, who: b.name, weight: 1 + i / 4, text: `${b.name} ganhou a ${next.badge} de ${next.leader}${tries > 1 ? ` na ${tries}ª tentativa` : ''}, com ${listPt(seen)}.`});
+      news(w, {wave, who: b.name, weight: 1 + i / 4, text: `${b.name} ganhou a ${next.badge} de ${next.leader}${tries > 1 ? ` na ${tries}ª tentativa` : ''}, com ${listPt(glimpse(seen, `gym|${next.leader}|${wave}`))} em destaque.`});
       if (b.badges.filter(x => getGym(x.gym)?.region === b.region).length === gyms.length) {
         addPts(b, POINTS.book, `Caderneta de ${getRegion(b.region).name} completa`, wave);
         news(w, {wave, who: b.name, weight: 4, text: `${b.name} completou a caderneta de insígnias de ${getRegion(b.region).name}!`});

@@ -4,6 +4,7 @@ import {useEffect, useState} from 'react';
 import {useGame} from '../game/store';
 import {playAchievement, setSoundEnabled, soundEnabled} from './audio';
 import {HelpModal} from './screens/HelpModal';
+import {BiomeGuide} from './screens/BiomeGuide';
 import {IvWeb, Modal, PixelIcon, Sprite, TypeCalc} from './components';
 import {BattleScreen} from './screens/BattleScreen';
 import {EndScreen, PartyPanel, PendingModal, RewardScreen, RunSidebar, TravelScreen} from './screens/RunScreens';
@@ -22,6 +23,7 @@ import {fast, setFast} from './settings';
 export function App() {
   const {screen, run, toasts, achievePops, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const careerCode = useGame(s => s.trainer?.career?.code);
   // Carreira online: mantém a classificação e o progresso dos amigos atualizados.
   useEffect(() => {
@@ -91,6 +93,9 @@ export function App() {
         >
           {fastOn ? '⏩' : '▶'} <span className="nav-label">{fastOn ? 'Rápido' : 'Animações'}</span>
         </button>
+        <button className="btn small ghost" onClick={() => setGuideOpen(true)} title="Guia dos biomas: quem aparece em cada lugar e com que chance">
+          <PixelIcon name="book" /> <span className="nav-label">Guia</span>
+        </button>
         <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
           <PixelIcon name="help" /> <span className="nav-label">Ajuda</span>
         </button>
@@ -126,6 +131,7 @@ export function App() {
       {screen === 'run' && !run?.badgeWon && run?.legendAfter && run.phase !== 'battle' && <LegendAfterModal />}
       {screen === 'run' && !run?.badgeWon && !run?.legendAfter && <PendingModal />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+      {guideOpen && <BiomeGuide onClose={() => setGuideOpen(false)} />}
       {typeCalc && <TypeCalc initial={typeCalc} onClose={() => openTypeCalc(null)} />}
       {ivGain && (
         <Modal onClose={clearIvGain}>
