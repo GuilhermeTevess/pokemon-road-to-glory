@@ -1,3 +1,4 @@
+import {roundOf} from '../../game/career';
 import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {BIOMES, biomePools, hiddenBiomeOf} from '../../data/biomes';
@@ -50,7 +51,7 @@ const GALLERY_TABS = [
 const PAGE = 60;
 
 /** Galeria com os sprites oficiais de treinador: abas, busca e "mostrar mais". */
-function AvatarEditor({avatar, onChange}: {avatar: string; onChange: (a: string) => void}) {
+export function AvatarEditor({avatar, onChange}: {avatar: string; onChange: (a: string) => void}) {
   const [tab, setTab] = useState<'p' | 'n' | 'c'>('p');
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(PAGE);
@@ -98,8 +99,10 @@ function trainerStats(t: Trainer) {
 
 /** Escolha / criação de treinador. Cada treinador tem coleção e run próprias. */
 export function TrainerSelect() {
-  const {trainers, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer} = useGame();
-  const [creating, setCreating] = useState(trainers.length === 0);
+  const {trainers: all, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer, setScreen} = useGame();
+  const trainers = all.filter(t => !t.career);
+  const careers = all.filter(t => t.career);
+  const [creating, setCreating] = useState(all.length === 0);
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(() => AVATARS[Math.floor(Math.random() * AVATARS.length)]);
   /** Treinador cujo visual está sendo editado. */
@@ -151,6 +154,42 @@ export function TrainerSelect() {
           </button>
         )}
       </div>
+      <div className="panel career-strip">
+        <h3>🌐 Carreira online com amigos</h3>
+        <p className="hint">O host escolhe as regras, os amigos entram com o código e cada um joga no seu tempo. Nos torneios, vocês se enfrentam com os times de verdade.</p>
+        {careers.length > 0 && (
+          <div className="career-list">
+            {careers.map(t => (
+              <div key={t.id} className="career-chip">
+                <TrainerAvatar avatar={t.avatar} name={t.name} size={40} />
+                <div>
+                  <b>{t.name}</b>
+                  <div className="hint small">
+                    Código {t.career!.code} · {t.career!.done ? 'carreira encerrada' : `temporada ${t.career!.season}`}
+                  </div>
+                </div>
+                <button className="btn small primary" onClick={() => (selectTrainer(t.id), setScreen('career'))}>
+                  Entrar
+                </button>
+                {confirmDel === t.id ? (
+                  <button className="btn small danger" onClick={() => removeTrainer(t.id)}>
+                    Sair de vez?
+                  </button>
+                ) : (
+                  <button className="btn small ghost" onClick={() => setConfirmDel(t.id)}>
+                    Sair
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="row center">
+          <button className="btn primary" onClick={() => setScreen('career')}>
+            Criar ou entrar numa carreira
+          </button>
+        </div>
+      </div>
       {creating && (
         <div className="panel trainer-new">
           <h3>Novo treinador</h3>
@@ -160,7 +199,7 @@ export function TrainerSelect() {
           </label>
           <AvatarEditor avatar={avatar} onChange={setAvatar} />
           <div className="row center">
-            {trainers.length > 0 && (
+            {all.length > 0 && (
               <button className="btn" onClick={() => setCreating(false)}>
                 Cancelar
               </button>
@@ -198,7 +237,7 @@ export function TrainerSelect() {
 }
 
 export function TitleScreen() {
-  const {run, setScreen, abandonRun, collection, trainer, selectTrainer} = useGame();
+  const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career} = useGame();
   const [confirm, setConfirm] = useState(false);
   if (!trainer) return <TrainerSelect />;
   const active = run && run.phase !== 'gameOver' && run.phase !== 'stageClear';
@@ -244,11 +283,12 @@ export function TitleScreen() {
         <div className="menu panel">
           {active && (
             <button className="btn primary big-play" onClick={() => setScreen('run')}>
-              ▶ Continuar · ronda {run.wave}
+              ▶ Continuar · ronda {roundOf(run)}
             </button>
           )}
           <button
             className={`btn ${active ? '' : 'primary big-play'}`}
+            disabled={!!trainer.career?.done || (!!trainer.career && !career)}
             onClick={() => {
               if (active && !confirm) return setConfirm(true);
               abandonRun();
@@ -256,8 +296,19 @@ export function TitleScreen() {
               useGame.getState().setScreen('run');
             }}
           >
-            {active && confirm ? 'Certeza? A run atual será perdida' : active ? 'Nova run' : '▶ Nova run'}
+            {trainer.career?.done
+              ? 'Carreira encerrada'
+              : active && confirm
+              ? trainer.career ? 'Certeza? A temporada atual acaba aqui' : 'Certeza? A run atual será perdida'
+              : trainer.career
+              ? `${active ? '' : '▶ '}${active ? 'Encerrar e ir para a' : 'Jogar'} temporada ${trainer.career.season + (active ? 1 : 0)}/${career?.rules.seasons ?? '?'}`
+              : active ? 'Nova run' : '▶ Nova run'}
           </button>
+          {trainer.career && (
+            <button className="btn career-btn" onClick={() => setScreen('career')}>
+              🌐 Carreira {trainer.career.code} <small>Classificação, regras e amigos</small>
+            </button>
+          )}
           <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>
             ⚡ Quickplay <small>Rush com amigo · Campeonato rápido</small>
           </button>

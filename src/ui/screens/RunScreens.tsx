@@ -1,3 +1,4 @@
+import {roundOf, roundsOf, waveStep} from '../../game/career';
 import {useEffect, useState} from 'react';
 import {dex, species} from '../../data/dex';
 import {moveDescPt} from '../../data/movesPt';
@@ -159,7 +160,7 @@ export function RewardScreen() {
   const [choosing, setChoosing] = useState<string | null>(null);
   if (!run) return null;
   const cost = rerollPrice(run, rerollCost(run.rerolls, run.wave));
-  const nextWave = run.wave + 1;
+  const nextWave = run.wave + waveStep(run);
   const nextGymId = run.gyms?.find(g => g.wave === nextWave)?.id;
   const nextGym = nextGymId ? getGym(nextGymId) : undefined;
   const notes = [
@@ -188,7 +189,7 @@ export function RewardScreen() {
   };
   return (
     <div className="screen reward-screen">
-      <h2>Ronda {run.wave} concluída!</h2>
+      <h2>Ronda {roundOf(run)} concluída!</h2>
       {notes.map(([icon, text]) => (
         <p key={text} className="note">
           <PixelIcon name={icon} /> {text}
@@ -260,7 +261,7 @@ export function RewardScreen() {
         </div>
       )}
       <p className="hint">
-        Próxima: ronda {Math.min(nextWave, SEASON_LENGTH)}
+        Próxima: ronda {Math.min(roundOf({...run, wave: nextWave}), roundsOf(run))}
         {tourAt(nextWave) ? ` · ${tourAt(nextWave)!.name}!` : ''}.
       </p>
       {choosing && choosingItem && (
@@ -447,13 +448,13 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <div className="trainer-name">{trainer?.name}</div>
           <div className="sb-money">₽ {run.money}</div>
           <div className="muted">
-            Ronda {run.wave}/{SEASON_LENGTH} · {seasonPoints(run)} pts
+            Ronda {roundOf(run)}/{roundsOf(run)} · {seasonPoints(run)} pts
           </div>
           {run.wave > 0 && run.phase === 'travel' && <div className="sb-where muted">🗺️ Escolhendo o destino...</div>}
           {run.wave > 0 && run.phase !== 'travel' && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
-            <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, run.regionLeft ?? 0)} rondas
+            <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, Math.ceil((run.regionLeft ?? 0) / waveStep(run)))} rondas
             <br />
-            <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, run.biomeLeft ?? 0)} rondas
+            <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, Math.ceil((run.biomeLeft ?? 0) / waveStep(run)))} rondas
           </div>}
           {run.wave > 0 && <TrailMeter value={trailOf(run)} />}
         </div>
@@ -744,8 +745,8 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
       <h1>{kind === 'stageClear' ? 'Temporada completa!' : 'Fim da run'}</h1>
       <p>
         {kind === 'stageClear'
-          ? `Você chegou ao fim das ${SEASON_LENGTH} rondas e disputou o Mundial!`
-          : `Seu time caiu na ronda ${run.wave}.`}
+          ? `Você chegou ao fim das ${roundsOf(run)} rondas e disputou o Mundial!`
+          : `Seu time caiu na ronda ${roundOf(run)}.`}
       </p>
       <div className="row center wrap">
         {run.party.map(m => (

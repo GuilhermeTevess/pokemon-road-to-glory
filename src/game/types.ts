@@ -1,3 +1,4 @@
+import type {RunCareer} from './career';
 import type {PointEntry, PointSource, SeasonRec} from './league';
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
 import type {Egg} from './daycare';
@@ -126,6 +127,8 @@ export interface RunState {
   version: 1;
   /** Campeonato rápido (Quickplay): não mexe na coleção e some quando o campeonato acaba. */
   quick?: boolean;
+  /** Run de uma carreira online (código, temporada e regras do host). */
+  career?: RunCareer;
   id: string;
   startedAt: number;
   wave: number;
