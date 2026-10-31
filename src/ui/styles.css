@@ -1260,3 +1260,18 @@ table.move-info td { padding: 3px 0; }
 @media (max-width: 640px) { .career-top { grid-template-columns: 1fr; } }
 .row.between { justify-content: space-between; align-items: center; }
 .choice-row .btn { font-size: 12px; padding: 6px 10px; }
+/* Professor de golpes */
+.tutor-mons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.tutor-mon { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; }
+.tutor-mon img { max-height: 56px; }
+.tutor-pick { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.tutor-search { font: inherit; padding: 8px 10px; border: 2px solid var(--line); }
+.tutor-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.tutor-move { text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.tutor-move:disabled { opacity: .5; }
+.tutor-price { margin-left: auto; font-weight: bold; color: #b8860b; }
+.tm-options { display: flex; flex-direction: column; gap: 6px; }
+.tm-options .move-chip { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.shiny-star { display: inline-block; vertical-align: middle; margin-left: 4px; animation: shiny-twinkle 1.6s steps(4) infinite; filter: drop-shadow(0 0 2px rgba(255, 210, 60, .8)); }
+@keyframes shiny-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.7) rotate(45deg); opacity: .75; } }
+.sb-glow { font-size: 12px; color: #a87900; margin-top: 4px; }

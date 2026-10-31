@@ -1,3 +1,5 @@
+import {shinyGlow} from '../../game/meta';
+import {ShinyStar} from '../components';
 import {roundOf, roundsOf, waveStep} from '../../game/career';
 import {useEffect, useState} from 'react';
 import {dex, species} from '../../data/dex';
@@ -457,6 +459,11 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
             <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, Math.ceil((run.biomeLeft ?? 0) / waveStep(run)))} rondas
           </div>}
           {run.wave > 0 && <TrailMeter value={trailOf(run)} />}
+          {shinyGlow(run.party) > 0 && (
+            <div className="sb-glow" title="Shinies no time atraem mais shinies (os mais raros brilham mais).">
+              <ShinyStar /> Brilho do time: shiny 1 em {Math.round(256 / (1 + shinyGlow(run.party) + (run.bag.shinycharm ? 2 : 0)))}
+            </div>
+          )}
         </div>
       </div>
       <div className="panel sb-team">
@@ -545,7 +552,6 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
         <Sprite name={mon.species} shiny={mon.shiny} />
         <div>
           <h3>
-            {mon.shiny && <span className="shiny"><PixelIcon name="star" color="#e0a100" /> </span>}
             <MonName mon={mon} /> <span className="lv">Nv. {mon.level}</span>
           </h3>
           {rename !== null ? (
@@ -704,6 +710,30 @@ export function PendingModal() {
       </Modal>
     );
   }
+  if (ev.kind === 'tmChoice')
+    return (
+      <Modal>
+        <h2>Disco Técnico: o que {displayName(mon)} vai aprender?</h2>
+        <p className="muted">Escolha 1 dos 3 golpes. {mon.moves.length >= 4 ? 'Depois você escolhe qual esquecer.' : ''}</p>
+        <div className="list-actions tm-options">
+          {ev.moves.map(id => {
+            const m = dex.moves.get(id);
+            return (
+              <button key={id} className="move-chip big" onClick={() => resolvePending(id)}>
+                <span className="row">
+                  <TypeBadge type={m.type} /> {m.name} · Poder {m.basePower || '—'} ·{' '}
+                  {m.category === 'Physical' ? 'Físico' : m.category === 'Special' ? 'Especial' : 'Status'}
+                </span>
+                <small className="muted">{moveDescPt(m.name)}</small>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn small" onClick={() => resolvePending(null)}>
+          Guardar o disco para depois
+        </button>
+      </Modal>
+    );
   const newMove = dex.moves.get(ev.move);
   return (
     <Modal>

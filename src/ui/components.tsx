@@ -28,8 +28,26 @@ export function Sprite(props: {name: string; back?: boolean; shiny?: boolean; st
   );
 }
 
-/** Nome do Pokémon: apelido grande com a espécie pequena embaixo; coração no parceiro. */
-export function MonName({mon}: {mon: {species: string; nickname?: string; partner?: boolean}}) {
+/** Brilhinho de shiny em pixel art (estrela de 4 pontas que pisca). */
+export function ShinyStar({size = 12}: {size?: number}) {
+  // Grade 7x7: o miolo claro e as pontas douradas.
+  const gold = [[3, 0], [3, 1], [0, 3], [1, 3], [5, 3], [6, 3], [3, 5], [3, 6], [2, 2], [4, 2], [2, 4], [4, 4]];
+  const core = [[3, 2], [2, 3], [3, 3], [4, 3], [3, 4]];
+  return (
+    <svg className="shiny-star" width={size} height={size} viewBox="0 0 7 7" shapeRendering="crispEdges" aria-label="Shiny">
+      <title>Shiny</title>
+      {gold.map(([x, y]) => (
+        <rect key={`g${x}-${y}`} x={x} y={y} width={1} height={1} fill="#f2b400" />
+      ))}
+      {core.map(([x, y]) => (
+        <rect key={`c${x}-${y}`} x={x} y={y} width={1} height={1} fill="#fff6c2" />
+      ))}
+    </svg>
+  );
+}
+
+/** Nome do Pokémon: apelido grande com a espécie pequena embaixo; coração no parceiro, brilho no shiny. */
+export function MonName({mon}: {mon: {species: string; nickname?: string; partner?: boolean; shiny?: boolean}}) {
   const sp = species(mon.species).name.replace(/^(.*)-Mega(?:-([XY]))?$/, (_, base: string, xy?: string) => `Mega ${base}${xy ? ` ${xy}` : ''}`);
   return (
     <span className="mon-name">
@@ -46,6 +64,7 @@ export function MonName({mon}: {mon: {species: string; nickname?: string; partne
       ) : (
         sp
       )}
+      {mon.shiny && <ShinyStar />}
     </span>
   );
 }

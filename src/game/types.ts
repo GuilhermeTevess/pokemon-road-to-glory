@@ -92,11 +92,15 @@ export type RunEvent =
   | {kind: 'merchant'; give: string; get: string}
   | {kind: 'rival'; name: string}
   | {kind: 'seer'; upcoming: Encounter[]}
+  /** Professor de golpes: ensina qualquer golpe que o Pokémon aprende, por dinheiro. */
+  | {kind: 'tutor'}
   | {kind: 'traveler'; name: string; avatar: string; ask: 'money' | 'heal' | 'item'; cost?: number; item?: string; hint: string};
 
 /** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
 export type PendingEvent =
   | {kind: 'learnMove'; uid: string; move: string}
+  /** Disco Técnico: 3 golpes sorteados, o jogador escolhe 1. */
+  | {kind: 'tmChoice'; uid: string; moves: string[]}
   | {kind: 'evolve'; uid: string; into: string[]};
 
 /** Melhorias gerais (Glória) congeladas no começo da run. */

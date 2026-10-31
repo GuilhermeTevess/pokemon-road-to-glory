@@ -20,13 +20,13 @@ import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
   HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
   addCandies, addHeartPts, applyEntry, entryOf, expBonus, heartsOf, lineRoot, loadCollection, movePrice,
-  careerOf, registerCatch, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
+  careerOf, registerCatch, registerStarter, shinyGlow, saveCollection, shinyChance, spendCandies, starterIvs, statsOf, teamCost,
 } from './meta';
 import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
 import {moneyReward, moneyValue, rerollCost, rollRewards, shopPrice, travelBlocked} from './rewards';
-import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
+import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent, tutorMoves, tutorPrice} from './events';
 import {START_LEVELS, applyPerks, buyUpgrade, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {
@@ -144,6 +144,8 @@ interface Store {
   equipAbility(line: string, ability: string | null): void;
   buyCostCut(line: string): void;
   buyShiny(line: string): void;
+  /** Quem já tem o shiny escolhe começar com a cor shiny ou normal. */
+  setShinyPref(line: string, off: boolean): void;
   setFavorite(line: string | null): void;
   buyUpgrade(id: keyof RunPerks): void;
   /** Compra a Mega Pedra própria da linha (ou troca qual pedra usar, se já comprou). */
@@ -454,6 +456,9 @@ export const useGame = create<Store>((set, get) => {
     }
     // Amuleto Brilhante: chance extra de shiny (fica ~3x mais comum).
     if (run.bag.shinycharm && !run.encounter!.trainer && !run.encounter!.mon.shiny && Math.random() < 2 / 256) run.encounter!.mon.shiny = true;
+    // Shinies no time atraem mais shinies: cada um soma conforme a raridade.
+    const glow = shinyGlow(run.party);
+    if (glow > 0 && !run.encounter!.trainer && !run.encounter!.mon.shiny && Math.random() < glow / 256) run.encounter!.mon.shiny = true;
     // Dupla: às vezes (5%) dois selvagens aparecem juntos. Nunca com chefes, lendas ou ginásios.
     const enc0 = run.encounter!;
     if (!enc0.boss && !enc0.trainer && !enc0.team && run.wave >= 5 && run.party.filter(m => m.hp > 0).length >= 2 && Math.random() < DOUBLE_CHANCE) {
@@ -645,13 +650,12 @@ export const useGame = create<Store>((set, get) => {
           break;
         }
         case 'tm': {
-          const options = shuffle(teachableMoves(species(mon.species)).filter(m => !mon.moves.includes(m)));
+          const options = shuffle(teachableMoves(species(mon.species), true).filter(m => !mon.moves.includes(m)));
           if (options.length) {
-            const move = pick(options.slice(0, 20));
-            if (mon.moves.length < 4) {
-              mon.moves.push(move);
-              message = `${mon.species} aprendeu ${move}!`;
-            } else run.pending.push({kind: 'learnMove', uid: mon.uid, move});
+            // 3 sorteados, e um deles tende a ser forte (poder 80+ ou de preparar).
+            const strong = options.find(m => movePrice(m) >= 20);
+            const moves = [...new Set([...(strong ? [strong] : []), ...options])].slice(0, 3);
+            run.pending.push({kind: 'tmChoice', uid: mon.uid, moves: shuffle(moves)});
             used = true;
           }
           break;
@@ -827,6 +831,7 @@ export const useGame = create<Store>((set, get) => {
       applyPerks(run, perksOf(col));
       run.regionLeft = regionStay(run);
       run.rivalPoints = rollRivalPoints(col);
+      const unlockNotes: string[] = [];
       run.party = picked.map(name => {
         const mon = createMon(name, {
           level: START_LEVELS[perksOf(col).level ?? 0] ?? STARTER_LEVEL,
@@ -836,6 +841,12 @@ export const useGame = create<Store>((set, get) => {
           shinyChance: shinyChance(col, name),
         });
         applyEntry(col, mon);
+        // Já tem o shiny desta linha: começa shiny, a não ser que prefira a cor normal.
+        const line = col.entries[lineRoot(name)];
+        if (line?.shiny) mon.shiny = !line.shinyOff;
+        const reg = registerStarter(col, mon);
+        const news = [reg.newNature && `nature ${mon.nature}`, reg.newAbility && `habilidade ${mon.ability}`, reg.betterIvs && 'IVs melhores'].filter(Boolean);
+        if (news.length) unlockNotes.push(`${species(lineRoot(name)).name}: ${news.join(', ')} guardado(s) na ficha!`);
         mon.metWave = 0;
         if (name === (partner ?? picked[0])) {
           mon.partner = true;
@@ -861,6 +872,7 @@ export const useGame = create<Store>((set, get) => {
       saveRun(tid(), run);
       saveCollection(cid(), col);
       set({run, collection: col, screen: 'run'});
+      unlockNotes.forEach(n => get().toast(n));
     },
 
     renameMon(monUid, name) {
@@ -994,6 +1006,19 @@ export const useGame = create<Store>((set, get) => {
               message = `Você pegou ${getItem(choice).name}.`;
             }
             break;
+          case 'tutor': {
+            const [monUid, move] = (choice ?? '').split('|');
+            const mon = run.party.find(m => m.uid === monUid);
+            if (!mon || !move || !tutorMoves(mon).includes(move)) break;
+            const price = tutorPrice(run, move);
+            if (run.money < price) return;
+            run.money -= price;
+            if (mon.moves.length < 4) {
+              mon.moves.push(move);
+              message = `${displayName(mon)} aprendeu ${dex.moves.get(move).name}!`;
+            } else run.pending.push({kind: 'learnMove', uid: mon.uid, move});
+            break;
+          }
           case 'merchant':
             if (choice === 'trade' && run.bag[ev.give]) {
               run.bag[ev.give]--;
@@ -1048,6 +1073,13 @@ export const useGame = create<Store>((set, get) => {
     },
     buyUpgrade(id) {
       editCollection(col => buyUpgrade(col, id));
+    },
+    setShinyPref(line, off) {
+      editCollection(col => {
+        const e = col.entries[lineRoot(line)];
+        if (!e?.shiny) return false;
+        e.shinyOff = off || undefined;
+      });
     },
     setFavorite(line) {
       editCollection(col => {
@@ -1318,9 +1350,16 @@ export const useGame = create<Store>((set, get) => {
         const ev = run.pending.shift();
         if (!ev) return;
         const mon = findMon(run, ev.uid);
+        // Desistir do Disco Técnico devolve o disco para a mochila.
+        if (ev.kind === 'tmChoice' && choice === null) run.bag.tm = (run.bag.tm ?? 0) + 1;
         if (mon && choice !== null) {
           if (ev.kind === 'learnMove' && typeof choice === 'number') {
             mon.moves[choice] = ev.move;
+          } else if (ev.kind === 'tmChoice' && typeof choice === 'string' && ev.moves.includes(choice)) {
+            if (mon.moves.length < 4) {
+              mon.moves.push(choice);
+              get().toast(`${displayName(mon)} aprendeu ${choice}!`);
+            } else run.pending.unshift({kind: 'learnMove', uid: mon.uid, move: choice});
           } else if (ev.kind === 'evolve' && typeof choice === 'string' && ev.into.includes(choice)) {
             const from = mon.species;
             evolve(mon, choice);

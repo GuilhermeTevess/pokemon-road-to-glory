@@ -12,7 +12,7 @@ import {NICK_MAX} from '../../game/mon';
 import {useGame} from '../../game/store';
 import {STAT_IDS, STAT_LABEL} from '../../game/types';
 import type {StatId} from '../../game/types';
-import {IvWeb, ItemIcon, Modal, MoveInfo, PixelIcon, Sprite, TypeBadge, TypeFilter, Types} from '../components';
+import {IvWeb, ItemIcon, Modal, MoveInfo, PixelIcon, ShinyStar, Sprite, TypeBadge, TypeFilter, Types} from '../components';
 import {playCry} from '../audio';
 import {TrainerAvatar} from './StartScreens';
 import {CareerCard} from './TournamentScreen';
@@ -312,7 +312,7 @@ function EvBox({root, e}: {root: string; e: Entry}) {
 
 /** Painel do Pokémon (ficha da linha): visual, apelido, corações, IVs, golpe inicial e melhorias. */
 export function PokemonPanel({line, onTrain}: {line: string; onTrain?: () => void}) {
-  const {collection, setNickname, unlockMove, equipMove, buyCostCut, buyShiny, setFavorite, buyMegaStone} = useGame();
+  const {collection, setNickname, unlockMove, equipMove, buyCostCut, buyShiny, setFavorite, buyMegaStone, setShinyPref} = useGame();
   const root = lineRoot(line);
   const e = peekEntry(collection, root);
   const [view, setView] = useState<Species>(species(root));
@@ -448,6 +448,21 @@ export function PokemonPanel({line, onTrain}: {line: string; onTrain?: () => voi
                 <span className="hint">no mínimo</span>
               )}
             </li>
+            {e.shiny ? (
+              <li>
+                <span>
+                  <ShinyStar /> Você já tem o shiny! Começar a run com a cor:
+                </span>
+                <span className="row">
+                  <button className={`btn small ${!e.shinyOff ? 'primary' : ''}`} onClick={() => setShinyPref(root, false)}>
+                    Shiny
+                  </button>
+                  <button className={`btn small ${e.shinyOff ? 'primary' : ''}`} onClick={() => setShinyPref(root, true)}>
+                    Normal
+                  </button>
+                </span>
+              </li>
+            ) : (
             <li>
               <span>
                 Chance de shiny ao começar: <b>1 em {Math.round(1 / SHINY_CHANCE[e.shinyLv])}</b>
@@ -460,6 +475,7 @@ export function PokemonPanel({line, onTrain}: {line: string; onTrain?: () => voi
                 <span className="hint">no máximo</span>
               )}
             </li>
+            )}
             {stones.length > 0 && (
               <li>
                 <span>
