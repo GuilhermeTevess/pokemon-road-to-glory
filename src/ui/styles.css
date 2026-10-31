@@ -1025,3 +1025,55 @@ table.move-info td { padding: 3px 0; }
 .ceremony-badge2.give { animation: badgeglow .6s ease-in-out infinite; }
 .ceremony-badge2.cheer { left: 44%; top: 60%; width: 64px; height: 64px; animation: badgeglow .6s ease-in-out infinite; }
 .ceremony-scene .ceremony-book { position: absolute; z-index: 6; left: 58%; right: 4%; top: 10%; bottom: auto; height: 46%; }
+
+/* ---------- Olheiro: últimas batalhas do adversário ---------- */
+.scout { display: flex; flex-direction: column; gap: 6px; }
+.scout p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.scout-row { display: grid; grid-template-columns: 64px minmax(80px, 140px) auto 1fr; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; background: rgba(0,0,0,.04); }
+.scout-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scout .win-tag, .lose-tag { font-size: 8px; padding: 3px 4px; text-align: center; color: #fff; }
+.scout .win-tag { background: #3d9a4f; }
+.lose-tag { font-family: 'Press Start 2P', monospace; background: #b5473f; }
+@media (max-width: 560px) { .scout-row { grid-template-columns: 56px 1fr; } .scout-row small { grid-column: 1 / -1; } }
+
+/* ---------- Festa de campeão ---------- */
+.champion-scene { position: fixed; inset: 0; z-index: 60; overflow: hidden; background: linear-gradient(#2b3a5c, #4b5e8a 45%, #6e5a48 46%, #8a6f55); }
+.champion-scene.size-2, .champion-scene.size-3 { background: linear-gradient(#05060f, #121a3a 46%, #20203a 47%, #2c2a40); }
+.champ-sky { position: absolute; inset: 0 0 55% 0; background: radial-gradient(ellipse at 50% 120%, rgba(255,220,140,.25), transparent 60%); }
+.champion-scene .crowd { z-index: 1; }
+.champ-spot { position: absolute; top: -10%; width: 32%; height: 110%; z-index: 2; background: linear-gradient(rgba(255,250,210,.45), transparent 85%); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); mix-blend-mode: screen; animation: champ-spot 4s ease-in-out infinite alternate; }
+.champ-spot.l { left: 6%; transform-origin: 50% 0; }
+.champ-spot.r { right: 6%; transform-origin: 50% 0; animation-delay: -2s; }
+@keyframes champ-spot { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+.champion-scene .confetti { z-index: 5; }
+.champ-stage { position: absolute; left: 0; right: 0; bottom: 120px; height: 46%; z-index: 3; display: flex; justify-content: center; align-items: flex-end; }
+.champ-podium { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(520px, 90%); height: 70px; border-radius: 50% / 40%; background: radial-gradient(ellipse at 50% 30%, #f6e6a8, #c9a24c 60%, #7a5a20); box-shadow: 0 0 40px rgba(255,210,100,.5); }
+.size-3 .champ-podium { box-shadow: 0 0 90px rgba(255,220,120,.9); }
+.champ-hero { position: relative; display: flex; align-items: flex-end; gap: 4px; margin-bottom: 34px; animation: champ-rise .9s ease-out both; }
+.champ-trainer { position: relative; }
+.champ-trainer img, .champ-trainer svg { image-rendering: pixelated; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); animation: champ-cheer 1.2s ease-in-out infinite; }
+.champ-trophy { position: absolute; left: 50%; top: -70px; transform: translateX(-50%); z-index: 2; filter: drop-shadow(0 0 10px #ffd84a); animation: champ-trophy 1.2s ease-in-out infinite; }
+.champ-partner { image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+.champ-partner.shoulder { position: absolute; top: 2%; right: -30%; animation: champ-cheer 1.2s ease-in-out .15s infinite; }
+.champ-partner.beside { animation: champ-cheer 1.4s ease-in-out .3s infinite; }
+.champ-title { position: absolute; top: 6%; left: 0; right: 0; z-index: 6; text-align: center; color: #fff; text-shadow: 0 3px 0 #7a4b00, 0 0 18px rgba(255,200,60,.8); }
+.champ-title small { display: block; font-size: 14px; letter-spacing: .1em; opacity: .9; }
+.champ-title b { display: block; font-size: clamp(28px, 7vw, 56px); color: #ffd84a; animation: champ-pulse 1.6s ease-in-out infinite; }
+.size-0 .champ-title b { font-size: clamp(24px, 5vw, 36px); }
+.champion-scene .dialogue, .champion-scene .dialogue-end { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); z-index: 8; }
+.champ-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,.65); color: #fff; }
+.champ-end p { margin: 0 8px 0 0; font-weight: 700; }
+.fireworks { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.fw { position: absolute; width: 0; height: 0; }
+.fw i { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; opacity: 0; animation: fw-burst 2.6s ease-out infinite; }
+@keyframes fw-burst {
+  0% { opacity: 0; transform: rotate(var(--r)) translateY(0); }
+  8% { opacity: 1; transform: rotate(var(--r)) translateY(0); }
+  45% { opacity: 1; transform: rotate(var(--r)) translateY(-70px); }
+  70%, 100% { opacity: 0; transform: rotate(var(--r)) translateY(-82px); }
+}
+@keyframes champ-rise { from { opacity: 0; transform: translateY(40px) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes champ-cheer { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes champ-trophy { 0%, 100% { transform: translateX(-50%) translateY(0) rotate(-4deg); } 50% { transform: translateX(-50%) translateY(-6px) rotate(4deg); } }
+@keyframes champ-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .champ-spot, .fw i, .champ-hero, .champ-trainer img, .champ-partner, .champ-trophy, .champ-title b { animation: none; } .fw i { opacity: 1; transform: rotate(var(--r)) translateY(-60px); } }
