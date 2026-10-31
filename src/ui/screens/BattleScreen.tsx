@@ -58,6 +58,7 @@ const at = (fn: (v: SideView | null) => SideView | null, slot = 0) => (list: Vie
 };
 const each = (fn: (v: SideView) => SideView) => (list: Views): Views => list.map(v => (v ? fn(v) : v));
 
+const LOCKED_TIP = 'Seu Pokémon está no meio de um golpe (no ar, embaixo da terra, carregando...) e só pode continuar ele';
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
 /** Quem está esperando uma fala terminar; um clique na caixa de texto pula a espera. */
@@ -217,7 +218,8 @@ export function BattleScreen() {
   const moves = ctl.moveOptions();
   const party = ctl.partyStatus();
   // Em dupla: Pokébola só quando sobra um selvagem; itens só na escolha do primeiro Pokémon (gastam o turno dos dois).
-  const ballBlock = enc.trainer ? 'Não dá para capturar o Pokémon de um treinador' : ctl.doubles && ctl.foesUp().length > 1 ? 'Na dupla, derrote um selvagem antes de capturar o outro' : ctl.hasPending ? 'Só na escolha do primeiro Pokémon' : undefined;
+  const ballBlock = enc.trainer ? 'Não dá para capturar o Pokémon de um treinador' : ctl.doubles && ctl.foesUp().length > 1 ? 'Na dupla, derrote um selvagem antes de capturar o outro' : ctl.hasPending ? 'Só na escolha do primeiro Pokémon' : ctl.anyLocked() ? LOCKED_TIP : undefined;
+  const bagBlock = ctl.hasPending ? 'Só na escolha do primeiro Pokémon' : ctl.anyLocked() ? LOCKED_TIP : undefined;
 
   const throwBall = async (id: string) => {
     if (!consume(id)) return;
@@ -396,7 +398,7 @@ export function BattleScreen() {
               <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length || !!ballBlock} title={ballBlock}>
                 <img className="act-icon" src={itemSpriteUrl('poke-ball')} alt="" /> Pokébola
               </button>
-              <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length || ctl.hasPending}>
+              <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length || !!bagBlock} title={bagBlock}>
                 <img className="act-icon" src={itemSpriteUrl('potion')} alt="" /> Mochila
               </button>
               <button className="btn act" onClick={() => setMenu('switch')} disabled={!ctl.canSwitch() || party.filter(p => p.hp > 0).length < 2}>
@@ -430,7 +432,7 @@ export function BattleScreen() {
                   <button
                     key={m.id + m.index}
                     className="move-btn"
-                    disabled={m.disabled || m.pp <= 0}
+                    disabled={m.disabled || (!m.locked && m.pp <= 0)}
                     style={{['--mc' as string]: TYPE_COLORS[m.type]}}
                     onClick={() => {
                       if (m.needsTarget) {
@@ -462,9 +464,7 @@ export function BattleScreen() {
                       <TypeBadge type={m.type} small />
                       <CategoryIcon category={m.category} />
                       {m.basePower > 0 && <span>Poder {m.basePower}</span>}
-                      <span>
-                        PP {m.pp}/{m.maxpp}
-                      </span>
+                      {m.locked ? <span>Continua o golpe</span> : <span>PP {m.pp}/{m.maxpp}</span>}
                     </span>
                     <span className="move-desc">{moveDescPt(m.name)}</span>
                   </button>

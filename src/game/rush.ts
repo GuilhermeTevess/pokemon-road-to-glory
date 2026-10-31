@@ -102,6 +102,8 @@ export interface DuelMove {
   pp: number;
   maxpp: number;
   disabled: boolean;
+  /** Golpe em andamento (Bounce/Fly/Dig no 2º turno, Outrage, recarga): única opção, sem PP. */
+  locked?: boolean;
   /** Eficácia contra quem está em campo do outro lado (null = golpe de status). */
   eff: number | null;
 }
@@ -133,9 +135,11 @@ export function duelRequest(b: Battle, side: Side): DuelReq {
     canMega: !!act?.canMegaEvo,
     moves: (act?.moves ?? []).map((m, i) => {
       const mv = dex.moves.get(m.id);
+      // O simulador manda o golpe travado sem PP: é o 2º turno de um golpe de vários turnos.
+      const locked = m.pp === undefined;
       return {
         index: i + 1, id: mv.id, name: mv.name, type: mv.type, category: mv.category, basePower: mv.basePower,
-        pp: m.pp ?? 0, maxpp: m.maxpp ?? 0, disabled: !!m.disabled,
+        pp: m.pp ?? 0, maxpp: m.maxpp ?? 0, disabled: !locked && !!m.disabled, locked,
         eff: mv.category === 'Status' || !foe ? null : typeMultiplier(mv.type, foe.getTypes()),
       };
     }),
