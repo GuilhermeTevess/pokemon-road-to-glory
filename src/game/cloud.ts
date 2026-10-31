@@ -2,6 +2,7 @@
 // Cada documento guarda um único campo `json` com o objeto inteiro.
 import {FIREBASE} from '../data/firebase';
 import type {CareerDoc, PlayerDoc} from './career';
+import type {Entrant, MatchResult} from './tournament';
 
 function localMode(): boolean {
   try {
@@ -49,6 +50,27 @@ async function putDoc(path: string, value: unknown): Promise<void> {
   if (!res.ok) throw new Error(`Firestore ${res.status}`);
 }
 
+/**
+ * Cria o documento só se ainda não existir e devolve o que ficou na nuvem: o primeiro
+ * jogador a chegar decide (a chave do torneio, o resultado de uma partida entre bots).
+ */
+async function createOnce<T>(path: string, value: T): Promise<T> {
+  if (localMode()) {
+    const existing = await getDoc<T>(path);
+    if (existing) return existing;
+    await putDoc(path, value);
+    return value;
+  }
+  const body: Doc = {fields: {json: {stringValue: JSON.stringify(value)}}};
+  const res = await fetch(`${BASE()}/${path}?currentDocument.exists=false&${KEY()}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (res.ok) return value;
+  if (res.status === 409 || res.status === 400) {
+    const existing = await getDoc<T>(path);
+    if (existing) return existing;
+  }
+  throw new Error(`Firestore ${res.status}`);
+}
+
 async function listDocs<T>(path: string): Promise<T[]> {
   if (localMode()) {
     const out: T[] = [];
@@ -73,6 +95,7 @@ export const cloud = {
   putCareer: (doc: CareerDoc) => putDoc(`careers/${code(doc.code)}`, doc),
   players: (c: string) => listDocs<PlayerDoc>(`careers/${code(c)}/players`),
   putPlayer: (c: string, p: PlayerDoc) => putDoc(`careers/${code(c)}/players/${encodeURIComponent(p.id)}`, p),
+  putMatch: (c: string, m: MatchResult) => cloudMatches.put(c, m),
 };
 
 /** Última cópia da carreira e dos jogadores neste navegador (para abrir sem internet). */
@@ -91,3 +114,24 @@ export function cacheCareer(c: string, doc: CareerDoc | null, peers: PlayerDoc[]
     /* ignora */
   }
 }
+
+
+/** Partidas dos torneios da carreira (as que têm jogadores). */
+const matchPath = (c: string, m: {tid: string; key: string}) => `careers/${code(c)}/matches/${encodeURIComponent(`${m.tid}_${m.key}`)}`;
+
+export const cloudMatches = {
+  put: (c: string, m: MatchResult) => putDoc(matchPath(c, m), m),
+  /** Partida entre bots: quem simular primeiro grava, os outros usam o mesmo resultado. */
+  createOnce: (c: string, m: MatchResult) => createOnce(matchPath(c, m), m),
+  list: async (c: string, tid: string) => (await listDocs<MatchResult>(`careers/${code(c)}/matches`)).filter(m => m.tid === tid),
+};
+
+/** Chave do torneio da carreira: montada pelo primeiro jogador que chega e igual para todos. */
+export interface SharedTourDoc {
+  region?: string;
+  entrants: Entrant[];
+}
+
+export const cloudTours = {
+  createOnce: (c: string, tid: string, doc: SharedTourDoc) => createOnce(`careers/${code(c)}/tours/${encodeURIComponent(tid)}`, doc),
+};

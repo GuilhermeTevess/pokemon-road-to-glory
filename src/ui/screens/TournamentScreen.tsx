@@ -1,4 +1,7 @@
+import {getItem} from '../../data/items';
 import {roundOf} from '../../game/career';
+import {maxHp} from '../../game/mon';
+import {CareerDuel} from './CareerDuel';
 // Torneios: explicação, sorteio animado, chaveamento e histórico.
 import {useEffect, useState} from 'react';
 import {useGame} from '../../game/store';
@@ -12,12 +15,12 @@ import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {fast} from '../settings';
 import {ChampionCelebration} from './ChampionScreen';
-import {scoutReport} from '../../game/scout';
+import {playerScout, scoutReport} from '../../game/scout';
 import {species} from '../../data/dex';
 
 /** Formato comum para a chave ao vivo e para o histórico. */
 interface BracketData {
-  entrants: {name: string; avatar?: string; player?: boolean; friend?: boolean; team: string[]}[];
+  entrants: {name: string; avatar?: string; player?: boolean; friend?: boolean; pid?: string; team: string[]}[];
   rounds: MatchRec[][];
 }
 
@@ -43,8 +46,10 @@ function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
 }
 
 /** Estatísticas da temporada de um rival: dá uma ideia do que vem, sem entregar o time de hoje. */
-export function ScoutPanel({name, wave, team}: {name: string; wave: number; team: string[]}) {
-  const r = scoutReport(name, wave, team);
+export function ScoutPanel({name, wave, team, pid}: {name: string; wave: number; team: string[]; pid?: string}) {
+  const peer = useGame(s => (pid ? s.careerPeers.find(p => p.id === pid) : undefined));
+  const r = peer ? playerScout(peer) : scoutReport(name, wave, team);
+  if (r && !r.usage.length) return <p className="muted">{name} ainda não jogou nenhuma ronda.</p>;
   if (!r) return <p className="muted">Ninguém sabe muito sobre {name} ainda.</p>;
   const top = r.usage[0];
   return (
@@ -75,7 +80,9 @@ export function ScoutPanel({name, wave, team}: {name: string; wave: number; team
       {r.matches.map((m, i) => (
         <div key={i} className="scout-row">
           <span className={m.won ? 'win-tag' : 'lose-tag'}>{m.won ? 'Venceu' : 'Perdeu'}</span>
-          <span>vs {m.vs}</span>
+          <span>
+            {m.label ? `${m.label}: ` : ''}vs {m.vs}
+          </span>
           <TeamRow team={m.seen} size={32} />
         </div>
       ))}
@@ -99,7 +106,7 @@ function MatchDetail({data, match, onClose, wave}: {data: BracketData; match: Ma
             <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={56} />
             <b>{e.name}</b>
             {match.winner === (i === 0 ? match.a : match.b) && <span className="win-tag">Venceu</span>}
-            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player || e.friend ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} team={e.team} />}
+            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} team={e.team} pid={e.pid} />}
           </div>
         ))}
       </div>
@@ -214,11 +221,38 @@ function DrawAnimation({names, onDone}: {names: string[]; onDone: () => void}) {
 
 /** Tela do torneio dentro da run. */
 export function TournamentScreen() {
-  const {run, trainer, tourStage, tourFight, tourFinish} = useGame();
+  const {run, trainer, tourStage, tourFight, tourFinish, tourSync, tourLoad, tourDuelResult} = useGame();
   const t = run?.tournament;
   // Depois da festa de campeão, volta para a chave.
   const [party, setParty] = useState(false);
+  const [duel, setDuel] = useState(false);
+  const shared = !!t?.shared;
+  const loading = shared && !t?.shared?.ready;
+  const live = shared && !loading && t?.stage === 'bracket';
+  // Carreira online: a chave vem da nuvem (a mesma para todo mundo).
+  useEffect(() => {
+    if (!loading) return;
+    void tourLoad();
+    const id = setInterval(() => void tourLoad(), 4000);
+    return () => clearInterval(id);
+  }, [loading, tourLoad]);
+  // Carreira online: as partidas dos outros jogadores chegam pela nuvem.
+  useEffect(() => {
+    if (!live) return;
+    void tourSync();
+    const id = setInterval(() => void tourSync(), 4000);
+    return () => clearInterval(id);
+  }, [live, tourSync]);
   if (!run || !t) return null;
+  if (loading)
+    return (
+      <div className="screen tour-screen">
+        <div className="panel tour-intro">
+          <PixelIcon name="trophy" color="#e0a100" size={40} />
+          <p className="hint waiting">Montando a chave do torneio com os outros jogadores...</p>
+        </div>
+      </div>
+    );
   const info = tourInfo(t.kind);
   const me = playerIndex(t);
   const data: BracketData = {
@@ -227,6 +261,30 @@ export function TournamentScreen() {
   };
   const next = playerMatch(t);
   const foe = next ? t.entrants[next.a === me ? next.b : next.a] : null;
+  if (duel && foe?.friend && foe.pid && t.shared && next) {
+    const r = t.rounds.length - 1;
+    const i = t.rounds[r].indexOf(next);
+    const team = run.party.slice(0, info.teamSize).map(m => ({
+      ...structuredClone(m),
+      hp: maxHp(m),
+      // Sem mega na carreira, a pedra fica de fora.
+      item: run.career?.rules.megas === false && m.item && getItem(m.item).megaFor ? undefined : m.item,
+    }));
+    return (
+      <CareerDuel
+        room={`${t.shared.tid}-${r}-${i}`}
+        host={t.shared.me < foe.pid}
+        me={{name: trainer?.name ?? 'Você', avatar: trainer?.avatar ?? ''}}
+        foe={{name: foe.name, avatar: foe.avatar ?? ''}}
+        team={team}
+        onLeave={() => setDuel(false)}
+        onDone={res => {
+          setDuel(false);
+          tourDuelResult({...res, host: t.shared!.me < foe.pid!});
+        }}
+      />
+    );
+  }
   const final = t.rounds[t.rounds.length - 1]?.find(m => m.a === me || m.b === me);
   const finalFoe = final ? t.entrants[final.a === me ? final.b : final.a] : null;
   const pi = prizeIndex(t.placement ?? 5);
@@ -305,11 +363,23 @@ export function TournamentScreen() {
                 <b>
                   {ROUND_NAMES[t.rounds.length - 1]}: {trainer?.name ?? 'Você'} vs {foe.name}
                 </b>
-                <ScoutToggle name={foe.name} wave={t.wave} team={foe.team.map(m => m.species)} />
+                <ScoutToggle name={foe.name} wave={t.wave} team={foe.team.map(m => m.species)} pid={foe.pid} />
+                {foe.friend && <p className="hint small">Jogador de verdade: a partida é ao vivo, cada um no seu PC. Vocês dois precisam entrar.</p>}
               </div>
-              <button className="btn primary" onClick={tourFight}>
-                Lutar!
-              </button>
+              {foe.friend ? (
+                <button className="btn primary" onClick={() => setDuel(true)}>
+                  ⚡ Partida ao vivo
+                </button>
+              ) : (
+                <button className="btn primary" onClick={tourFight}>
+                  Lutar!
+                </button>
+              )}
+            </div>
+          )}
+          {t.stage === 'bracket' && !next && shared && (
+            <div className="panel tour-next">
+              <p className="hint waiting">Esperando as outras partidas desta rodada terminarem... (os amigos estão jogando as deles)</p>
             </div>
           )}
           {t.stage === 'done' && (
@@ -407,7 +477,7 @@ export function CareerCard() {
 }
 
 /** Botão "Estudar adversário": abre as últimas batalhas dele. */
-function ScoutToggle({name, wave, team}: {name: string; wave: number; team: string[]}) {
+function ScoutToggle({name, wave, team, pid}: {name: string; wave: number; team: string[]; pid?: string}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -429,7 +499,7 @@ function ScoutToggle({name, wave, team}: {name: string; wave: number; team: stri
                   </span>
                 </div>
                 <div className="pc-body">
-                  <ScoutPanel name={name} wave={wave} team={team} />
+                  <ScoutPanel name={name} wave={wave} team={team} pid={pid} />
                   <p className="hint">O elenco dele é maior que o time: quem joga hoje deve sair dos mais usados, mas não dá para ter certeza.</p>
                 </div>
               </div>

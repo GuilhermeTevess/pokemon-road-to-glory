@@ -12,7 +12,7 @@ import {AchievementsScreen, RankingScreen} from './screens/LeagueScreens';
 import {BiomeSelect, RegionSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
 import {CollectionScreen} from './screens/CollectionScreen';
 import {QuickplayScreen} from './screens/QuickplayScreen';
-import {CareerScreen} from './screens/CareerScreen';
+import {CareerScreen, WaitingScreen} from './screens/CareerScreen';
 import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
@@ -22,6 +22,14 @@ import {fast, setFast} from './settings';
 export function App() {
   const {screen, run, toasts, achievePops, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
+  const careerCode = useGame(s => s.trainer?.career?.code);
+  // Carreira online: mantém a classificação e o progresso dos amigos atualizados.
+  useEffect(() => {
+    if (!careerCode) return;
+    void useGame.getState().refreshCareer();
+    const id = setInterval(() => void useGame.getState().refreshCareer(), 20000);
+    return () => clearInterval(id);
+  }, [careerCode]);
   const [sound, setSound] = useState(soundEnabled());
   const [fastOn, setFastOn] = useState(fast);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
@@ -46,6 +54,7 @@ export function App() {
   else if (run.phase === 'gymIntro') body = <GymIntroScreen />;
   else if (run.phase === 'event') body = <EventScreen />;
   else if (run.phase === 'tournament') body = <TournamentScreen />;
+  else if (run.phase === 'waiting') body = <WaitingScreen />;
   else if (run.phase === 'reward' || run.phase === 'postBattle') body = <RewardScreen />;
   else body = <EndScreen kind={run.phase === 'stageClear' ? 'stageClear' : 'gameOver'} />;
 

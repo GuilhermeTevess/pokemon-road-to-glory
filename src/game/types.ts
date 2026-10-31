@@ -50,6 +50,8 @@ export type Phase =
   | 'gymIntro'
   | 'event'
   | 'tournament'
+  /** Carreira online: esperando os outros jogadores terminarem a ronda. */
+  | 'waiting'
   | 'gameOver'
   | 'stageClear';
 
@@ -133,6 +135,8 @@ export interface RunState {
   quick?: boolean;
   /** Run de uma carreira online (código, temporada e regras do host). */
   career?: RunCareer;
+  /** Última ronda de jogo terminada (vitória, torneio encerrado...). */
+  cleared?: number;
   id: string;
   startedAt: number;
   wave: number;
