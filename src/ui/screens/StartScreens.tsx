@@ -11,7 +11,7 @@ import {decodeLook, isCustom, lookFromName, lookPixels} from '../../game/look';
 import {CHARACTERS, CLASSES, PROTAGONISTS} from '../../data/trainerSprites';
 import type {Look} from '../../game/look';
 import type {Trainer} from '../../game/trainers';
-import {PARTY_SIZE, useGame} from '../../game/store';
+import {PARTY_SIZE, peekRun, runActive, useGame} from '../../game/store';
 import type {Screen} from '../../game/store';
 import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
@@ -99,7 +99,7 @@ function trainerStats(t: Trainer) {
 
 /** Escolha / criação de treinador. Cada treinador tem coleção e run próprias. */
 export function TrainerSelect() {
-  const {trainers: all, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer, setScreen} = useGame();
+  const {trainers: all, trainer, selectTrainer, createTrainer, removeTrainer, updateTrainer, setScreen, playSolo, playOnline} = useGame();
   const trainers = all.filter(t => !t.career);
   const careers = all.filter(t => t.career);
   const [creating, setCreating] = useState(all.length === 0);
@@ -108,6 +108,8 @@ export function TrainerSelect() {
   /** Treinador cujo visual está sendo editado. */
   const [editing, setEditing] = useState<Trainer | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  /** Treinador cuja run vai ser apagada para começar outra (pede confirmação). */
+  const [confirmNew, setConfirmNew] = useState<string | null>(null);
   return (
     <div className="screen trainer-screen">
       <div className="logo small">
@@ -115,22 +117,47 @@ export function TrainerSelect() {
         <div className="logo-main">ROAD TO GLORY</div>
       </div>
       <h2>Quem vai jogar?</h2>
-      <p className="hint">Cada treinador tem sua própria coleção e sua própria run salva. Até {MAX_TRAINERS} treinadores.</p>
+      <p className="hint">
+        Até {MAX_TRAINERS} treinadores, cada um com a sua coleção e a sua run: dá para ter {MAX_TRAINERS} runs ao mesmo tempo. Começar uma run nova com um treinador apaga a run que ele tinha.
+      </p>
       <div className="trainer-slots">
         {trainers.map(t => {
           const st = trainerStats(t);
+          const saved = peekRun(t.id);
+          const going = runActive(saved);
           return (
             <div key={t.id} className={`trainer-card panel ${trainer?.id === t.id ? 'selected' : ''}`}>
               <TrainerAvatar avatar={t.avatar} name={t.name} />
               <h3>{t.name}</h3>
+              <div className={`run-status ${going ? 'on' : ''}`}>{going ? `Run em andamento · ronda ${Math.max(1, roundOf(saved))}` : 'Sem run em andamento'}</div>
               <ul className="trainer-stats">
                 <li>Coleção: {st.species}</li>
                 <li>Runs: {st.runs}</li>
                 <li>Melhor ronda: {st.best}</li>
                 <li>Etapas concluídas: {st.clears}</li>
               </ul>
-              <button className="btn primary" onClick={() => selectTrainer(t.id)}>
-                Jogar
+              {going ? (
+                <>
+                  <button className="btn primary" onClick={() => playSolo(t.id, false)}>
+                    ▶ Continuar run
+                  </button>
+                  {confirmNew === t.id ? (
+                    <button className="btn small danger" onClick={() => playSolo(t.id, true)}>
+                      Apagar a run de agora e começar outra?
+                    </button>
+                  ) : (
+                    <button className="btn small" onClick={() => setConfirmNew(t.id)}>
+                      Nova run
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button className="btn primary" onClick={() => playSolo(t.id, true)}>
+                  ▶ Nova run
+                </button>
+              )}
+              <button className="btn small" onClick={() => selectTrainer(t.id)}>
+                Menu do treinador
               </button>
               <button className="btn small" onClick={() => (setCreating(false), setEditing({...t}))}>
                 Editar visual
@@ -166,10 +193,17 @@ export function TrainerSelect() {
                   <b>{t.name}</b>
                   <div className="hint small">
                     Código {t.career!.code} · {t.career!.done ? 'carreira encerrada' : `temporada ${t.career!.season}`}
+                    {(() => {
+                      const r = peekRun(t.id);
+                      return !t.career!.done && runActive(r) ? ` · ronda ${roundOf(r)}` : '';
+                    })()}
                   </div>
                 </div>
-                <button className="btn small primary" onClick={() => (selectTrainer(t.id), setScreen('career'))}>
-                  Entrar
+                <button className="btn small primary" onClick={() => void playOnline(t.id)}>
+                  ▶ Jogar
+                </button>
+                <button className="btn small" onClick={() => (selectTrainer(t.id), setScreen('career'))}>
+                  Classificação
                 </button>
                 {confirmDel === t.id ? (
                   <button className="btn small danger" onClick={() => removeTrainer(t.id)}>
@@ -237,7 +271,9 @@ export function TrainerSelect() {
 }
 
 export function TitleScreen() {
-  const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career, careerPeers} = useGame();
+  const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career, careerPeers, trainers, playOnline} = useGame();
+  const careers = trainers.filter(t => t.career);
+  const [onlineOpen, setOnlineOpen] = useState(false);
   const seasonWait = trainer?.career ? seasonBlockers(careerPeers, playerId(trainer.id), trainer.career.season) : [];
   const [confirm, setConfirm] = useState(false);
   if (!trainer) return <TrainerSelect />;
@@ -310,6 +346,44 @@ export function TitleScreen() {
           {trainer.career && (
             <button className="btn career-btn" onClick={() => setScreen('career')}>
               🌐 Carreira {trainer.career.code} <small>Classificação, regras e amigos</small>
+            </button>
+          )}
+          {!trainer.career && (
+            <button
+              className="btn career-btn online-btn"
+              onClick={() => {
+                // Uma carreira só: entra direto nela. Várias: mostra a lista. Nenhuma: criar ou entrar com código.
+                if (careers.length === 1) void playOnline(careers[0].id);
+                else if (careers.length) setOnlineOpen(o => !o);
+                else setScreen('career');
+              }}
+            >
+              🌐 Jogar online{' '}
+              <small>{careers.length === 1 ? `Continuar a carreira ${careers[0].career!.code}` : careers.length ? `${careers.length} carreiras: escolha uma` : 'Carreira com amigos: criar ou entrar com código'}</small>
+            </button>
+          )}
+          {onlineOpen && !trainer.career && careers.length > 1 && (
+            <div className="career-list">
+              {careers.map(t => (
+                <button key={t.id} className="career-chip pick" onClick={() => void playOnline(t.id)}>
+                  <TrainerAvatar avatar={t.avatar} name={t.name} size={32} />
+                  <div>
+                    <b>{t.name}</b>
+                    <div className="hint small">
+                      Código {t.career!.code} · {t.career!.done ? 'encerrada' : `temporada ${t.career!.season}`}
+                    </div>
+                  </div>
+                  <span>▶</span>
+                </button>
+              ))}
+              <button className="btn small" onClick={() => setScreen('career')}>
+                Criar ou entrar em outra carreira
+              </button>
+            </div>
+          )}
+          {careers.length === 1 && !trainer.career && (
+            <button className="link small" onClick={() => setScreen('career')}>
+              Criar ou entrar em outra carreira
             </button>
           )}
           <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>

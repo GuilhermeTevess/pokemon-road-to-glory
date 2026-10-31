@@ -38,7 +38,7 @@ import type {MatchResult, TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {TrainerCareer} from './trainers';
-import {careerBoost, enforceRules, fromSnap, groupLog, playerId, roundBlockers, snapMon, waveStep} from './career';
+import {careerBoost, deviceId, enforceRules, fromSnap, groupLog, playerId, roundBlockers, seasonBlockers, snapMon, waveStep} from './career';
 import type {CareerDoc, CareerFight, PlayerDoc} from './career';
 import {cacheCareer, cachedCareer, cloud, cloudMatches, cloudTours, cloudWorld} from './cloud';
 import {listPt, newWorld, nextSeasonWorld, stepWorld, worldTournament} from './world';
@@ -62,6 +62,16 @@ function loadRun(trainerId: string | null): RunState | null {
     /* sem storage */
   }
   return null;
+}
+
+/** Run salva de um treinador (sem trocar de treinador). Cada treinador tem a sua. */
+export function peekRun(trainerId: string): RunState | null {
+  return loadRun(trainerId);
+}
+
+/** Run ainda em andamento (não acabou nem fechou a etapa). */
+export function runActive(run: RunState | null): run is RunState {
+  return !!run && run.party.length > 0 && run.phase !== 'gameOver' && run.phase !== 'stageClear';
 }
 
 function saveRun(trainerId: string | null, run: RunState | null): void {
@@ -159,6 +169,12 @@ interface Store {
   resetLineEvs(line: string): void;
   presetEvs(line: string, preset: number): void;
   abandonRun(): void;
+  /** Escolhe o treinador e vai direto para a run dele (fresh: apaga a que ele tinha e começa outra). */
+  playSolo(trainerId: string, fresh: boolean): void;
+  /** Entra numa carreira online e já vai jogando: continua a temporada ou começa a próxima. */
+  playOnline(trainerId: string): Promise<void>;
+  /** Continua a carreira do treinador atual (ou mostra a carreira se precisa esperar). */
+  continueCareer(): void;
   chooseStartBiome(id: string, region?: string): void;
   finishBattle(outcome: 'won' | 'caught' | 'fled' | 'lost'): void;
   resolvePending(choice: string | number | null): void;
@@ -810,7 +826,9 @@ export const useGame = create<Store>((set, get) => {
       const trainers = [...get().trainers, t];
       saveTrainers(trainers, t.id);
       battle = null;
-      set({trainers, trainer: t, run: null, collection: loadCollection(colFrom ?? t.id), career: doc, careerPeers: [], screen: 'career'});
+      // Quem criou vê o código para mandar aos amigos; quem entrou já vai escolher o time.
+      const screen: Screen = doc.host === deviceId() ? 'career' : 'run';
+      set({trainers, trainer: t, run: null, collection: loadCollection(colFrom ?? t.id), career: doc, careerPeers: [], screen});
       cacheCareer(doc.code, doc, []);
       pushNow(null);
       setTimeout(() => void get().refreshCareer(), 600);
@@ -1195,6 +1213,30 @@ export const useGame = create<Store>((set, get) => {
       battle = null;
       saveRun(tid(), null);
       set({run: null, screen: 'title'});
+    },
+
+    playSolo(trainerId, fresh) {
+      if (get().trainer?.id !== trainerId) get().selectTrainer(trainerId);
+      if (fresh || !runActive(get().run)) get().abandonRun();
+      set({screen: 'run'});
+    },
+
+    async playOnline(trainerId) {
+      if (get().trainer?.id !== trainerId) get().selectTrainer(trainerId);
+      if (!get().trainer?.career) return;
+      if (!get().career || !runActive(get().run)) await get().refreshCareer();
+      if (get().trainer?.id === trainerId) get().continueCareer();
+    },
+
+    continueCareer() {
+      const {trainer, career, careerPeers, run} = get();
+      const tc = trainer?.career;
+      if (!trainer || !tc) return;
+      if (runActive(run)) return set({screen: 'run'});
+      // Carreira acabou, sem internet ou esperando os amigos fecharem a temporada: mostra a carreira.
+      if (tc.done || !career || seasonBlockers(careerPeers, playerId(trainer.id), tc.season).length) return set({screen: 'career'});
+      get().abandonRun();
+      set({screen: 'run'});
     },
 
     chooseStartBiome(id, region) {
