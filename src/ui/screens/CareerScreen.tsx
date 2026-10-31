@@ -1,9 +1,9 @@
 // Carreira online: criar (host escolhe as regras), entrar com o código e ver a classificação.
 import {useEffect, useState} from 'react';
-import {DEFAULT_RULES, MAX_PLAYERS, deviceId, newCareerCode, playerId, roundBlockers, rulesSummary, standings} from '../../game/career';
+import {DEFAULT_RULES, MAX_PLAYERS, deviceId, newCareerCode, playerId, roundBlockers, roundOf, rulesSummary, seasonBlockers, standings} from '../../game/career';
 import type {CareerDoc, CareerRules, PlayerDoc} from '../../game/career';
 import {cloud, cloudReady} from '../../game/cloud';
-import {useGame} from '../../game/store';
+import {runActive, useGame} from '../../game/store';
 import {AVATARS} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
 import {tourInfo} from '../../game/tournament';
@@ -271,7 +271,7 @@ function PlayerRow({p, pos, me, seasons, rounds, onPoints, onProfile}: {p: Playe
 }
 
 function CareerHub() {
-  const {trainer, career, refreshCareer, setScreen, selectTrainer} = useGame();
+  const {trainer, career, refreshCareer, selectTrainer, continueCareer, careerPeers, run} = useGame();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     void refreshCareer();
@@ -322,9 +322,23 @@ function CareerHub() {
         </p>
       </div>
       <div className="row center">
-        <button className="btn primary big-play" onClick={() => setScreen('title')}>
-          ▶ Jogar
-        </button>
+        {(() => {
+          const going = runActive(run);
+          const wait = going ? [] : seasonBlockers(careerPeers, playerId(trainer.id), trainer.career.season);
+          return (
+            <button className="btn primary big-play" disabled={!going && (!!trainer.career.done || !career || wait.length > 0)} onClick={continueCareer}>
+              {going
+                ? `▶ Continuar · ronda ${roundOf(run)}`
+                : trainer.career.done
+                ? 'Carreira encerrada'
+                : !career
+                ? 'Conectando…'
+                : wait.length
+                ? `Esperando ${wait.map(p => p.name).join(', ')} terminar a temporada`
+                : `▶ Jogar temporada ${trainer.career.season}/${career.rules.seasons}`}
+            </button>
+          );
+        })()}
         <button className="btn small ghost" onClick={() => selectTrainer(null)}>
           Trocar treinador
         </button>
