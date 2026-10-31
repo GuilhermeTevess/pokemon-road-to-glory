@@ -436,7 +436,7 @@ export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose
 }
 
 /** Painel fixo ao lado da run: treinador, dinheiro, time, mochila, PC e fraquezas. */
-export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => void}) {
+export function RunSidebar({onOpen, open = false, onClose}: {onOpen: (tab: PartyTab, mon?: string) => void; open?: boolean; onClose?: () => void}) {
   const {run, trainer} = useGame();
   const [shop, setShop] = useState(false);
   const [diary, setDiary] = useState(false);
@@ -444,7 +444,12 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
   if (!run) return null;
   const bagCount = Object.values(run.bag).reduce((a, n) => a + n, 0);
   return (
-    <aside className="run-sidebar">
+    <>
+    {open && <div className="sb-backdrop" onClick={onClose} />}
+    <aside className={`run-sidebar ${open ? 'open' : ''}`}>
+      <button className="btn small sb-close" onClick={onClose}>
+        ✕ Fechar painel
+      </button>
       <div className="panel sb-head">
         {trainer && <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={48} />}
         <div>
@@ -527,6 +532,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
         </TeamWeakness>
       </div>
     </aside>
+    </>
   );
 }
 
