@@ -1,6 +1,6 @@
 // Carreira online: criar (host escolhe as regras), entrar com o código e ver a classificação.
 import {useEffect, useState} from 'react';
-import {DEFAULT_RULES, deviceId, newCareerCode, rulesSummary, standings} from '../../game/career';
+import {DEFAULT_RULES, deviceId, newCareerCode, playerId, roundBlockers, rulesSummary, standings} from '../../game/career';
 import type {CareerDoc, CareerRules, PlayerDoc} from '../../game/career';
 import {cloud, cloudReady} from '../../game/cloud';
 import {useGame} from '../../game/store';
@@ -8,7 +8,7 @@ import {AVATARS} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
 import {tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
-import {Sprite} from '../components';
+import {Modal, Sprite} from '../components';
 import {AvatarEditor, TrainerAvatar} from './StartScreens';
 
 export function CareerScreen() {
@@ -229,7 +229,7 @@ function CareerSetup() {
 
 const MEDAL: Record<number, string> = {1: '🥇', 2: '🥈', 3: '🥉'};
 
-function PlayerRow({p, pos, me, seasons, rounds}: {p: PlayerDoc; pos: number; me: boolean; seasons: number; rounds: number}) {
+function PlayerRow({p, pos, me, seasons, rounds, onPoints}: {p: PlayerDoc; pos: number; me: boolean; seasons: number; rounds: number; onPoints: () => void}) {
   const titles = p.results.filter(r => r.placement === 1);
   return (
     <div className={`standing-row ${me ? 'me' : ''}`}>
@@ -252,15 +252,15 @@ function PlayerRow({p, pos, me, seasons, rounds}: {p: PlayerDoc; pos: number; me
           ))}
         </div>
       </div>
-      <span className="pts">
+      <button className="pts link-pts" onClick={onPoints} title="Ver de onde vêm os pontos">
         {MEDAL[pos] ?? ''} {p.banked + p.points} pts
-      </span>
+      </button>
     </div>
   );
 }
 
 function CareerHub() {
-  const {trainer, career, careerPeers, refreshCareer, setScreen, selectTrainer} = useGame();
+  const {trainer, career, refreshCareer, setScreen, selectTrainer} = useGame();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     void refreshCareer();
@@ -268,8 +268,6 @@ function CareerHub() {
     return () => clearInterval(id);
   }, [refreshCareer]);
   if (!trainer?.career) return null;
-  const myId = deviceId() + '-' + trainer.id;
-  const rows = standings(careerPeers);
   const code = trainer.career.code;
   const share = `${location.origin}${location.pathname}`;
   return (
@@ -307,10 +305,7 @@ function CareerHub() {
             ↻ Atualizar
           </button>
         </div>
-        {rows.length === 0 && <p className="hint">Ninguém jogou ainda. Manda o código para os amigos!</p>}
-        {rows.map((p, i) => (
-          <PlayerRow key={p.id} p={p} pos={i + 1} me={p.id === myId} seasons={career?.rules.seasons ?? 1} rounds={career?.rules.rounds ?? 120} />
-        ))}
+        <CareerStandings />
         <p className="hint small">
           Cada um joga no seu tempo. Nos torneios, os outros jogadores entram na sua chave com o time que levaram para aquele torneio (ou o time de agora, se ainda não chegaram lá).
         </p>
@@ -322,6 +317,98 @@ function CareerHub() {
         <button className="btn small ghost" onClick={() => selectTrainer(null)}>
           Trocar treinador
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Extrato de pontos de um jogador (o que o ranking mostra ao clicar nos pontos). */
+function PointsModal({p, onClose}: {p: PlayerDoc; onClose: () => void}) {
+  const log = p.log ?? [];
+  return (
+    <Modal onClose={onClose}>
+      <h2>Pontos de {p.name}</h2>
+      <div className="points-list">
+        {p.banked > 0 && (
+          <div className="points-row">
+            <span>Temporadas anteriores</span>
+            <b>{p.banked}</b>
+          </div>
+        )}
+        {log.map(e => (
+          <div key={e.label} className="points-row">
+            <span>{e.label}</span>
+            <b>+{e.pts}</b>
+          </div>
+        ))}
+        {!log.length && !p.banked && <p className="hint">Ainda sem pontos nesta temporada.</p>}
+        <div className="points-row total">
+          <span>Total</span>
+          <b>{p.banked + p.points}</b>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Classificação da carreira (todos os jogadores), com o extrato de pontos de cada um. */
+export function CareerStandings({compact}: {compact?: boolean}) {
+  const {trainer, career, careerPeers} = useGame();
+  const [open, setOpen] = useState<PlayerDoc | null>(null);
+  if (!trainer?.career) return null;
+  const myId = playerId(trainer.id);
+  const rows = standings(careerPeers);
+  return (
+    <div className={compact ? 'standings-compact' : undefined}>
+      {rows.length === 0 && <p className="hint">Ninguém jogou ainda. Manda o código para os amigos!</p>}
+      {rows.map((p, i) =>
+        compact ? (
+          <button key={p.id} className={`mini-standing ${p.id === myId ? 'me' : ''}`} onClick={() => setOpen(p)}>
+            <span>{i + 1}º</span>
+            <b>{p.name}</b>
+            <small>{p.out ? 'fora da temporada' : `ronda ${p.round}`}</small>
+            <span className="pts">{p.banked + p.points}</span>
+          </button>
+        ) : (
+          <PlayerRow key={p.id} p={p} pos={i + 1} me={p.id === myId} seasons={career?.rules.seasons ?? 1} rounds={career?.rules.rounds ?? 120} onPoints={() => setOpen(p)} />
+        ),
+      )}
+      {open && <PointsModal p={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+/** Ronda terminada: esperando os outros jogadores terminarem a deles. */
+export function WaitingScreen() {
+  const {run, trainer, careerPeers, careerContinue} = useGame();
+  useEffect(() => {
+    void careerContinue();
+    const id = setInterval(() => void careerContinue(), 5000);
+    return () => clearInterval(id);
+  }, [careerContinue]);
+  if (!run?.career || !trainer) return null;
+  const blockers = roundBlockers(careerPeers, playerId(trainer.id), run.career.season, run.wave);
+  return (
+    <div className="screen career-screen">
+      <div className="panel career-panel waiting-panel">
+        <h2>⏳ Esperando os amigos</h2>
+        <p>Você terminou esta ronda! Na carreira as rondas andam juntas: a próxima começa quando todo mundo terminar a sua.</p>
+        <div className="blockers">
+          {blockers.map(p => (
+            <div key={p.id} className="career-chip">
+              <TrainerAvatar avatar={p.avatar} name={p.name} size={40} />
+              <div>
+                <b>{p.name}</b>
+                <div className="hint small">{p.round ? `jogando a ronda ${p.round}` : 'ainda não começou a temporada'}</div>
+              </div>
+            </div>
+          ))}
+          {!blockers.length && <p className="hint">Todo mundo pronto! Seguindo...</p>}
+        </div>
+      </div>
+      <div className="panel standings">
+        <h3>Classificação</h3>
+        <CareerStandings />
       </div>
     </div>
   );

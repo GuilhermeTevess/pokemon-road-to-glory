@@ -1,4 +1,4 @@
-import {roundOf} from '../../game/career';
+import {playerId, roundOf, seasonBlockers} from '../../game/career';
 import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {BIOMES, biomePools, hiddenBiomeOf} from '../../data/biomes';
@@ -237,7 +237,8 @@ export function TrainerSelect() {
 }
 
 export function TitleScreen() {
-  const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career} = useGame();
+  const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career, careerPeers} = useGame();
+  const seasonWait = trainer?.career ? seasonBlockers(careerPeers, playerId(trainer.id), trainer.career.season) : [];
   const [confirm, setConfirm] = useState(false);
   if (!trainer) return <TrainerSelect />;
   const active = run && run.phase !== 'gameOver' && run.phase !== 'stageClear';
@@ -288,7 +289,7 @@ export function TitleScreen() {
           )}
           <button
             className={`btn ${active ? '' : 'primary big-play'}`}
-            disabled={!!trainer.career?.done || (!!trainer.career && !career)}
+            disabled={!!trainer.career?.done || (!!trainer.career && !career) || (!active && seasonWait.length > 0)}
             onClick={() => {
               if (active && !confirm) return setConfirm(true);
               abandonRun();
@@ -300,6 +301,8 @@ export function TitleScreen() {
               ? 'Carreira encerrada'
               : active && confirm
               ? trainer.career ? 'Certeza? A temporada atual acaba aqui' : 'Certeza? A run atual será perdida'
+              : !active && seasonWait.length
+              ? `Esperando ${seasonWait.map(p => p.name).join(', ')} terminar a temporada`
               : trainer.career
               ? `${active ? '' : '▶ '}${active ? 'Encerrar e ir para a' : 'Jogar'} temporada ${trainer.career.season + (active ? 1 : 0)}/${career?.rules.seasons ?? '?'}`
               : active ? 'Nova run' : '▶ Nova run'}

@@ -1275,3 +1275,21 @@ table.move-info td { padding: 3px 0; }
 .shiny-star { display: inline-block; vertical-align: middle; margin-left: 4px; animation: shiny-twinkle 1.6s steps(4) infinite; filter: drop-shadow(0 0 2px rgba(255, 210, 60, .8)); }
 @keyframes shiny-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.7) rotate(45deg); opacity: .75; } }
 .sb-glow { font-size: 12px; color: #a87900; margin-top: 4px; }
+/* Carreira sincronizada */
+.link-pts { background: none; border: 0; cursor: pointer; text-decoration: underline dotted; color: inherit; }
+.points-list { display: flex; flex-direction: column; gap: 4px; min-width: 280px; }
+.points-row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 8px; background: var(--panel-2); border: 2px solid var(--line); }
+.points-row.total { background: var(--butter); font-weight: bold; }
+.sb-career { margin-top: 6px; font-size: 12px; }
+.sb-career summary { cursor: pointer; font-weight: bold; }
+.standings-compact { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.mini-standing { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 6px; align-items: center; font: inherit; font-size: 11px; padding: 3px 6px; background: var(--panel-2); border: 2px solid var(--line); cursor: pointer; text-align: left; color: var(--ink); }
+.mini-standing.me { background: var(--butter); }
+.mini-standing .pts { font-weight: bold; }
+.waiting-panel { text-align: center; }
+.blockers { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.duel-wait { display: flex; justify-content: center; padding-top: 40px; }
+.duel-wait-card { padding: 24px 32px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.duel-vs { display: flex; align-items: center; gap: 24px; }
+.duel-vs > span:not(.vs) { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.duel-vs .vs { font-family: 'Press Start 2P', monospace; font-size: 22px; color: var(--pink-d); }

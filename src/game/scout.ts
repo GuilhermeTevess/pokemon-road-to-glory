@@ -4,6 +4,7 @@
 import {RIVALS, getRival} from '../data/rivals';
 import {getItem} from '../data/items';
 import {rivalItem} from './tournament';
+import type {PlayerDoc} from './career';
 
 export interface ScoutUse {
   species: string;
@@ -14,6 +15,8 @@ export interface ScoutUse {
 }
 
 export interface ScoutMatch {
+  /** Tipo da luta (Ginásio, Torneio...), quando é um jogador de verdade. */
+  label?: string;
   vs: string;
   won: boolean;
   /** Pokémon que apareceram naquela luta. */
@@ -60,4 +63,16 @@ export function scoutReport(name: string, wave: number, team: string[]): ScoutRe
     return {vs: others[Math.floor(rand() * others.length)].name, won: rand() < 0.6, seen};
   });
   return {usage, matches, season, lead: rand() < 0.7 ? team[0] : undefined};
+}
+
+const FIGHT_LABEL = {gym: 'Ginásio', tour: 'Torneio', legend: 'Lenda', boss: 'Chefe', rival: 'Rival'} as const;
+
+/** Estudo de um jogador da carreira: números reais da temporada dele (uso, lutas importantes). */
+export function playerScout(p: PlayerDoc): ScoutReport {
+  const items = new Map(p.team.map(m => [m.species, m.item ? getItem(m.item).name : '—']));
+  const usage = Object.entries(p.usage ?? {})
+    .map(([sp, rounds]) => ({species: sp, rounds, item: items.get(sp) ?? '—'}))
+    .sort((a, b) => b.rounds - a.rounds);
+  const matches = (p.fights ?? []).slice(0, 6).map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: f.seen}));
+  return {usage, matches, season: Math.max(1, p.round, ...usage.map(u => u.rounds)), lead: p.team[0]?.species};
 }
