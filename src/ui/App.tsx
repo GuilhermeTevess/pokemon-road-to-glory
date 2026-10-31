@@ -12,11 +12,13 @@ import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
 import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
+import {fast, setFast} from './settings';
 
 export function App() {
   const {screen, run, toasts, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
   const [helpOpen, setHelpOpen] = useState(false);
   const [sound, setSound] = useState(soundEnabled());
+  const [fastOn, setFastOn] = useState(fast);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
 
   let body;
@@ -49,6 +51,16 @@ export function App() {
         )}
         <button className="btn small ghost" onClick={() => openTypeCalc([])} title="Calculadora de tipos">
           <PixelIcon name="dice" /> Tipos
+        </button>
+        <button
+          className={`btn small ghost ${fastOn ? 'on' : ''}`}
+          onClick={() => {
+            setFast(!fastOn);
+            setFastOn(!fastOn);
+          }}
+          title="Pular animações: batalhas, capturas, evoluções e sorteios mais rápidos"
+        >
+          {fastOn ? '⏩ Rápido' : '▶ Animações'}
         </button>
         <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
           <PixelIcon name="help" /> Ajuda

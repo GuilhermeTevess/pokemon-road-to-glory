@@ -15,6 +15,7 @@ import {playCoins, playEvolve, playItem} from '../audio';
 import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {EggInfo} from './DaycareScreen';
+import {fast} from '../settings';
 
 /** Lista de Pokémon para escolher em quem usar um item. */
 function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: OwnedMon[]; onPick: (uid: string) => void; children?: React.ReactNode}) {
@@ -116,6 +117,11 @@ export function RewardScreen() {
     pickReward(id);
   };
   const choosingItem = choosing ? getItem(choosing) : null;
+  const taken = run.rewardTaken;
+  const take = (id: string, target?: string) => {
+    pickReward(id, target);
+    setChoosing(null);
+  };
   return (
     <div className="screen reward-screen">
       <h2>Ronda {run.wave} concluída!</h2>
@@ -126,34 +132,52 @@ export function RewardScreen() {
       ))}
       <div className="tabs big">
         <button className={`tab ${tab === 'reward' ? 'active' : ''}`} onClick={() => setTab('reward')}>
-          Recompensa grátis
+          <PixelIcon name="star" /> Recompensa
         </button>
         <button className={`tab ${tab === 'shop' ? 'active' : ''}`} onClick={() => setTab('shop')}>
-          Loja · ₽ {run.money}
+          <ItemIcon id="money" size={18} /> Loja · ₽ {run.money}
         </button>
       </div>
       {tab === 'reward' ? (
-        <>
-          <p className="hint">Escolha 1 item de graça. Itens que vão num Pokémon podem ser usados na hora ou guardados na mochila.</p>
-          <div className="rewards">
-            {run.rewardOptions.map(id => (
-              <RewardCard key={id} id={id} wave={run.wave} onClick={() => choose(id)} />
-            ))}
+        taken || !run.rewardOptions.length ? (
+          <div className="panel reward-taken">
+            {taken && (
+              <p>
+                <ItemIcon id={taken} size={32} /> Você pegou <b>{getItem(taken).name}</b>!
+              </p>
+            )}
+            <div className="row center wrap">
+              <button className="btn" onClick={() => setTab('shop')}>
+                <ItemIcon id="money" size={18} /> Passar na loja
+              </button>
+              <button className="btn primary" onClick={skipReward}>
+                Continuar ▶
+              </button>
+            </div>
           </div>
-          <div className="row center">
-            <button className="btn" disabled={run.money < cost} onClick={reroll}>
-              <PixelIcon name="dice" /> Sortear de novo · {cost ? `₽ ${cost}` : 'grátis'}
-            </button>
-            <button className="btn" onClick={skipReward}>
-              Pular
-            </button>
-          </div>
-        </>
+        ) : (
+          <>
+            <p className="hint">Escolha 1 item de graça.</p>
+            <div className="rewards">
+              {run.rewardOptions.map(id => (
+                <RewardCard key={id} id={id} wave={run.wave} onClick={() => choose(id)} />
+              ))}
+            </div>
+            <div className="row center wrap">
+              <button className="btn" disabled={run.money < cost} onClick={reroll}>
+                <PixelIcon name="dice" /> Sortear de novo · {cost ? `₽ ${cost}` : 'grátis'}
+              </button>
+              <button className="btn ghost" onClick={skipReward}>
+                Pular
+              </button>
+            </div>
+          </>
+        )
       ) : (
         <div className="shop">
           <div className="wallet panel">
             <ItemIcon id="money" size={32} /> Você tem <strong>₽ {run.money}</strong>
-            <span className="muted"> · ganha dinheiro a cada vitória e com Bolsas e Pepitas</span>
+
           </div>
           {SHOP.map(shelf => (
             <section key={shelf.title} className="shelf">
@@ -178,9 +202,16 @@ export function RewardScreen() {
               </div>
             </section>
           ))}
-          <button className="btn" onClick={() => setTab('reward')}>
-            Voltar para a recompensa
-          </button>
+          <div className="row center wrap">
+            <button className="btn" onClick={() => setTab('reward')}>
+              Voltar
+            </button>
+            {(taken || !run.rewardOptions.length) && (
+              <button className="btn primary" onClick={skipReward}>
+                Continuar ▶
+              </button>
+            )}
+          </div>
         </div>
       )}
       <p className="hint">
@@ -191,18 +222,18 @@ export function RewardScreen() {
         <Modal onClose={() => setChoosing(null)}>
           <h2>Usar agora?</h2>
           {needsTarget(choosingItem) ? (
-            <TargetPicker itemId={choosing} mons={[...run.party, ...run.box]} onPick={uid => pickReward(choosing, uid)}>
-              <button className="btn" onClick={() => pickReward(choosing)}>
+            <TargetPicker itemId={choosing} mons={[...run.party, ...run.box]} onPick={uid => take(choosing, uid)}>
+              <button className="btn" onClick={() => take(choosing)}>
                 Guardar na mochila
               </button>
             </TargetPicker>
           ) : (
             <div className="list-actions">
               <p>{choosingItem.desc}</p>
-              <button className="btn primary" onClick={() => pickReward(choosing, '')}>
+              <button className="btn primary" onClick={() => take(choosing, '')}>
                 Usar agora
               </button>
-              <button className="btn" onClick={() => pickReward(choosing)}>
+              <button className="btn" onClick={() => take(choosing)}>
                 Guardar na mochila
               </button>
             </div>
@@ -498,8 +529,12 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
 
 /** Cena de evolução: o Pokémon no centro brilha, alterna as silhuetas cada vez mais rápido, flash e revela a nova forma. */
 function EvolutionScene({mon, into, onDone}: {mon: OwnedMon; into: string; onDone: () => void}) {
-  const [phase, setPhase] = useState<'start' | 'glow' | 'flash' | 'done'>('start');
+  const [phase, setPhase] = useState<'start' | 'glow' | 'flash' | 'done'>(fast() ? 'done' : 'start');
   useEffect(() => {
+    if (fast()) {
+      playEvolve('done');
+      return;
+    }
     const t = [
       setTimeout(() => {
         setPhase('glow');

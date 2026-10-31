@@ -127,6 +127,20 @@ function sentencePt(s: string): string {
 const cache = new Map<string, string>();
 
 /** Descrição curta do golpe em português (cai no inglês se faltar tradução). */
+const AMOUNT: Record<string, string> = {'1': 'um pouco', '2': 'bastante', '3': 'demais'};
+
+/** Deixa o texto mais conversado: "em 2" vira "bastante", "usuário" vira "quem usa". */
+function simplify(t: string): string {
+  return t
+    .replace(/(Aumenta|Baixa) (.+?) (do usuário|do alvo|dos inimigos|de um aliado) em (\d)\./g, (_, verb: string, what: string, who: string, n: string) => `${verb} ${AMOUNT[n] ?? `${n} níveis`} ${what} ${who}.`)
+    .replace(/\bdo usuário\b/g, 'de quem usa')
+    .replace(/\bao usuário\b/g, 'a quem usa')
+    .replace(/\bO usuário\b/g, 'Quem usa')
+    .replace(/\bo usuário\b/g, 'quem usa')
+    .replace(/\bSe o usuário\b/g, 'Se quem usa')
+    .replace(/^Sem efeito extra\.$/, 'Só causa dano, sem efeito extra.');
+}
+
 export function moveDescPt(move: string): string {
   const m = dex.moves.get(move);
   const en = m.shortDesc || m.desc || '';
@@ -139,8 +153,9 @@ export function moveDescPt(move: string): string {
     .map(s => s.replace(/@/g, '. ').replace(/Phys\.  /g, 'Phys. '))
     .map(s => sentencePt(s))
     .join(' ');
-  cache.set(en, out);
-  return out;
+  const friendly = simplify(out);
+  cache.set(en, friendly);
+  return friendly;
 }
 
 /** Só para testes: frases que ainda não têm tradução. */

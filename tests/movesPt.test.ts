@@ -11,8 +11,8 @@ describe('descrições dos golpes em português', () => {
 
   it('usa modelos para efeitos comuns', () => {
     expect(moveDescPt('Ember')).toBe('10% de chance de queimar o alvo.');
-    expect(moveDescPt('Swords Dance')).toBe('Aumenta o Ataque do usuário em 2.');
-    expect(moveDescPt('Close Combat')).toBe('Baixa Defesa e Def. Esp. do usuário em 1.');
-    expect(moveDescPt('Icy Wind')).toBe('Baixa a Velocidade dos inimigos em 1.');
+    expect(moveDescPt('Swords Dance')).toBe('Aumenta bastante o Ataque de quem usa.');
+    expect(moveDescPt('Close Combat')).toBe('Baixa um pouco Defesa e Def. Esp. de quem usa.');
+    expect(moveDescPt('Icy Wind')).toBe('Baixa um pouco a Velocidade dos inimigos.');
   });
 });

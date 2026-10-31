@@ -4,7 +4,7 @@ import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
 import {ALL_TYPES, TYPE_COLORS, dex, species} from '../../data/dex';
 import {
-  ALL_NATURES, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_PRESETS, EV_RESET_PRICE, HEART_PERKS, TUTOR_PLANS, evTotal, lineAbilities, lineMegaStones, MEGA_STONE_PRICE, tutorPrice, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
+  ALL_NATURES, CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_PRESETS, EV_RESET_PRICE, HEART_PERKS, TUTOR_PLANS, evTotal, lineAbilities, lineMegaStones, MEGA_STONE_PRICE, tutorPrice, HEART_STEPS, MAX_COST_CUT, SHINY_CHANCE, SHINY_PRICE,
   baseCost, favoriteOf, heartProgress, heartsOf, lineRoot, lineSpecies, movePrice, peekEntry, startMoveOptions, statsOf, teamCost,
 } from '../../game/meta';
 import type {CollectionEntry, Entry} from '../../game/meta';
@@ -19,11 +19,34 @@ import {CareerCard} from './TournamentScreen';
 
 const candyColor = (line: string) => TYPE_COLORS[species(line).types[0]] ?? '#e0b43a';
 
+const CANDY_HOW = `Como ganhar doces: capturar +${CANDY.catch} (repetido +${CANDY.duplicate}) · vencer lutando +${CANDY.defeat} · chefe ou treinador +${CANDY.boss} · evoluir +${CANDY.evolve}`;
+
 export function Candies({line, n}: {line: string; n: number}) {
   return (
-    <span className="candies" title={`Doces de ${species(lineRoot(line)).name}`}>
+    <span className="candies" title={`Doces de ${species(lineRoot(line)).name}. ${CANDY_HOW}`}>
       <PixelIcon name="candy" size={16} color={candyColor(lineRoot(line))} />
       {n}
+    </span>
+  );
+}
+
+/** Doces com um balãozinho (toque ou mouse) explicando como ganhar mais. */
+function CandyInfo({line, n}: {line: string; n: number}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="candy-info" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className="link candy-btn" onClick={() => setOpen(o => !o)}>
+        <Candies line={line} n={n} /> doces
+      </button>
+      {open && (
+        <span className="candy-pop">
+          <b>Como ganhar</b>
+          <span>Capturar: +{CANDY.catch} (repetido +{CANDY.duplicate})</span>
+          <span>Vencer lutando: +{CANDY.defeat}</span>
+          <span>Chefe ou treinador: +{CANDY.boss}</span>
+          <span>Evoluir: +{CANDY.evolve}</span>
+        </span>
+      )}
     </span>
   );
 }
@@ -86,73 +109,154 @@ function natureLabel(n: string): string {
   return `${n} (+${short(nat.plus)} −${short(nat.minus)})`;
 }
 
-function TutorBox({root, e}: {root: string; e: Entry}) {
-  const tutor = useGame(g => g.tutor);
-  const [kind, setKind] = useState<'nature' | 'ability'>('nature');
+const NAT_STATS: StatId[] = ['atk', 'def', 'spa', 'spd', 'spe'];
+const NAT_SHORT: Record<string, string> = {atk: 'Atq', def: 'Def', spa: 'At.Esp', spd: 'Df.Esp', spe: 'Vel'};
+/** Nature de cada célula: linha = atributo que sobe, coluna = atributo que desce. */
+const NATURE_AT: Record<string, string> = {};
+for (const n of ALL_NATURES) {
+  const nat = dex.natures.get(n);
+  if (nat.plus && nat.minus) NATURE_AT[`${nat.plus}-${nat.minus}`] = n;
+}
+/** Neutras na diagonal, na ordem tradicional da tabela. */
+const NEUTRAL = ['Hardy', 'Docile', 'Bashful', 'Quirky', 'Serious'];
+
+/** Tabela das natures: linhas = sobe, colunas = desce. Verde = liberada, estrela = equipada. */
+function NatureGrid({e, selected, onPick}: {e: Entry; selected: string | null; onPick: (n: string) => void}) {
+  const cell = (n: string) => {
+    const owned = e.natures.includes(n);
+    return (
+      <button
+        key={n}
+        className={`nat-cell ${owned ? 'owned' : ''} ${e.nature === n ? 'equipped' : ''} ${selected === n ? 'sel' : ''}`}
+        onClick={() => onPick(n)}
+        title={natureLabel(n)}
+      >
+        {e.nature === n && '★ '}
+        {n}
+      </button>
+    );
+  };
+  return (
+    <div className="nat-grid-wrap">
+      <table className="nat-grid">
+        <thead>
+          <tr>
+            <th className="nat-corner">
+              <span className="up">▲ sobe</span>
+              <span className="down">▼ desce</span>
+            </th>
+            {NAT_STATS.map(st => (
+              <th key={st} className="down">
+                ▼ {NAT_SHORT[st]}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {NAT_STATS.map(up => (
+            <tr key={up}>
+              <th className="up">▲ {NAT_SHORT[up]}</th>
+              {NAT_STATS.map(down => (
+                <td key={down}>{up === down ? cell(NEUTRAL[NAT_STATS.indexOf(up)]) : cell(NATURE_AT[`${up}-${down}`])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="hint small">Na diagonal ficam as neutras (não mexem em nada). Verde = já tem. Toque para equipar ou pedir ao Tutor.</p>
+    </div>
+  );
+}
+
+/** Aba Treinar: natures (tabela), habilidades pelo Tutor e EVs. */
+function TrainPanel({root}: {root: string}) {
+  const {collection, tutor, equipNature, equipAbility} = useGame();
+  const e = peekEntry(collection, root);
+  const [kind, setKind] = useState<'nature' | 'ability' | 'evs'>('nature');
   const [target, setTarget] = useState<string | null>(null);
   const [result, setResult] = useState('');
-  const options =
-    kind === 'nature'
-      ? ALL_NATURES.filter(n => !e.natures.includes(n)).map(n => ({name: n, label: natureLabel(n), hidden: false}))
-      : lineAbilities(root)
-          .filter(a => !e.abilities.includes(a.name))
-          .map(a => ({name: a.name, label: a.hidden ? `${a.name} (oculta)` : a.name, hidden: a.hidden}));
-  const chosen = options.find(o => o.name === target);
+  useEffect(() => (setTarget(null), setResult('')), [root]);
+  if (!e) return null;
+  const abilities = lineAbilities(root);
+  const owned = kind === 'nature' ? e.natures.includes(target ?? '') : e.abilities.includes(target ?? '');
+  const hidden = kind === 'ability' && abilities.find(a => a.name === target)?.hidden;
+  const pick = (k: 'nature' | 'ability', name: string) => {
+    setResult('');
+    if (k === 'nature' ? e.natures.includes(name) : e.abilities.includes(name)) {
+      if (k === 'nature') equipNature(root, e.nature === name ? null : name);
+      else equipAbility(root, e.ability === name ? null : name);
+      setTarget(null);
+    } else setTarget(name);
+  };
   return (
-    <section className="tutor">
-      <h3>Tutor</h3>
-      <p className="hint">
-        Escolha a {kind === 'nature' ? 'nature' : 'habilidade'} que você quer e um plano. Se não sair a escolhida, você ganha outra que
-        ainda não tem: nunca repete.
-      </p>
+    <div className="train-panel">
+      <div className="train-head">
+        <Sprite name={species(root).name} shiny={e.shiny} size={48} still />
+        <b>Treinar {species(root).name}</b>
+        <CandyInfo line={root} n={e.candies} />
+      </div>
       <div className="tabs">
         <button className={`tab ${kind === 'nature' ? 'active' : ''}`} onClick={() => (setKind('nature'), setTarget(null))}>
-          Nature
+          Natures
         </button>
         <button className={`tab ${kind === 'ability' ? 'active' : ''}`} onClick={() => (setKind('ability'), setTarget(null))}>
-          Habilidade
+          Habilidades
+        </button>
+        <button className={`tab ${kind === 'evs' ? 'active' : ''}`} onClick={() => (setKind('evs'), setTarget(null))}>
+          EVs
         </button>
       </div>
-      {options.length ? (
-        <div className="chips">
-          {options.map(o => (
-            <button
-              key={o.name}
-              className={`chip ${target === o.name ? 'active' : ''}`}
-              onClick={() => setTarget(o.name)}
-              title={kind === 'ability' ? dex.abilities.get(o.name).shortDesc : undefined}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="hint">Você já tem todas!</p>
-      )}
-      {chosen && (
-        <div className="tutor-plans">
-          {TUTOR_PLANS.map(p => {
-            const price = tutorPrice(root, kind, chosen.name, p.id);
-            if (price === null) return null;
+      {kind === 'nature' && <NatureGrid e={e} selected={target} onPick={n => pick('nature', n)} />}
+      {kind === 'ability' && (
+        <div className="ability-list">
+          {abilities.map(a => {
+            const has = e.abilities.includes(a.name);
             return (
               <button
-                key={p.id}
-                className="btn small"
-                disabled={e.candies < price}
-                onClick={() => {
-                  setResult(tutor(root, kind, chosen.name, p.id));
-                  setTarget(null);
-                }}
+                key={a.name}
+                className={`ability-row ${has ? 'owned' : ''} ${e.ability === a.name ? 'equipped' : ''} ${target === a.name ? 'sel' : ''}`}
+                onClick={() => pick('ability', a.name)}
               >
-                {p.name} · {Math.round(p.chance * 100)}% · <Candies line={root} n={price} />
+                <b>
+                  {e.ability === a.name && '★ '}
+                  {a.name}
+                  {a.hidden && <small> (oculta)</small>}
+                </b>
+                <span className="muted">{dex.abilities.get(a.name).shortDesc}</span>
               </button>
             );
           })}
-          {chosen.hidden && <span className="hint">Habilidade oculta: só no plano Garantido.</span>}
+        </div>
+      )}
+      {kind === 'evs' && <EvBox root={root} e={e} />}
+      {target && !owned && kind !== 'evs' && (
+        <div className="panel tutor-plans">
+          <b>Tutor: tentar {kind === 'nature' ? natureLabel(target) : target}</b>
+          <span className="hint small">Se não sair, você ganha outra que ainda não tem.</span>
+          <div className="row center wrap">
+            {TUTOR_PLANS.map(p => {
+              const price = tutorPrice(root, kind, target, p.id);
+              if (price === null) return null;
+              return (
+                <button
+                  key={p.id}
+                  className="btn small"
+                  disabled={e.candies < price}
+                  onClick={() => {
+                    setResult(tutor(root, kind, target, p.id));
+                    setTarget(null);
+                  }}
+                >
+                  {p.name} · {Math.round(p.chance * 100)}% · <Candies line={root} n={price} />
+                </button>
+              );
+            })}
+          </div>
+          {hidden && <span className="hint small">Habilidade oculta: só no plano Garantido.</span>}
         </div>
       )}
       {result && <p className="tutor-result">{result}</p>}
-    </section>
+    </div>
   );
 }
 
@@ -161,11 +265,7 @@ function EvBox({root, e}: {root: string; e: Entry}) {
   const total = evTotal(e.evs);
   return (
     <section className="ev-box">
-      <h3>EVs</h3>
-      <p className="hint">
-        Cada vitória desta linha guarda EVs no banco (vitaminas e itens Power também ajudam). Distribua aqui: até {EV_MAX_STAT} por
-        atributo e {EV_MAX_TOTAL} no total. O Pokémon começa a run já treinado.
-      </p>
+      <p className="hint small">Vitórias enchem o banco. Até {EV_MAX_STAT} por atributo e {EV_MAX_TOTAL} no total.</p>
       <div className="ev-bank">
         Banco: <b>{e.evBank}</b> · Distribuídos: {total}/{EV_MAX_TOTAL}
       </div>
@@ -210,15 +310,16 @@ function EvBox({root, e}: {root: string; e: Entry}) {
   );
 }
 
-/** Ficha da linha evolutiva. */
-export function LineSheet({line, onClose}: {line: string; onClose: () => void}) {
-  const {collection, setNickname, unlockMove, equipMove, equipNature, equipAbility, buyCostCut, buyShiny, setFavorite, buyMegaStone} = useGame();
+/** Painel do Pokémon (ficha da linha): visual, apelido, corações, IVs, golpe inicial e melhorias. */
+export function PokemonPanel({line, onTrain}: {line: string; onTrain?: () => void}) {
+  const {collection, setNickname, unlockMove, equipMove, buyCostCut, buyShiny, setFavorite, buyMegaStone} = useGame();
   const root = lineRoot(line);
   const e = peekEntry(collection, root);
   const [view, setView] = useState<Species>(species(root));
   const [moveFilter, setMoveFilter] = useState<'type' | 'all'>('type');
   const [info, setInfo] = useState<string | null>(null);
   const [nick, setNick] = useState(collection.entries[root]?.nickname ?? '');
+  useEffect(() => setNick(collection.entries[root]?.nickname ?? ''), [root]); // eslint-disable-line react-hooks/exhaustive-deps
   const options = useMemo(() => startMoveOptions(root), [root]);
   const stones = useMemo(() => lineMegaStones(root), [root]);
   if (!e) return null;
@@ -226,194 +327,186 @@ export function LineSheet({line, onClose}: {line: string; onClose: () => void}) 
   const shownMoves = options.filter(o => !e.moves.includes(o.id) && (moveFilter === 'all' || types.includes(dex.moves.get(o.id).type)));
   const fav = favoriteOf(collection) === root;
   const cost = teamCost(collection, root);
+  const h = heartsOf(e);
   return (
-    <Modal onClose={onClose} wide>
-      <div className="sheet">
-        <div className="sheet-left">
-          <EvoViewer name={root} shiny={e.shiny} onChange={setView} />
-          <div className="row center">
-            {view.types.map(t => (
-              <TypeBadge key={t} type={t} info />
-            ))}
-          </div>
-          <form
-            className="rename"
-            onSubmit={ev => {
-              ev.preventDefault();
-              setNickname(root, nick);
-            }}
-          >
-            <input value={nick} maxLength={NICK_MAX} onChange={ev => setNick(ev.target.value)} placeholder="Apelido" />
-            <button className="btn small" type="submit" disabled={(e.nickname ?? '') === nick.trim()}>
-              Salvar
-            </button>
-          </form>
-          <div className="sheet-numbers">
-            <Candies line={root} n={e.candies} />
-            <span>{e.caught ? `Capturado ${e.caught}x` : 'Parceiro inicial'}</span>
-            <span>Custo no time: {cost}</span>
-          </div>
-          <Hearts entry={e} />
-          <ul className="perks">
-            {HEART_PERKS.map((p, i) => (
-              <li key={p} className={i < heartsOf(e) ? 'on' : ''}>
-                <PixelIcon name="heart" size={12} color={i < heartsOf(e) ? 'var(--pink-d)' : '#cfc6dd'} /> {i + 1}: {p}
-              </li>
-            ))}
-          </ul>
-          <p className="hint">Corações enchem quando esta linha luta e vence no seu time.</p>
-          <button className={`btn small ${fav ? 'fav-on' : ''}`} onClick={() => setFavorite(fav ? null : root)}>
-            <PixelIcon name="star" /> {fav ? 'Favorito do perfil' : 'Tornar favorito'}
+    <div className="mon-panel">
+      <EvoViewer name={root} shiny={e.shiny} onChange={setView} />
+      <div className="row center">
+        {view.types.map(t => (
+          <TypeBadge key={t} type={t} info />
+        ))}
+      </div>
+      <form
+        className="rename"
+        onSubmit={ev => {
+          ev.preventDefault();
+          setNickname(root, nick);
+        }}
+      >
+        <input value={nick} maxLength={NICK_MAX} onChange={ev => setNick(ev.target.value)} placeholder="Apelido" />
+        <button className="btn small" type="submit" disabled={(e.nickname ?? '') === nick.trim()}>
+          Salvar
+        </button>
+      </form>
+      <div className="sheet-numbers">
+        <CandyInfo line={root} n={e.candies} />
+        <span>{e.caught ? `Capturado ${e.caught}x` : 'Inicial'}</span>
+        <span>Custo {cost}</span>
+      </div>
+      <div className="hearts-line" title={HEART_PERKS.map((p, i) => `${i + 1}: ${p}`).join('\n')}>
+        <Hearts entry={e} />
+        <span className="hint small">{h ? `Bônus: ${HEART_PERKS.slice(0, h).join(' · ')}` : 'Lute com ele no time para ganhar corações.'}</span>
+      </div>
+      <div className="row center wrap">
+        {onTrain && (
+          <button className="btn small primary" onClick={onTrain}>
+            Treinar
           </button>
-        </div>
-        <div className="sheet-right">
-          <section>
-            <h3>IVs</h3>
-            {e.caught ? (
-              <IvWeb before={e.bestIvs} after={e.bestIvs} size={220} />
-            ) : (
-              <p className="hint">Capture um {species(root).name} selvagem para guardar os IVs dele. Repetidos melhoram a teia.</p>
-            )}
-          </section>
-          <section>
-            <h3>Nature para começar</h3>
-            {e.natures.length ? (
-              <div className="chips">
-                <button className={`chip ${!e.nature ? 'active' : ''}`} onClick={() => equipNature(root, null)}>
-                  Aleatória
-                </button>
-                {e.natures.map(n => (
-                  <button key={n} className={`chip ${e.nature === n ? 'active' : ''}`} onClick={() => equipNature(root, n)}>
-                    {natureLabel(n)}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="hint">Cada nature que você capturar desta linha fica liberada aqui.</p>
-            )}
-          </section>
-          <section>
-            <h3>Habilidade para começar</h3>
-            {e.abilities.length ? (
-              <div className="chips">
-                <button className={`chip ${!e.ability ? 'active' : ''}`} onClick={() => equipAbility(root, null)}>
-                  Aleatória
-                </button>
-                {e.abilities.map(a => (
-                  <button key={a} className={`chip ${e.ability === a ? 'active' : ''}`} onClick={() => equipAbility(root, a)} title={dex.abilities.get(a).shortDesc}>
-                    {a}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="hint">Habilidades vistas em capturas ficam liberadas aqui.</p>
-            )}
-          </section>
-          <TutorBox root={root} e={e} />
-          <EvBox root={root} e={e} />
-          <section>
-            <h3>Golpe inicial</h3>
-            <p className="hint">Libere com doces um golpe que {species(root).name} aprende. Ele começa a run já sabendo.</p>
-            {e.moves.length > 0 && (
-              <div className="chips">
-                <button className={`chip ${!e.startMove ? 'active' : ''}`} onClick={() => equipMove(root, null)}>
-                  Nenhum
-                </button>
-                {e.moves.map(m => (
-                  <button key={m} className={`chip ${e.startMove === m ? 'active' : ''}`} onClick={() => equipMove(root, m)}>
-                    {dex.moves.get(m).name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="tabs">
-              <button className={`tab ${moveFilter === 'type' ? 'active' : ''}`} onClick={() => setMoveFilter('type')}>
-                Do tipo dele
+        )}
+        <button className={`btn small ${fav ? 'fav-on' : ''}`} onClick={() => setFavorite(fav ? null : root)}>
+          <PixelIcon name="star" /> {fav ? 'Favorito' : 'Tornar favorito'}
+        </button>
+      </div>
+      <dl className="mon-facts">
+        <dt>Nature</dt>
+        <dd>{e.nature ? natureLabel(e.nature) : 'aleatória'}</dd>
+        <dt>Habilidade</dt>
+        <dd>{e.ability ?? 'aleatória'}</dd>
+        <dt>EVs</dt>
+        <dd>
+          {evTotal(e.evs)}/{EV_MAX_TOTAL}
+          {e.evBank ? ` (+${e.evBank} no banco)` : ''}
+        </dd>
+      </dl>
+      <div className="sheet-right">
+        <section>
+          <h3>IVs</h3>
+          {e.caught ? (
+            <IvWeb before={e.bestIvs} after={e.bestIvs} size={200} />
+          ) : (
+            <p className="hint small">Capture um selvagem para guardar os IVs. Repetidos melhoram a teia.</p>
+          )}
+        </section>
+        <section>
+          <h3>Golpe inicial</h3>
+          <p className="hint small">Libere com doces: ele começa a run já sabendo.</p>
+          {e.moves.length > 0 && (
+            <div className="chips">
+              <button className={`chip ${!e.startMove ? 'active' : ''}`} onClick={() => equipMove(root, null)}>
+                Nenhum
               </button>
-              <button className={`tab ${moveFilter === 'all' ? 'active' : ''}`} onClick={() => setMoveFilter('all')}>
-                Todos
-              </button>
+              {e.moves.map(m => (
+                <button key={m} className={`chip ${e.startMove === m ? 'active' : ''}`} onClick={() => equipMove(root, m)}>
+                  {dex.moves.get(m).name}
+                </button>
+              ))}
             </div>
-            <ul className="unlock-list">
-              {shownMoves.map(o => {
-                const m = dex.moves.get(o.id);
-                const price = movePrice(o.id);
-                return (
-                  <li key={o.id}>
-                    <TypeBadge type={m.type} small />
-                    <button className="link" onClick={() => setInfo(o.id)}>
-                      {m.name}
-                    </button>
-                    <span className="hint">
-                      {m.basePower ? `Poder ${m.basePower}` : 'Status'} · {o.how === 'level' ? 'nível' : 'MT/tutor'}
-                    </span>
-                    <button className="btn small" disabled={e.candies < price} onClick={() => unlockMove(root, o.id)}>
-                      <Candies line={root} n={price} />
-                    </button>
-                  </li>
-                );
-              })}
-              {!shownMoves.length && <li className="hint">Nada para liberar aqui.</li>}
-            </ul>
-          </section>
-          <section>
-            <h3>Melhorias da linha</h3>
-            <ul className="unlock-list">
-              <li>
-                <span>
-                  Custo no time: <b>{cost}</b>
-                  {e.costCut > 0 && <span className="hint"> (era {baseCost(root)})</span>}
-                </span>
-                {e.costCut < MAX_COST_CUT && cost > 1 ? (
-                  <button className="btn small" disabled={e.candies < COST_CUT_PRICE[e.costCut]} onClick={() => buyCostCut(root)}>
-                    −1 custo · <Candies line={root} n={COST_CUT_PRICE[e.costCut]} />
+          )}
+          <div className="tabs">
+            <button className={`tab ${moveFilter === 'type' ? 'active' : ''}`} onClick={() => setMoveFilter('type')}>
+              Do tipo dele
+            </button>
+            <button className={`tab ${moveFilter === 'all' ? 'active' : ''}`} onClick={() => setMoveFilter('all')}>
+              Todos
+            </button>
+          </div>
+          <ul className="unlock-list">
+            {shownMoves.map(o => {
+              const m = dex.moves.get(o.id);
+              const price = movePrice(o.id);
+              return (
+                <li key={o.id}>
+                  <TypeBadge type={m.type} small />
+                  <button className="link" onClick={() => setInfo(o.id)}>
+                    {m.name}
                   </button>
-                ) : (
-                  <span className="hint">no mínimo</span>
-                )}
-              </li>
-              <li>
-                <span>
-                  Chance de shiny ao começar: <b>1 em {Math.round(1 / SHINY_CHANCE[e.shinyLv])}</b>
-                </span>
-                {e.shinyLv < SHINY_PRICE.length ? (
-                  <button className="btn small" disabled={e.candies < SHINY_PRICE[e.shinyLv]} onClick={() => buyShiny(root)}>
-                    Aumentar · <Candies line={root} n={SHINY_PRICE[e.shinyLv]} />
-                  </button>
-                ) : (
-                  <span className="hint">no máximo</span>
-                )}
-              </li>
-              {stones.length > 0 && (
-                <li>
-                  <span>
-                    Começar com a Mega Pedra própria
-                    <small className="species-sub">Funciona quando ele estiver na forma que mega-evolui. Só 1 mega por time.</small>
+                  <span className="hint">
+                    {m.basePower ? `Poder ${m.basePower}` : 'Status'} · {o.how === 'level' ? 'nível' : 'MT/tutor'}
                   </span>
-                  {stones.map(st => (
-                    <button
-                      key={st.id}
-                      className={`btn small ${e.megaStone === st.id ? 'fav-on' : ''}`}
-                      disabled={!e.megaStone && e.candies < MEGA_STONE_PRICE}
-                      onClick={() => buyMegaStone(root, st.id)}
-                      title={st.desc}
-                    >
-                      <ItemIcon id={st.id} size={18} /> {st.name}
-                      {!e.megaStone && (
-                        <>
-                          {' · '}
-                          <Candies line={root} n={MEGA_STONE_PRICE} />
-                        </>
-                      )}
-                    </button>
-                  ))}
+                  <button className="btn small" disabled={e.candies < price} onClick={() => unlockMove(root, o.id)}>
+                    <Candies line={root} n={price} />
+                  </button>
                 </li>
+              );
+            })}
+            {!shownMoves.length && <li className="hint">Nada para liberar aqui.</li>}
+          </ul>
+        </section>
+        <section>
+          <h3>Melhorias da linha</h3>
+          <ul className="unlock-list">
+            <li>
+              <span>
+                Custo no time: <b>{cost}</b>
+                {e.costCut > 0 && <span className="hint"> (era {baseCost(root)})</span>}
+              </span>
+              {e.costCut < MAX_COST_CUT && cost > 1 ? (
+                <button className="btn small" disabled={e.candies < COST_CUT_PRICE[e.costCut]} onClick={() => buyCostCut(root)}>
+                  −1 custo · <Candies line={root} n={COST_CUT_PRICE[e.costCut]} />
+                </button>
+              ) : (
+                <span className="hint">no mínimo</span>
               )}
-            </ul>
-          </section>
-        </div>
+            </li>
+            <li>
+              <span>
+                Chance de shiny ao começar: <b>1 em {Math.round(1 / SHINY_CHANCE[e.shinyLv])}</b>
+              </span>
+              {e.shinyLv < SHINY_PRICE.length ? (
+                <button className="btn small" disabled={e.candies < SHINY_PRICE[e.shinyLv]} onClick={() => buyShiny(root)}>
+                  Aumentar · <Candies line={root} n={SHINY_PRICE[e.shinyLv]} />
+                </button>
+              ) : (
+                <span className="hint">no máximo</span>
+              )}
+            </li>
+            {stones.length > 0 && (
+              <li>
+                <span>
+                  Começar com a Mega Pedra própria
+                  <small className="species-sub">Funciona quando ele estiver na forma que mega-evolui. Só 1 mega por time.</small>
+                </span>
+                {stones.map(st => (
+                  <button
+                    key={st.id}
+                    className={`btn small ${e.megaStone === st.id ? 'fav-on' : ''}`}
+                    disabled={!e.megaStone && e.candies < MEGA_STONE_PRICE}
+                    onClick={() => buyMegaStone(root, st.id)}
+                    title={st.desc}
+                  >
+                    <ItemIcon id={st.id} size={18} /> {st.name}
+                    {!e.megaStone && (
+                      <>
+                        {' · '}
+                        <Candies line={root} n={MEGA_STONE_PRICE} />
+                      </>
+                    )}
+                  </button>
+                ))}
+              </li>
+            )}
+          </ul>
+        </section>
       </div>
       {info && <MoveInfo move={info} onClose={() => setInfo(null)} />}
+    </div>
+  );
+}
+
+/** Ficha em janela (usada na montagem do time). */
+export function LineSheet({line, onClose}: {line: string; onClose: () => void}) {
+  const [tab, setTab] = useState<'mon' | 'train'>('mon');
+  return (
+    <Modal onClose={onClose} wide>
+      <div className="tabs">
+        <button className={`tab ${tab === 'mon' ? 'active' : ''}`} onClick={() => setTab('mon')}>
+          Pokémon
+        </button>
+        <button className={`tab ${tab === 'train' ? 'active' : ''}`} onClick={() => setTab('train')}>
+          Treinar
+        </button>
+      </div>
+      {tab === 'mon' ? <PokemonPanel line={line} onTrain={() => setTab('train')} /> : <TrainPanel root={lineRoot(line)} />}
     </Modal>
   );
 }
@@ -440,16 +533,10 @@ function TrainerHeader() {
             <b>{st.caught}</b> capturas
           </span>
           <span>
-            <b>{st.defeated}</b> vitórias
-          </span>
-          <span>
             Melhor ronda <b>{st.bestWave}</b>
           </span>
           <span>
             <b>{st.stageClears}</b> temporadas completas
-          </span>
-          <span>
-            ₽ <b>{st.moneyEarned}</b> ganhos
           </span>
         </div>
         <CareerCard />
@@ -469,6 +556,7 @@ export function CollectionScreen() {
   const {collection, setScreen} = useGame();
   const [type, setType] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [tab, setTab] = useState<'grid' | 'train'>('grid');
   const entries = Object.entries(collection.entries)
     .filter(([id]) => !type || species(id).types.includes(type))
     .sort((a, b) => species(a[0]).num - species(b[0]).num);
@@ -482,43 +570,74 @@ export function CollectionScreen() {
         <span />
       </header>
       <TrainerHeader />
-      <p className="hint">
-        Cada linha evolutiva tem uma ficha. Toque num Pokémon para ver doces, corações, IVs e para gastar doces em golpe
-        inicial, custo menor no time e chance de shiny.
-      </p>
-      <TypeFilter value={type} onChange={setType} types={ALL_TYPES} />
-      {!entries.length && <p className="hint">Nenhum Pokémon aqui ainda.</p>}
-      <div className="grid">
-        {entries.map(([id, raw]) => {
-          const e = peekEntry(collection, id)!;
-          return (
-            <button key={id} className="cell" onClick={() => setOpen(id)}>
-              <Sprite name={id} shiny={raw.shiny} size={80} />
-              <span className="cell-name">{species(id).name}</span>
-              <Types name={id} />
-              <span className="cell-sub row center">
-                <Candies line={id} n={e.candies} />
-                {e.caught ? `x${e.caught}` : 'inicial'}
-              </span>
-              <Hearts entry={e} small />
+      <div className={`col-layout ${open ? 'has-open' : ''}`}>
+        <aside className="panel col-side">
+          {open ? (
+            <>
+              <button className="modal-close" onClick={() => (setOpen(null), setTab('grid'))} aria-label="Fechar">
+                ✕
+              </button>
+              <PokemonPanel line={open} onTrain={() => setTab('train')} />
+            </>
+          ) : (
+            <p className="hint col-empty">Toque num Pokémon para ver a ficha dele aqui.</p>
+          )}
+        </aside>
+        <div className="col-main">
+          <div className="tabs big-tabs">
+            <button className={`tab ${tab === 'grid' ? 'active' : ''}`} onClick={() => setTab('grid')}>
+              Coleção · {Object.keys(collection.entries).length}
             </button>
-          );
-        })}
+            <button
+              className={`tab ${tab === 'train' ? 'active' : ''}`}
+              onClick={() => setTab('train')}
+              disabled={!open}
+              title={open ? undefined : 'Escolha um Pokémon primeiro'}
+            >
+              Treinar{open ? ` ${species(open).name}` : ''}
+            </button>
+          </div>
+          {tab === 'train' && open ? (
+            <div className="panel">
+              <TrainPanel root={open} />
+            </div>
+          ) : (
+            <>
+              <TypeFilter value={type} onChange={setType} types={ALL_TYPES} />
+              {!entries.length && <p className="hint">Nenhum Pokémon aqui ainda.</p>}
+              <div className="grid">
+                {entries.map(([id, raw]) => {
+                  const e = peekEntry(collection, id)!;
+                  return (
+                    <button key={id} className={`cell ${open === id ? 'selected' : ''}`} onClick={() => setOpen(id)}>
+                      <Sprite name={id} shiny={raw.shiny} size={72} />
+                      <span className="cell-name">{species(id).name}</span>
+                      <Types name={id} />
+                      <span className="cell-sub row center">
+                        <Candies line={id} n={e.candies} />
+                      </span>
+                      <Hearts entry={e} small />
+                    </button>
+                  );
+                })}
+              </div>
+              {collection.runs.length > 0 && (
+                <details className="runs-details">
+                  <summary>Últimas runs</summary>
+                  <ul className="runs panel">
+                    {collection.runs.map(r => (
+                      <li key={r.endedAt}>
+                        {new Date(r.endedAt).toLocaleDateString('pt-BR')} · {r.starter} · ronda {r.wave} ·{' '}
+                        {r.result === 'stageClear' ? 'temporada completa' : r.result === 'lost' ? 'derrota' : 'abandonada'}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
+        </div>
       </div>
-      {collection.runs.length > 0 && (
-        <>
-          <h3 className="section-title">Últimas runs</h3>
-          <ul className="runs panel">
-            {collection.runs.map(r => (
-              <li key={r.endedAt}>
-                {new Date(r.endedAt).toLocaleDateString('pt-BR')} · {r.starter} · ronda {r.wave} ·{' '}
-                {r.result === 'stageClear' ? 'temporada completa' : r.result === 'lost' ? 'derrota' : 'abandonada'}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {open && <LineSheet line={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {isBossWave, isMilestoneWave, SEASON_LENGTH} from '../../game/encounters'
 import {getBattle, useGame} from '../../game/store';
 import {ROUND_NAMES, tourInfo} from '../../game/tournament';
 import {
+  CategoryIcon,
   HpBar,
   ItemIcon,
   MatchupPanel,
@@ -21,7 +22,8 @@ import {
   Types,
   effectivenessLabel,
 } from '../components';
-import {playBall, playCry, playHit, playJingle, playMove, playShake} from '../audio';
+import {playBall, playCry, playHit, playJingle, playMove, playPlin, playShake} from '../audio';
+import {fast} from '../settings';
 import {FX, playMoveFx, throwBallFx} from '../fx';
 import {lineRoot} from '../../game/meta';
 import type {OwnedMon} from '../../game/types';
@@ -42,7 +44,7 @@ interface SideView {
 
 type Menu = 'main' | 'fight' | 'bag' | 'balls' | 'switch' | 'healTarget';
 
-const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
 export function BattleScreen() {
   const run = useGame(s => s.run)!;
@@ -55,7 +57,9 @@ export function BattleScreen() {
   const [menu, setMenu] = useState<Menu>('main');
   const [healItem, setHealItem] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState<'wild' | 'player' | null>(null);
-  const [ballAnim, setBallAnim] = useState<number | null>(null);
+  /** Pokébola no lugar do selvagem: número = balançada, 'caught' = fechou. */
+  const [ballAnim, setBallAnim] = useState<number | 'caught' | null>(null);
+  const [ballId, setBallId] = useState('pokeball');
   const [, force] = useState(0);
   const started = useRef(false);
   const fxRef = useRef<HTMLDivElement>(null);
@@ -104,7 +108,7 @@ export function BattleScreen() {
           const set = mv.side === 'p1' ? setPlayer : setWild;
           set(v => (v ? {...v, anim: 'attack'} : v));
           await Promise.all([
-            fxRef.current && arenaRef.current ? playMoveFx(fxRef.current, arenaRef.current, mv.move, mv.side) : Promise.resolve(),
+            fxRef.current && arenaRef.current && !fast() ? playMoveFx(fxRef.current, arenaRef.current, mv.move, mv.side) : Promise.resolve(),
             wait(450),
           ]);
           setPlayer(v => (v && v.anim === 'attack' ? {...v, anim: undefined} : v));
@@ -189,26 +193,31 @@ export function BattleScreen() {
     setMenu('main');
     setBusy(true);
     const {result, events} = ctl.throwBall(id);
+    const ballSrc = itemSpriteUrl(getItem(id).sprite);
+    setBallId(id);
     setMessage(`Você jogou uma ${getItem(id).name}!`);
     playBall();
-    if (fxRef.current) await throwBallFx(fxRef.current);
+    if (fxRef.current && !fast()) await throwBallFx(fxRef.current, ballSrc);
     setBallAnim(0);
     await wait(400);
     for (let i = 0; i < Math.min(result.shakes, 3); i++) {
       setBallAnim(i + 1);
       playShake();
-      await wait(550);
+      await wait(650);
     }
-    setBallAnim(null);
     if (result.caught) {
+      // Fecha: estrelinhas e "plin". O Pokémon não reaparece.
       caughtRef.current = true;
-      setWild(v => (v ? {...v, anim: 'caught'} : v));
-      playJingle('catch');
+      setBallAnim('caught');
+      playPlin();
       setMessage(`Gotcha! ${enc.mon.species} foi capturado!`);
-      await wait(1600);
+      await wait(500);
+      playJingle('catch');
+      await wait(1400);
       finishBattle('caught');
       return;
     }
+    setBallAnim(null);
     await play(events.slice(1));
   };
 
@@ -278,11 +287,16 @@ export function BattleScreen() {
             </div>
             <div className={`mon-slot wild-slot ${wild.anim ?? ''} ${enc.boss ? 'boss' : ''}`}>
               {ballAnim !== null ? (
-                <img
-                  className={`ball-sprite shake-${ballAnim}`}
-                  src={FX('pokeball.png')}
-                  alt="Pokébola"
-                />
+                <span className={`ball-wrap ${ballAnim === 'caught' ? 'caught' : ''}`}>
+                  <img className={`ball-sprite shake-${ballAnim}`} src={itemSpriteUrl(getItem(ballId).sprite)} alt={getItem(ballId).name} />
+                  {ballAnim === 'caught' && (
+                    <span className="catch-stars">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )}
+                </span>
               ) : (
                 <Sprite name={wild.species} shiny={wild.shiny} />
               )}
@@ -372,7 +386,7 @@ export function BattleScreen() {
                     </span>
                     <span className="move-meta">
                       <TypeBadge type={m.type} small />
-                      <span className="cat">{m.category === 'Physical' ? 'Físico' : m.category === 'Special' ? 'Especial' : 'Status'}</span>
+                      <CategoryIcon category={m.category} />
                       {m.basePower > 0 && <span>Poder {m.basePower}</span>}
                       <span>
                         PP {m.pp}/{m.maxpp}
