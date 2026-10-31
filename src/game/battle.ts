@@ -61,6 +61,11 @@ export interface MoveOption {
   pp: number;
   maxpp: number;
   disabled: boolean;
+  /**
+   * Golpe em andamento (2º turno de Bounce/Fly/Dig/Solar Beam, Outrage, recarga do Hyper Beam):
+   * é a única opção, não gasta PP e sempre pode ser escolhido.
+   */
+  locked?: boolean;
   /** Multiplicador de tipo contra o selvagem em campo (null para golpes de status). */
   effectiveness: number | null;
   /** Em dupla: o golpe pede para escolher qual selvagem atacar. */
@@ -208,11 +213,28 @@ export class BattleController {
     return this.mustSwitch || !req?.active?.[this.slot]?.trapped;
   }
 
+  /**
+   * O Pokémon está no meio de um golpe de vários turnos (no ar com Bounce/Fly, embaixo da terra
+   * com Dig, carregando Solar Beam, em fúria com Outrage, recarregando do Hyper Beam...).
+   * Igual aos jogos: nesse turno ele só continua o golpe, sem trocar nem usar itens.
+   */
+  isLocked(slot = this.slot): boolean {
+    if (this.mustSwitch) return false;
+    const p = this.battle.p1.active[slot];
+    return !!p && !p.fainted && !!p.getLockedMove();
+  }
+
+  /** Algum Pokémon do jogador em campo está preso a um golpe de vários turnos. */
+  anyLocked(): boolean {
+    return this.slotsToChoose().some(i => this.isLocked(i));
+  }
+
   moveOptions(): MoveOption[] {
     const req = this.battle.p1.activeRequest as {active?: {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]}[]} | null;
     const moves = req?.active?.[this.slot]?.moves ?? [];
     const target = this.wildActive;
     const foes = this.doubles ? this.foesUp() : [target];
+    const locked = this.isLocked();
     return moves
       .map((m, i) => {
         const data = dex.moves.get(m.id);
@@ -227,7 +249,8 @@ export class BattleController {
           basePower: data.basePower,
           pp: m.pp ?? 0,
           maxpp: m.maxpp ?? 0,
-          disabled: !!m.disabled,
+          disabled: !locked && !!m.disabled,
+          locked,
           effectiveness: data.category === 'Status' ? null : Math.max(...foes.map(f => typeMultiplier(type, f.getTypes()))),
           needsTarget: this.doubles && ['normal', 'any', 'adjacentFoe'].includes(this.battle.dex.moves.get(m.id).target) && foes.length > 1,
         };
@@ -344,7 +367,7 @@ export class BattleController {
   useHealItem(itemId: string, uid: string): BattleEvent[] {
     const item = getItem(itemId);
     const p = [...this.uidOf.entries()].find(([, u]) => u === uid)?.[0];
-    if (!p) return [];
+    if (!p || !this.canUseItem()) return [];
     const events: BattleEvent[] = [];
     if (item.kind === 'revive') {
       if (!p.fainted) return [];
@@ -367,12 +390,20 @@ export class BattleController {
   useBoostItem(itemId: string): BattleEvent[] {
     const item = getItem(itemId);
     const p = this.playerActive;
-    if (!p || p.fainted || !item.stat) return [];
+    if (!p || p.fainted || !item.stat || !this.canUseItem()) return [];
     const cur = p.boosts[item.stat];
     if (cur >= 6) return [{text: `O atributo de ${p.name} já está no máximo.`}];
     p.boosts[item.stat] = Math.min(6, cur + 2);
     const label: Record<string, string> = {atk: 'Ataque', def: 'Defesa', spa: 'Ataque Especial', spd: 'Defesa Especial', spe: 'Velocidade', accuracy: 'Precisão'};
     return [{text: `${item.name}: ${label[item.stat]} de ${p.name} subiu muito!`}, ...this.spendTurn()];
+  }
+
+  /**
+   * Itens (e Pokébolas) só podem ser usados no lugar da ação do Pokémon: não durante a troca
+   * obrigatória e não quando ele está preso a um golpe de vários turnos.
+   */
+  canUseItem(): boolean {
+    return !this.battle.ended && !this.mustSwitch && !this.hasPending && !this.anyLocked();
   }
 
   /** Situação dos Pokémon do jogador dentro da batalha. */
@@ -424,25 +455,30 @@ export class BattleController {
     const slots = this.slotsToChoose();
     const actives = slots.map(i => this.battle.p1.active[i]).filter(Boolean);
     if (!actives.length) return [];
+    const restore: (() => void)[] = [];
     for (const a of actives) {
       a.moveSlots.push({
         move: ACTION_NAME, id: ACTION_MOVE as never, pp: 64, maxpp: 64, target: 'self', disabled: false, used: false,
       } as never);
+      // Choice Band/Scarf/Specs, Taunt, Encore etc. não podem bloquear a ação do treinador:
+      // senão o item sairia de graça, sem gastar o turno.
+      const orig = a.disableMove;
+      a.disableMove = ((id: string, ...rest: unknown[]) => (id === ACTION_MOVE ? undefined : (orig as (...x: unknown[]) => unknown).call(a, id, ...rest))) as never;
+      restore.push(() => {
+        a.disableMove = orig;
+      });
     }
     this.battle.makeRequest();
     const req = (this.battle.p1.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]}[]} | null)?.active ?? [];
     const choices = slots.map(i => {
+      // Preso a um golpe de vários turnos (só acontece na dupla): esse continua o golpe.
+      if (this.isLocked(i)) return 'move 1';
       const opts = req[i]?.moves ?? [];
       const idx = opts.findIndex(m => m.id === ACTION_MOVE);
-      return idx >= 0 && !opts[idx].disabled ? `move ${idx + 1}` : null;
+      return `move ${idx >= 0 ? idx + 1 : 1}`;
     });
-    let events: BattleEvent[];
-    if (choices.every(Boolean)) {
-      events = this.commit(choices.join(', '));
-    } else {
-      // Preso a um golpe (ex.: Choice Band): o item é usado sem gastar o turno.
-      events = this.readLog();
-    }
+    const events = this.commit(choices.join(', '));
+    for (const r of restore) r();
     for (const a of actives) a.moveSlots = a.moveSlots.filter(m => m.id !== ACTION_MOVE);
     if (!this.battle.ended && this.battle.p1.requestState === 'move') this.battle.makeRequest();
     return events;
