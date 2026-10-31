@@ -25,6 +25,12 @@ export const UPGRADES: Upgrade[] = [
   {id: 'evs', name: 'Treino pesado', levels: ['EVs das vitórias 50% maiores', 'EVs em dobro'], costs: [30, 80]},
   {id: 'hatch', name: 'Chocadeira', levels: ['Ovos chocam 20% mais rápido', '40% mais rápido'], costs: [25, 60]},
   {id: 'reroll', name: 'Segunda chance', levels: ['1º sorteio de novo grátis em cada ronda'], costs: [50]},
+  {id: 'regions', name: 'Mapa detalhado', levels: ['Mapa de Região mostra 4 regiões', '5 regiões'], costs: [25, 70]},
+  {id: 'stay', name: 'Estadia longa', levels: ['+5 rondas em cada região', '+10 rondas'], costs: [30, 80]},
+  {id: 'trail', name: 'Faro de lenda', levels: ['Rastro da lenda sobe 50% mais rápido', 'Sobe em dobro'], costs: [40, 100]},
+  {id: 'hint', name: 'Ouvido atento', levels: ['Lendário da dica: 40% por ronda', '50% por ronda'], costs: [40, 100]},
+  {id: 'hidden', name: 'Trilha oculta', levels: ['Biomas ocultos aparecem 2x mais', '3x mais'], costs: [35, 90]},
+  {id: 'tickets', name: 'Sócio dos ginásios', levels: ['Ingressos 25% mais baratos', '50% mais baratos'], costs: [25, 60]},
   {id: 'discount', name: 'Cliente fiel', levels: ['Loja e sorteio 10% mais baratos', '20% mais baratos', '30% mais baratos'], costs: [30, 70, 130]},
 ];
 
@@ -35,7 +41,8 @@ export function perksOf(c: Collection): RunPerks {
   return {
     budget: u.budget ?? 0, luck: u.luck ?? 0, biomes: u.biomes ?? 0, rewards: u.rewards ?? 0, money: u.money ?? 0, balls: u.balls ?? 0,
     discount: u.discount ?? 0, level: u.level ?? 0, rest: u.rest ?? 0, candy: u.candy ?? 0, catch: u.catch ?? 0, reroll: u.reroll ?? 0,
-    hatch: u.hatch ?? 0, evs: u.evs ?? 0,
+    hatch: u.hatch ?? 0, evs: u.evs ?? 0, regions: u.regions ?? 0, stay: u.stay ?? 0, trail: u.trail ?? 0, hint: u.hint ?? 0,
+    hidden: u.hidden ?? 0, tickets: u.tickets ?? 0,
   };
 }
 

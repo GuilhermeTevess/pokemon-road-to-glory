@@ -104,6 +104,12 @@ export interface RunPerks {
   reroll?: number;
   hatch?: number;
   evs?: number;
+  regions?: number;
+  stay?: number;
+  trail?: number;
+  hint?: number;
+  hidden?: number;
+  tickets?: number;
 }
 
 export interface RunState {

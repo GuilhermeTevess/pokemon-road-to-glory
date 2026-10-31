@@ -50,6 +50,9 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   pódio, sua posição e de onde vieram os pontos. (No online, o host vai escolher quantas
   temporadas.)
 - **Conquistas** (menu inicial): 37 objetivos permanentes, sem bônus.
+- **Novas melhorias de Glória**: Mapa detalhado (mais regiões no Mapa de Região), Estadia longa
+  (+5/+10 rondas por região), Faro de lenda (rastro sobe mais rápido), Ouvido atento (lendário da
+  dica mais provável), Trilha oculta (biomas ocultos 2x/3x) e Sócio dos ginásios (ingressos mais baratos).
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,

@@ -18,7 +18,8 @@ export function trailOf(run: RunState, region = run.region): number {
 
 export function addTrail(run: RunState, amount: number, region = run.region): void {
   if (!region || !legendsOf(region).length) return;
-  run.trail = {...run.trail, [region]: Math.min(100, trailOf(run, region) + amount)};
+  const boost = 1 + 0.5 * (run.perks?.trail ?? 0);
+  run.trail = {...run.trail, [region]: Math.min(100, trailOf(run, region) + Math.round(amount * boost))};
 }
 
 /** Chance (0 a 1) de a lenda aparecer nesta ronda. */

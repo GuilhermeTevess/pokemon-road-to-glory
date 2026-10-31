@@ -11,7 +11,7 @@ import type {Encounter, RunState} from './types';
 export const GYM_PRIZE = {glory: 10, book: 60};
 
 export function ticketPrice(run: RunState): number {
-  return discounted(run, 1200 + 3 * moneyReward(run.wave, false));
+  return discounted(run, (1200 + 3 * moneyReward(run.wave, false)) * (1 - 0.25 * (run.perks?.tickets ?? 0)));
 }
 
 /** Insígnias já ganhas na região. */

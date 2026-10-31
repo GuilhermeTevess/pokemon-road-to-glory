@@ -12,7 +12,7 @@ import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
 import {HEAL_EVERY, SEASON_LENGTH, generateEncounter, isBossWave} from './encounters';
 import {TRAIL, addTrail, legendEncounter, legendPrize, rollLegend} from './legend';
-import {BIOME_STAY, REGIONS, REGION_STAY, getRegion} from '../data/regions';
+import {BIOME_STAY, REGIONS, REGION_STAY, getRegion, regionStay} from '../data/regions';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
   HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
@@ -307,7 +307,7 @@ export const useGame = create<Store>((set, get) => {
     const fromBiome = run.biome;
     if ((run.regionLeft ?? 1) <= 0) {
       run.region = pick(REGIONS).id;
-      run.regionLeft = REGION_STAY;
+      run.regionLeft = regionStay(run);
       run.regionPass = false;
       setBiome(run, rollBiome(run));
       run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome};
@@ -408,8 +408,8 @@ export const useGame = create<Store>((set, get) => {
           break;
         case 'regionStay':
           run.regionPass = true;
-          run.regionLeft = (run.regionLeft ?? 0) + REGION_STAY;
-          message = `Estadia dobrada: mais ${REGION_STAY} rondas em ${getRegion(run.region).name}.`;
+          run.regionLeft = (run.regionLeft ?? 0) + regionStay(run);
+          message = `Estadia dobrada: mais ${regionStay(run)} rondas em ${getRegion(run.region).name}.`;
           break;
         default:
           run.mapReady = true;
@@ -581,6 +581,7 @@ export const useGame = create<Store>((set, get) => {
       if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > teamBudget(col)) return;
       const run = emptyRun();
       applyPerks(run, perksOf(col));
+      run.regionLeft = regionStay(run);
       run.rivalPoints = rollRivalPoints(col);
       run.party = picked.map(name => {
         const mon = createMon(name, {
@@ -1149,7 +1150,7 @@ export const useGame = create<Store>((set, get) => {
       mutate(run => {
         if (id && id !== run.region) {
           run.region = id;
-          run.regionLeft = REGION_STAY;
+          run.regionLeft = regionStay(run);
           run.regionPass = false;
           run.upcoming = undefined;
         }

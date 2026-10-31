@@ -5,7 +5,7 @@ import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
 import {HEAL_EVERY, SEASON_LENGTH} from '../../game/encounters';
 import {BIOMES} from '../../data/biomes';
-import {REGIONS, getRegion} from '../../data/regions';
+import {REGIONS, getRegion, regionStay} from '../../data/regions';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
 import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game/rewards';
 import {gloryFor, rerollPrice} from '../../game/glory';
@@ -803,7 +803,7 @@ export function TravelScreen() {
             {same
               ? `Deu ${travel.region ? region.name : biome.name} de novo: você continua por aqui!`
               : travel.region
-                ? `Bem-vindo a ${region.name}! Você fica 20 rondas aqui.`
+                ? `Bem-vindo a ${region.name}! Você fica ${regionStay(run)} rondas aqui.`
                 : `Próxima parada: ${biome.name}. Você fica 10 rondas aqui.`}
           </p>
           <div className="travel-cards">
