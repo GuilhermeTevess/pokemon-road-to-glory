@@ -237,7 +237,7 @@ export const useGame = create<Store>((set, get) => {
 
   const goToReward = (run: RunState) => {
     run.rewardTaken = undefined;
-    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0));
+    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0);
     run.phase = 'reward';
   };
 
@@ -909,12 +909,15 @@ export const useGame = create<Store>((set, get) => {
         // Fica na tela da recompensa para dar tempo de passar na loja.
         run.rewardOptions = [];
         run.rewardTaken = itemId;
+        run.skipStreak = 0;
       });
       if (message) get().toast(message);
     },
 
     skipReward() {
       mutate(run => {
+        // Pular sem pegar nada melhora um pouco as próximas recompensas (até 2 vezes seguidas).
+        if (run.rewardOptions.length && !run.rewardTaken) run.skipStreak = Math.min(2, (run.skipStreak ?? 0) + 1);
         run.rewardOptions = [];
         run.rewardTaken = undefined;
         afterReward(run);
@@ -927,7 +930,7 @@ export const useGame = create<Store>((set, get) => {
         if (run.money < cost) return;
         run.money -= cost;
         run.rerolls++;
-        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0));
+        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0);
       });
     },
 

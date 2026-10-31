@@ -116,6 +116,8 @@ export interface RunState {
   rerolls: number;
   /** Recompensa já pega nesta ronda (a tela fica aberta para a loja). */
   rewardTaken?: string;
+  /** Recompensas puladas seguidas (deixam as próximas um pouco melhores). */
+  skipStreak?: number;
   /** Biomas visitados por último (não aparecem de novo logo) e espécies das últimas rondas. */
   visited?: string[];
   recent?: string[];
