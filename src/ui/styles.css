@@ -792,3 +792,12 @@ table.move-info td { padding: 3px 0; }
 .mult-card.mu-half .mult-label { background: #d8ecff; color: #1f5f9e; }
 .mult-card.mu-quarter .mult-label { background: #b9dcff; color: #174a7c; }
 .mult-card.mu-immune .mult-label { background: #e3e0ea; color: #555; }
+
+/* Regiões e viagem */
+.region-top { display: flex; justify-content: center; gap: 2px; padding: 10px 6px 0; width: 100%; background: color-mix(in srgb, var(--bc) 30%, transparent); }
+.region-blurb { font-size: 12px; padding: 0 8px; }
+.biome-card:hover .region-top .sprite { animation: hop .5s steps(2) infinite; }
+.sb-where { font-size: 12px; line-height: 1.5; margin-top: 2px; }
+.travel-roll { font-size: 34px; margin: 40px auto; padding: 16px 28px; display: inline-block; border: 3px solid var(--ink); border-radius: 10px; background: var(--panel); min-width: 260px; }
+.travel-cards { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.travel-cards .biome-card { width: 200px; }

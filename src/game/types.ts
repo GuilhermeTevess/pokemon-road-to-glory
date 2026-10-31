@@ -42,6 +42,8 @@ export type Phase =
   | 'postBattle'
   | 'reward'
   | 'biomeChoice'
+  | 'regionChoice'
+  | 'travel'
   | 'event'
   | 'tournament'
   | 'gameOver'
@@ -106,8 +108,19 @@ export interface RunState {
   box: OwnedMon[];
   bag: Record<string, number>;
   money: number;
-  /** Trocar de bioma está liberado após a próxima vitória (Mapa). */
+  /** Trocar de bioma está liberado após a próxima vitória (Mapa de Bioma). */
   mapReady: boolean;
+  /** Região atual e rondas que faltam nela e no bioma antes do novo sorteio. */
+  region?: string;
+  regionLeft?: number;
+  biomeLeft?: number;
+  /** Mapa de Região usado: escolhe a próxima região depois da vitória. */
+  regionMapReady?: boolean;
+  /** Passes já usados nesta estadia (cada um dobra a estadia uma vez). */
+  biomePass?: boolean;
+  regionPass?: boolean;
+  /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
+  travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
   incenseWaves: number;
   encounter?: Encounter;
   pending: PendingEvent[];

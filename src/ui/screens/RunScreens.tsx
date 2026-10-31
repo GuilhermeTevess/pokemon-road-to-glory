@@ -3,17 +3,19 @@ import {dex, species} from '../../data/dex';
 import {moveDescPt} from '../../data/movesPt';
 import {getBiome} from '../../data/biomes';
 import {TIER_COLORS, getItem, itemUsage, needsTarget} from '../../data/items';
-import {BIOME_CHANGE_EVERY, HEAL_EVERY, SEASON_LENGTH} from '../../game/encounters';
+import {HEAL_EVERY, SEASON_LENGTH} from '../../game/encounters';
+import {BIOMES} from '../../data/biomes';
+import {REGIONS, getRegion} from '../../data/regions';
 import {NICK_MAX, calcStats, displayName, expForLevel, itemEvolutions} from '../../game/mon';
-import {SHOP, moneyValue, rerollCost} from '../../game/rewards';
-import {discounted, gloryFor, rerollPrice} from '../../game/glory';
+import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game/rewards';
+import {gloryFor, rerollPrice} from '../../game/glory';
 import {EV_MAX_STAT} from '../../game/meta';
 import {tourAt} from '../../game/tournament';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
-import {playCoins, playEvolve, playItem} from '../audio';
+import {playCoins, playEvolve, playItem, playJingle} from '../audio';
 import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Sprite, StatsTable, TeamWeakness, TypeBadge, Types} from '../components';
-import {TrainerAvatar} from './StartScreens';
+import {BiomeCard, RegionCard, TrainerAvatar} from './StartScreens';
 import {EggInfo} from './DaycareScreen';
 import {fast} from '../settings';
 
@@ -106,16 +108,18 @@ export function ShopShelves() {
           <div className="shelf-items">
             {shelf.items.map(id => {
               const it = getItem(id);
+              const price = shopPrice(run, it);
+              const blocked = travelBlocked(run, it);
               return (
                 <div key={id} className="shop-card panel">
                   <ItemIcon id={id} size={40} />
                   <div className="shop-text">
                     <strong>{it.name}</strong>
                     <span className="muted">{it.desc}</span>
-                    <span className="muted">Na mochila: {run.bag[id] ?? 0}</span>
+                    <span className="muted">{blocked ?? `Na mochila: ${run.bag[id] ?? 0}`}</span>
                   </div>
-                  <button className="btn small primary" disabled={run.money < discounted(run, it.price)} onClick={() => { playCoins(); buy(id); }}>
-                    ₽ {discounted(run, it.price)}
+                  <button className="btn small primary" disabled={run.money < price || !!blocked} onClick={() => { playCoins(); buy(id); }}>
+                    ₽ {price}
                   </button>
                 </div>
               );
@@ -153,7 +157,9 @@ export function RewardScreen() {
   const notes = [
     run.wave >= SEASON_LENGTH ? (['trophy', 'Última ronda da temporada!'] as const) : null,
     run.wave % HEAL_EVERY === 0 ? (['heart', 'Seu time será curado no Centro Pokémon.'] as const) : null,
-    run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady ? (['map', 'Você vai poder trocar de bioma.'] as const) : null,
+    (run.regionLeft ?? 1) <= 0 ? (['map', 'Fim da estadia: uma nova região vai ser sorteada!'] as const) : (run.biomeLeft ?? 1) <= 0 ? (['map', 'Fim da estadia: um novo bioma vai ser sorteado!'] as const) : null,
+    run.regionMapReady ? (['map', 'Mapa de Região aberto: você escolhe a próxima região.'] as const) : null,
+    run.mapReady ? (['map', 'Mapa de Bioma aberto: você escolhe o próximo bioma.'] as const) : null,
   ].filter(n => n !== null);
   const choose = (id: string) => {
     const it = getItem(id);
@@ -429,8 +435,13 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <div className="trainer-name">{trainer?.name}</div>
           <div className="sb-money">₽ {run.money}</div>
           <div className="muted">
-            Ronda {run.wave}/{SEASON_LENGTH} · {getBiome(run.biome).name}
+            Ronda {run.wave}/{SEASON_LENGTH}
           </div>
+          {run.wave > 0 && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
+            <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, run.regionLeft ?? 0)} rondas
+            <br />
+            <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, run.biomeLeft ?? 0)} rondas
+          </div>}
         </div>
       </div>
       <div className="panel sb-team">
@@ -734,6 +745,54 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
       <button className="btn primary" onClick={abandonRun}>
         Voltar ao início
       </button>
+    </div>
+  );
+}
+
+/** Roleta da viagem: fim da estadia sorteia nova região (e bioma) ou só um novo bioma. */
+export function TravelScreen() {
+  const {run, continueTravel} = useGame();
+  const travel = run?.travel;
+  const [spin, setSpin] = useState(fast() ? -1 : 0);
+  useEffect(() => {
+    if (spin < 0) return;
+    if (spin >= 14) {
+      setSpin(-1);
+      playJingle('levelUp');
+      return;
+    }
+    const t = setTimeout(() => setSpin(n => n + 1), 60 + spin * 12);
+    return () => clearTimeout(t);
+  }, [spin]);
+  if (!run || !travel) return null;
+  const done = spin < 0;
+  const region = getRegion(travel.region ?? run.region);
+  const biome = getBiome(travel.biome);
+  const rolling = done ? '' : travel.region ? REGIONS[spin % REGIONS.length].name : BIOMES[(spin * 7) % BIOMES.length].name;
+  const same = travel.region ? travel.region === travel.fromRegion : travel.biome === travel.fromBiome;
+  return (
+    <div className="screen biome-screen travel-screen">
+      <h2>{travel.region ? 'Hora de mudar de região!' : 'Hora de mudar de bioma!'}</h2>
+      {!done ? (
+        <div className="travel-roll">{rolling}</div>
+      ) : (
+        <>
+          <p className="note">
+            {same
+              ? `Deu ${travel.region ? region.name : biome.name} de novo: você continua por aqui!`
+              : travel.region
+                ? `Bem-vindo a ${region.name}! Você fica 20 rondas aqui.`
+                : `Próxima parada: ${biome.name}. Você fica 10 rondas aqui.`}
+          </p>
+          <div className="travel-cards">
+            {travel.region && <RegionCard region={region} onClick={continueTravel} />}
+            <BiomeCard biome={biome} onClick={continueTravel} />
+          </div>
+          <button className="btn primary big" onClick={continueTravel}>
+            Partiu!
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -22,8 +22,12 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   só, com filtro por tipo e setinhas para ver as evoluções. Cada linha tem um custo
   pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 6 pontos (até 10 com Glória), então
   dá para começar com mais de um. Capturados ficam numa aba separada.
-- **20 biomas**, cada um com seus tipos de Pokémon. Troca de bioma a cada 5 rondas
-  (ou depois de usar um **Mapa**).
+- **9 regiões** (Kanto a Paldea). Você escolhe a primeira e fica 20 rondas; depois a próxima
+  é sorteada (pode repetir). Pokémon da geração da região aparecem 3x mais, formas regionais
+  só aparecem na região delas e os chefes das dezenas são da região.
+- **20 biomas**, cada um com seus tipos de Pokémon. Novo bioma sorteado a cada 10 rondas.
+  Na loja: **Mapa de Bioma** e **Mapa de Região** (você escolhe) e **Passes** que dobram a
+  estadia. O preço deles sobe com a ronda e com o seu dinheiro.
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,

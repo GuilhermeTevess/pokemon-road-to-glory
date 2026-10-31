@@ -1,6 +1,8 @@
 import {ITEMS} from '../data/items';
 import type {ItemDef, ItemTier} from '../data/items';
 import {weightedPick} from './rng';
+import {discounted} from './glory';
+import type {RunState} from './types';
 
 function tierWeights(wave: number): [ItemTier, number][] {
   return [
@@ -42,10 +44,32 @@ export const SHOP: {title: string; items: string[]}[] = [
   {title: 'Cura', items: ['potion', 'superpotion', 'hyperpotion', 'maxpotion', 'revive']},
   {title: 'Para a batalha', items: ['xattack', 'xdefense', 'xspatk', 'xspdef', 'xspeed', 'xaccuracy']},
   {title: 'Treino (EVs)', items: ['hpup', 'protein', 'iron', 'calcium', 'zinc', 'carbos']},
-  {title: 'Viagem', items: ['map']},
+  {title: 'Viagem', items: ['map', 'regionmap', 'staypass', 'regionpass']},
   {title: 'Especial', items: ['megastone', 'everstone', 'destinyknot']},
 ];
 
 export function shopItems(): ItemDef[] {
   return SHOP.flatMap(s => s.items).map(id => ITEMS.find(i => i.id === id)!).filter(Boolean);
+}
+
+/** Preço na loja da run: mapas e passes ficam mais caros com a ronda e com o dinheiro guardado. */
+export function shopPrice(run: RunState, item: ItemDef): number {
+  if (!item.scales) return discounted(run, item.price);
+  return discounted(run, item.price + 4 * moneyReward(run.wave, false) + 0.05 * run.money);
+}
+
+/** Por que um mapa ou passe não serve agora (null = pode usar/comprar). */
+export function travelBlocked(run: RunState, item: ItemDef): string | null {
+  const has = (run.bag[item.id] ?? 0) > 0;
+  switch (item.travel) {
+    case 'biomeStay':
+      return run.biomePass ? 'Já dobrou a estadia neste bioma.' : has ? 'Você já tem um na mochila.' : null;
+    case 'regionStay':
+      return run.regionPass ? 'Já dobrou a estadia nesta região.' : has ? 'Você já tem um na mochila.' : null;
+    case 'biome':
+      return run.mapReady ? 'Mapa já aberto: vale na próxima vitória.' : null;
+    case 'region':
+      return run.regionMapReady ? 'Mapa já aberto: vale na próxima vitória.' : null;
+  }
+  return null;
 }

@@ -2,6 +2,7 @@
 // As partidas entre bots são simuladas de verdade no Showdown, para dar para estudar os times depois.
 import {Battle} from '@pkmn/sim';
 import {BIOMES} from '../data/biomes';
+import {getRegion} from '../data/regions';
 import {aiMoveChoice, aiSwitchChoice} from './battle';
 import {generateEncounter} from './encounters';
 import {toSet} from './mon';
@@ -82,6 +83,8 @@ export interface MatchRec {
 export interface Tournament {
   kind: TourKind;
   wave: number;
+  /** Região onde acontece (League Cup e Regional são na sua região). */
+  region?: string;
   entrants: Entrant[];
   rounds: MatchRec[][];
   stage: 'intro' | 'draw' | 'bracket' | 'done';
@@ -140,7 +143,13 @@ export function botTeam(wave: number, size: number, skill: number): OwnedMon[] {
   return team;
 }
 
-export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>): Tournament {
+/** Nome do torneio: League Cup e Regional levam o nome da região onde acontecem. */
+export function tourName(t: {kind: TourKind; region?: string}): string {
+  const name = tourInfo(t.kind).name;
+  return t.region && (t.kind === 'cup' || t.kind === 'regional') ? `${name} de ${getRegion(t.region).name}` : name;
+}
+
+export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string): Tournament {
   const names = shuffle(BOT_NAMES).slice(0, 7);
   const bots: Entrant[] = names.map((name, i) => {
     const skill = randInt(-2, 2) + (info.kind === 'worlds' ? 2 : info.kind === 'international' ? 1 : 0);
@@ -157,7 +166,7 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>): Tou
     };
   });
   const entrants = shuffle([{...me, player: true, team: []}, ...bots]);
-  return {kind: info.kind, wave: info.wave, entrants, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro'};
+  return {kind: info.kind, wave: info.wave, region, entrants, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro'};
 }
 
 function pairUp(ids: number[]): MatchRec[] {
