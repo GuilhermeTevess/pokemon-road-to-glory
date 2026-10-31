@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import type {Species} from '@pkmn/sim';
-import {BIOMES, biomePools, getBiome} from '../../data/biomes';
+import {BIOMES, biomePools, getBiome, hiddenBiomeOf} from '../../data/biomes';
+import {getHint} from '../../data/hints';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
@@ -444,6 +445,7 @@ export function BiomeCard({biome, onClick, label}: {biome: Biome; onClick: () =>
         </span>
       </span>
       <span className="biome-name">{label ?? biome.name}</span>
+      {biome.region && <span className="biome-hidden">★ Bioma oculto</span>}
       <span className="row center wrap">
         {biome.types.map(t => (
           <TypeBadge key={t} type={t} small />
@@ -498,7 +500,11 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
     if (mode === 'start') return BIOMES;
     const n = 3 + (run?.perks?.biomes ?? 0);
     const fresh = shuffle(BIOMES.filter(b => b.id !== run?.biome && !run?.visited?.includes(b.id)));
-    return fresh.length >= n ? fresh.slice(0, n) : shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, n);
+    const out = fresh.length >= n ? fresh.slice(0, n) : shuffle(BIOMES.filter(b => b.id !== run?.biome)).slice(0, n);
+    // Com dica de viajante, o bioma oculto da região entra nas opções do Mapa.
+    const hidden = hiddenBiomeOf(run?.region);
+    if (hidden && hidden.id !== run?.biome && run?.diary?.some(id => getHint(id)?.biome === hidden.id)) out.unshift(hidden);
+    return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, run?.wave]);
   if (!run) return null;

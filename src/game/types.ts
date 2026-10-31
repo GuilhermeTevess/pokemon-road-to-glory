@@ -73,7 +73,8 @@ export type RunEvent =
   | {kind: 'berries'; options: string[]}
   | {kind: 'merchant'; give: string; get: string}
   | {kind: 'rival'; name: string}
-  | {kind: 'seer'; upcoming: Encounter[]};
+  | {kind: 'seer'; upcoming: Encounter[]}
+  | {kind: 'traveler'; name: string; avatar: string; ask: 'money' | 'heal' | 'item'; cost?: number; item?: string; hint: string};
 
 /** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
 export type PendingEvent =
@@ -123,6 +124,9 @@ export interface RunState {
   regionPass?: boolean;
   /** Rastro da lenda de cada região (0 a 100): chance de a lenda aparecer a cada ronda. */
   trail?: Record<string, number>;
+  /** Dicas de viajantes anotadas (ids de data/hints) e lendários já encontrados por elas. */
+  diary?: string[];
+  found?: string[];
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
   travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
   incenseWaves: number;

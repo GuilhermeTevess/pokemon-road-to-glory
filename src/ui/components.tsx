@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
+import {createPortal} from 'react-dom';
 import {ALL_TYPES, RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, dex, itemSpriteUrl, species, spriteUrls, typeMultiplier} from '../data/dex';
 import type {Rarity} from '../data/dex';
 import {getItem} from '../data/items';
@@ -203,7 +204,8 @@ export function StatsTable({mon}: {mon: OwnedMon}) {
 }
 
 export function Modal({children, onClose, wide}: {children: ReactNode; onClose?: () => void; wide?: boolean}) {
-  return (
+  // Portal no body: a janela fica por cima de tudo, mesmo aberta de dentro do painel lateral.
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className={`modal ${wide ? 'wide' : ''}`} onClick={e => e.stopPropagation()}>
         {onClose && (
@@ -213,7 +215,8 @@ export function Modal({children, onClose, wide}: {children: ReactNode; onClose?:
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
