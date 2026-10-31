@@ -274,24 +274,17 @@ export function BattleScreen() {
         <span>{header}</span>
         <span>₽ {run.money}</span>
       </div>
-      {partner && (
-        <div className="partner-corner" title="Seu parceiro nesta run">
-          <Sprite name={partner.species} shiny={partner.shiny} size={36} still />
-          <span>
-            <MonName mon={partner} />
-            <Hearts entry={collection.entries[lineRoot(partner.species)]} small />
-          </span>
-        </div>
-      )}
-      <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
-        {enc?.venue != null ? (
-          <ArenaBackdrop tier={enc.venue} color={biome.color} />
-        ) : enc?.gym && getGym(enc.gym) ? (
-          <GymBackdrop gym={getGym(enc.gym)!} crowd={!!enc.intro?.[0]?.startsWith('🎙️')} />
-        ) : (
-          <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+      <div className="battle-sub">
+        {partner && (
+          <div className="partner-corner" title="Seu parceiro nesta run">
+            <Sprite name={partner.species} shiny={partner.shiny} size={36} still />
+            <span>
+              <MonName mon={partner} />
+              <Hearts entry={collection.entries[lineRoot(partner.species)]} small />
+            </span>
+          </div>
         )}
-        <div className="fx-layer" ref={fxRef} />
+        <span className="battle-sub-spacer" />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
           {enc?.tournament && run.tournament ? tourName(run.tournament) : enc?.venue != null ? venueName(enc.venue, getRegion(run.region).name) : (
             <>
@@ -300,6 +293,17 @@ export function BattleScreen() {
             </>
           )}
         </div>
+        <span className="battle-sub-spacer" />
+      </div>
+      <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
+        {enc?.venue != null ? (
+          <ArenaBackdrop tier={enc.venue} color={biome.color} bg={biome.bg} filter={biome.filter} />
+        ) : enc?.gym && getGym(enc.gym) ? (
+          <GymBackdrop gym={getGym(enc.gym)!} crowd={!!enc.intro?.[0]?.startsWith('🎙️')} />
+        ) : (
+          <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
+        )}
+        <div className="fx-layer" ref={fxRef} />
         {wilds.map((wild, i) =>
           wild ? (
             <div key={`w${i}`} className="slot-group">

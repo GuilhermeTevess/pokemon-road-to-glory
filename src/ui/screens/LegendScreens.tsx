@@ -40,7 +40,7 @@ export function LegendMeetScreen() {
       <div className="screen legend-screen">
         <h2>{venueName(tier, regionName)}</h2>
         <div className="legend-scene venue">
-          <ArenaBackdrop tier={tier} color={biome.color} />
+          <ArenaBackdrop tier={tier} color={biome.color} bg={biome.bg} filter={biome.filter} />
           <div className="legend-people">
             <TrainerAvatar avatar={speakers.me.avatar} name={me.name} size={120} />
             <span className="legend-vs">VS</span>
@@ -138,7 +138,7 @@ export function LegendAfterModal() {
       <div className="legend-after">
         <h2>{after.won ? `Você venceu ${legend.name}!` : `${legend.name} venceu desta vez`}</h2>
         <div className="legend-scene venue">
-          <ArenaBackdrop tier={tier} color={getBiome(run.biome).color} />
+          <ArenaBackdrop tier={tier} color={getBiome(run.biome).color} bg={getBiome(run.biome).bg} filter={getBiome(run.biome).filter} />
           <div className="legend-people close">
             <span className={after.won ? 'cheer-loop' : ''}>
               <TrainerAvatar avatar={trainer?.avatar ?? 'red'} name={me.name} size={130} />
