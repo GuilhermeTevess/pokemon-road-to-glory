@@ -86,6 +86,8 @@ export interface Collection {
   career?: Career;
   /** Vitórias contra cada treinador lendário (id → vezes). */
   legends?: Record<string, number>;
+  /** Cadernetas completas por região (região → vezes). */
+  badgeBooks?: Record<string, number>;
 }
 
 export function lineRoot(name: string): string {

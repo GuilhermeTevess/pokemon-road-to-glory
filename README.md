@@ -38,6 +38,11 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Biomas ocultos** (um por região: Caverna Celeste, Torre de Lata, Torre do Céu, Mundo
   Distorcido, Torre Espiral do Dragão, Caverna Terminus, Ultra Espaço, Floresta Adormecida,
   Área Zero): 3% de chance no sorteio do bioma, 50% com a dica, e entram no Mapa de Bioma.
+- **Ginásios** (botão Ginásios no painel): 8 por região com os líderes oficiais (em Alola, as
+  7 provas com os Cristais Z). Compre o ingresso e marque a ronda (dentro da estadia na
+  região, fora de torneio e chefe). O time cresce com as insígnias que você já tem. Cada
+  insígnia dá Glória uma vez por temporada; a caderneta completa dá um bônus grande. Perder
+  não acaba a run.
 - **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
   ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
 - **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,
