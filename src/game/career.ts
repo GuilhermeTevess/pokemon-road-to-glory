@@ -24,6 +24,9 @@ export interface CareerRules {
   boost: 1 | 1.5 | 2;
 }
 
+/** Máximo de jogadores numa carreira (a chave dos torneios tem 8 lugares). */
+export const MAX_PLAYERS = 8;
+
 export const DEFAULT_RULES: CareerRules = {allowCollection: false, rounds: 120, seasons: 3, legendCap: 1, levelCap: 100, megas: true, boost: 1};
 
 export interface CareerDoc {
@@ -59,7 +62,29 @@ export interface PlayerDoc {
   results: CareerResult[];
   /** Terminou todas as temporadas. */
   done?: boolean;
+  /** Última ronda de jogo (wave) que terminou nesta temporada: as rondas andam juntas. */
+  cleared?: number;
+  /** A run desta temporada acabou (perdeu): não segura os outros. */
+  out?: boolean;
+  /** De onde vêm os pontos da temporada (para o ranking). */
+  log?: {label: string; pts: number}[];
+  /** Para estudar o jogador: rondas jogadas com cada Pokémon e as últimas lutas importantes. */
+  usage?: Record<string, number>;
+  fights?: CareerFight[];
+  /** Insígnias da temporada (como ganhou), lendas vencidas e o parceiro. */
+  badges?: {gym: string; wave: number; team: string[]; tries: number}[];
+  legends?: string[];
+  partner?: string;
   updatedAt: number;
+}
+
+/** Luta importante (ginásio, torneio, lenda, chefe, rival) para os outros estudarem. */
+export interface CareerFight {
+  vs: string;
+  won: boolean;
+  seen: string[];
+  kind: 'gym' | 'tour' | 'legend' | 'boss' | 'rival';
+  wave: number;
 }
 
 /** O que a run guarda da carreira. */
@@ -69,6 +94,8 @@ export interface RunCareer {
   rules: CareerRules;
   /** Time levado a cada torneio desta temporada (os outros jogadores enfrentam este time). */
   tours?: Partial<Record<string, SnapMon[]>>;
+  usage?: Record<string, number>;
+  fights?: CareerFight[];
 }
 
 export function newCareerCode(): string {
@@ -166,4 +193,27 @@ export function rulesSummary(r: CareerRules): string[] {
 /** Classificação: pontos das temporadas terminadas + a atual. */
 export function standings(players: PlayerDoc[]): PlayerDoc[] {
   return [...players].sort((a, b) => b.banked + b.points - (a.banked + a.points) || b.season - a.season || b.round - a.round);
+}
+
+/** Id do jogador na carreira (este navegador + o treinador). */
+export const playerId = (trainerId: string) => deviceId() + '-' + trainerId;
+
+/**
+ * Quem ainda não terminou a ronda `wave` desta temporada (as rondas andam juntas).
+ * Quem perdeu a run, já terminou a carreira ou está numa temporada à frente não segura ninguém.
+ */
+export function roundBlockers(peers: PlayerDoc[], me: string, season: number, wave: number): PlayerDoc[] {
+  return peers.filter(p => p.id !== me && !p.done && !p.out && p.season === season && (p.cleared ?? 0) < wave);
+}
+
+/** Quem ainda está jogando uma temporada anterior (ninguém começa a próxima antes de todos acabarem). */
+export function seasonBlockers(peers: PlayerDoc[], me: string, season: number): PlayerDoc[] {
+  return peers.filter(p => p.id !== me && !p.done && p.season < season);
+}
+
+/** Extrato agrupado: soma os pontos por descrição. */
+export function groupLog(entries: {label: string; pts: number}[]): {label: string; pts: number}[] {
+  const map = new Map<string, number>();
+  for (const e of entries) map.set(e.label, (map.get(e.label) ?? 0) + e.pts);
+  return [...map].map(([label, pts]) => ({label, pts})).sort((a, b) => b.pts - a.pts);
 }

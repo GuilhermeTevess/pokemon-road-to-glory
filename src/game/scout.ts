@@ -4,6 +4,8 @@
 import {RIVALS, getRival} from '../data/rivals';
 import {getItem} from '../data/items';
 import {rivalItem} from './tournament';
+import type {CareerFight, PlayerDoc} from './career';
+import type {WorldBot} from './world';
 
 export interface ScoutUse {
   species: string;
@@ -14,6 +16,8 @@ export interface ScoutUse {
 }
 
 export interface ScoutMatch {
+  /** Tipo da luta (Ginásio, Torneio...), quando é um jogador de verdade. */
+  label?: string;
   vs: string;
   won: boolean;
   /** Pokémon que apareceram naquela luta. */
@@ -60,4 +64,25 @@ export function scoutReport(name: string, wave: number, team: string[]): ScoutRe
     return {vs: others[Math.floor(rand() * others.length)].name, won: rand() < 0.6, seen};
   });
   return {usage, matches, season, lead: rand() < 0.7 ? team[0] : undefined};
+}
+
+const FIGHT_LABEL = {gym: 'Ginásio', tour: 'Torneio', legend: 'Lenda', boss: 'Chefe', rival: 'Rival'} as const;
+
+/** Estudo de um jogador da carreira: números reais da temporada dele (uso, lutas importantes). */
+export function playerScout(p: PlayerDoc): ScoutReport {
+  const items = new Map(p.team.map(m => [m.species, m.item ? getItem(m.item).name : '—']));
+  return realScout(p.usage ?? {}, p.fights ?? [], sp => items.get(sp) ?? '—', p.round, p.team[0]?.species);
+}
+
+/** Estudo de um rival do mundo da temporada: o que ele jogou de verdade. */
+export function botScout(b: WorldBot): ScoutReport {
+  return realScout(b.usage, b.fights, sp => getItem(rivalItem(b.name, sp)).name, 1, b.team[0]);
+}
+
+function realScout(usageMap: Record<string, number>, fights: CareerFight[], item: (sp: string) => string, round: number, lead?: string): ScoutReport {
+  const usage = Object.entries(usageMap)
+    .map(([sp, rounds]) => ({species: sp, rounds, item: item(sp)}))
+    .sort((a, b) => b.rounds - a.rounds);
+  const matches = fights.slice(0, 6).map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: f.seen}));
+  return {usage, matches, season: Math.max(1, round, ...usage.map(u => u.rounds)), lead};
 }

@@ -39,6 +39,8 @@ export interface RankRow {
   player?: boolean;
   region?: string;
   fav?: string;
+  /** Rival do mundo da temporada (dá para abrir o perfil). */
+  bot?: boolean;
 }
 
 export interface SeasonRec {
@@ -101,6 +103,11 @@ export function addPoints(run: RunState, col: Collection | null, source: PointSo
   if (col && fame) careerOf(col).fame += n;
 }
 
+/** Lendas vencidas nesta temporada (pelo extrato de pontos). */
+export function legendsBeaten(run: RunState): string[] {
+  return (run.pointLog ?? []).filter(e => e.source === 'legends').map(e => e.label.replace(/^Vitória sobre /, ''));
+}
+
 export function seasonPoints(run: RunState): number {
   return Object.values(run.points ?? {}).reduce((a, b) => a + (b ?? 0), 0);
 }
@@ -116,7 +123,9 @@ export function rollRivalPoints(col: Collection): Record<string, number> {
 export function seasonRanking(col: Collection, run: RunState, me: {name: string; avatar?: string}, final = false): RankRow[] {
   const progress = final ? 1 : Math.min(1, run.wave / 120);
   const rivals = run.rivalPoints ?? {};
-  const rows: RankRow[] = leagueOf(col).npcs.map(n => ({
+  const rows: RankRow[] = run.world
+    ? run.world.bots.map(b => ({name: b.name, avatar: b.avatar, region: b.region, fav: b.partner, points: b.points, bot: true}))
+    : leagueOf(col).npcs.map(n => ({
     name: n.name, avatar: n.avatar, region: n.region, fav: n.fav, points: Math.round(((rivals[n.name] ?? rivals[n.was ?? ''] ?? 0) * progress) / 10) * 10,
   }));
   rows.push({name: me.name, avatar: me.avatar, points: seasonPoints(run), player: true, region: run.region, fav: run.party[0]?.species});
@@ -136,7 +145,8 @@ export function overallRanking(col: Collection, me: {name: string; avatar?: stri
 export function finishSeason(col: Collection, run: RunState, me: {name: string; avatar?: string}): SeasonRec {
   const rows = seasonRanking(col, run, me, true);
   const league = leagueOf(col);
-  for (const n of league.npcs) n.total += run.rivalPoints?.[n.name] ?? run.rivalPoints?.[n.was ?? ''] ?? 0;
+  for (const n of league.npcs)
+    n.total += run.world ? (run.world.bots.find(b => b.name === n.name)?.points ?? 0) : (run.rivalPoints?.[n.name] ?? run.rivalPoints?.[n.was ?? ''] ?? 0);
   const champ = league.npcs.find(n => n.name === rows[0].name && !rows[0].player);
   if (champ) champ.wins++;
   const rec: SeasonRec = {

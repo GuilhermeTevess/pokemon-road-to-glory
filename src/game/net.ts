@@ -28,6 +28,8 @@ function localMode(): boolean {
 /** Canal local (mesmo navegador, duas abas): só para testes. */
 function localLink(code: string, me: 'host' | 'guest', onMsg: OnMsg, onOpen: () => void): Link {
   const ch = new BroadcastChannel(PREFIX + code);
+  let open = false;
+  let retry: ReturnType<typeof setInterval> | null = null;
   ch.onmessage = e => {
     const {from, msg} = e.data as {from: string; msg: Record<string, unknown>};
     if (from === me) return;
@@ -36,11 +38,26 @@ function localLink(code: string, me: 'host' | 'guest', onMsg: OnMsg, onOpen: () 
       onOpen();
       return;
     }
-    if (msg.t === '__hello') return onOpen();
+    if (msg.t === '__hello') {
+      if (open) return;
+      open = true;
+      if (retry) clearInterval(retry);
+      return onOpen();
+    }
     onMsg(msg);
   };
-  if (me === 'guest') ch.postMessage({from: me, msg: {t: '__hello'}});
-  return {send: msg => ch.postMessage({from: me, msg}), close: () => ch.close()};
+  // Como no PeerJS, o convidado insiste até o anfitrião abrir a sala.
+  if (me === 'guest') {
+    ch.postMessage({from: me, msg: {t: '__hello'}});
+    retry = setInterval(() => ch.postMessage({from: me, msg: {t: '__hello'}}), 1000);
+  }
+  return {
+    send: msg => ch.postMessage({from: me, msg}),
+    close: () => {
+      if (retry) clearInterval(retry);
+      ch.close();
+    },
+  };
 }
 
 function wire(conn: DataConnection, onMsg: OnMsg, onOpen: () => void, onClose: () => void): Link {
@@ -55,7 +72,7 @@ function wire(conn: DataConnection, onMsg: OnMsg, onOpen: () => void, onClose: (
 export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, onClose: () => void, onError: (e: string) => void): Promise<Link> {
   if (localMode()) return localLink(code, 'host', onMsg, onOpen);
   const {Peer} = await import('peerjs');
-  const peer: PeerT = new Peer(PREFIX + code);
+  const peer: PeerT = new Peer(PREFIX + code.toUpperCase());
   let link: Link | null = null;
   peer.on('error', e => onError(String((e as {type?: string}).type ?? e)));
   peer.on('connection', conn => {

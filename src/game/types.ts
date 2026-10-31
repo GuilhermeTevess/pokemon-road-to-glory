@@ -1,8 +1,9 @@
-import type {RunCareer} from './career';
+import type {CareerFight, RunCareer} from './career';
 import type {PointEntry, PointSource, SeasonRec} from './league';
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
 import type {Egg} from './daycare';
 import type {Tournament} from './tournament';
+import type {World} from './world';
 
 export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 export type StatTable = Record<StatId, number>;
@@ -50,6 +51,8 @@ export type Phase =
   | 'gymIntro'
   | 'event'
   | 'tournament'
+  /** Carreira online: esperando os outros jogadores terminarem a ronda. */
+  | 'waiting'
   | 'gameOver'
   | 'stageClear';
 
@@ -94,6 +97,10 @@ export type RunEvent =
   | {kind: 'seer'; upcoming: Encounter[]}
   /** Professor de golpes: ensina qualquer golpe que o Pokémon aprende, por dinheiro. */
   | {kind: 'tutor'}
+  | {kind: 'news'; items: {who: string; text: string}[]}
+  | {kind: 'fan'; avatar: string; heard?: string}
+  | {kind: 'place'; theme: string; mon?: OwnedMon; item?: string}
+  | {kind: 'life'; theme: 'mom' | 'center' | 'birthday'; uid?: string; chat?: string}
   | {kind: 'traveler'; name: string; avatar: string; ask: 'money' | 'heal' | 'item'; cost?: number; item?: string; hint: string};
 
 /** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
@@ -133,6 +140,8 @@ export interface RunState {
   quick?: boolean;
   /** Run de uma carreira online (código, temporada e regras do host). */
   career?: RunCareer;
+  /** Última ronda de jogo terminada (vitória, torneio encerrado...). */
+  cleared?: number;
   id: string;
   startedAt: number;
   wave: number;
@@ -162,11 +171,19 @@ export interface RunState {
   /** Ginásios marcados (ingresso pago) e insígnias ganhas nesta temporada. */
   gyms?: {id: string; wave: number; paid?: number}[];
   badges?: string[];
+  /** Como ganhou cada insígnia (ronda, time e tentativas) e derrotas por ginásio ainda sem insígnia. */
+  badgeInfo?: Record<string, {wave: number; team: string[]; tries: number}>;
+  gymTries?: Record<string, number>;
+  /** Rondas jogadas com cada Pokémon e as últimas lutas importantes (perfil e estudo). */
+  usage?: Record<string, number>;
+  fights?: CareerFight[];
   /** Pontos de fama desta temporada, por fonte, e pontos finais dos rivais (NPCs). */
   points?: Partial<Record<PointSource, number>>;
   /** Extrato dos pontos da temporada. */
   pointLog?: PointEntry[];
   rivalPoints?: Record<string, number>;
+  /** Os rivais jogando a mesma temporada (ginásios, lendas, torneios, notícias). */
+  world?: World;
   /** Resultado da temporada (tela final). */
   season?: SeasonRec;
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
