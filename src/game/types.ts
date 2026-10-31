@@ -77,6 +77,8 @@ export interface Encounter {
   hype?: number;
   /** Luta de lenda: nível do local (0 quadra da cidade ... 3 grande estádio). */
   venue?: number;
+  /** Quickplay no mesmo PC: o lado p2 também é gente (nome do jogador 1 aqui). */
+  versus?: string;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
@@ -122,6 +124,8 @@ export interface RunPerks {
 
 export interface RunState {
   version: 1;
+  /** Campeonato rápido (Quickplay): não mexe na coleção e some quando o campeonato acaba. */
+  quick?: boolean;
   id: string;
   startedAt: number;
   wave: number;

@@ -14,12 +14,12 @@ function tierWeights(wave: number): [ItemTier, number][] {
 }
 
 /** Três opções de recompensa para o fim da ronda (sem repetir). `bonus`: rondas puladas seguidas (até 2). */
-export function rollRewards(wave: number, count = 3, bonus = 0): string[] {
+export function rollRewards(wave: number, count = 3, bonus = 0, owned: Record<string, number> = {}): string[] {
   const out: string[] = [];
   for (let guard = 0; out.length < count && guard < 50; guard++) {
     // Cada recompensa pulada deixa a próxima como se fosse ~8 rondas à frente (raros um pouco mais comuns).
     const tier = weightedPick(tierWeights(wave + 8 * Math.min(2, bonus)));
-    const pool = ITEMS.filter(i => i.tier === tier && !out.includes(i.id) && i.weight !== 0 && wave >= (i.minWave ?? 0));
+    const pool = ITEMS.filter(i => i.tier === tier && !out.includes(i.id) && i.weight !== 0 && wave >= (i.minWave ?? 0) && !(i.kind === 'key' && owned[i.id]));
     if (pool.length) out.push(weightedPick(pool.map(i => [i, i.weight ?? 1] as [ItemDef, number])).id);
   }
   return out;

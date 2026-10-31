@@ -396,6 +396,13 @@ export class BattleController {
   }
 
   /** Eventos iniciais (entradas em campo). */
+  /** Quickplay no mesmo PC: a escolha do jogador 2 (golpe ou troca, no formato do simulador). */
+  chooseP2(choice: string): BattleEvent[] {
+    const b = this.battle;
+    if (!b.choose('p2', choice)) b.choose('p2', 'default');
+    return this.readLog();
+  }
+
   initialEvents(): BattleEvent[] {
     const intro = (this.encounter.intro ?? []).map(text => ({text, narrator: true}));
     return [...intro, ...this.readLog()];
@@ -437,7 +444,7 @@ export class BattleController {
   private commit(choice: string, mega = false): BattleEvent[] {
     const b = this.battle;
     this.foeSwitch();
-    if (b.p2.requestState === 'move' && !b.p2.isChoiceDone()) b.choose('p2', aiMoveChoice(b, 'p2'));
+    if (!this.encounter.versus && b.p2.requestState === 'move' && !b.p2.isChoiceDone()) b.choose('p2', aiMoveChoice(b, 'p2'));
     // Mega evolução quando o jogador pede (só 1 mega por time, controlado na loja/mochila).
     if (mega && choice.startsWith('move') && this.canMega() && b.choose('p1', `${choice} mega`)) {
       this.foeSwitch();
@@ -493,6 +500,7 @@ export class BattleController {
   /** Treinador com o Pokémon em campo desmaiado: manda o próximo (o melhor contra o seu). */
   private foeSwitch(): void {
     const b = this.battle;
+    if (this.encounter.versus) return;
     if (!b.ended && b.p2.requestState === 'switch' && !b.p2.isChoiceDone()) b.choose('p2', aiSwitchChoice(b, 'p2'));
   }
 
@@ -510,7 +518,7 @@ export class BattleController {
   private name(ident: string): {side: Side; name: string} {
     const side = ident.slice(0, 2) as Side;
     const raw = ident.replace(/^p\d[a-z]?: /, '');
-    if (side !== 'p2') return {side, name: raw};
+    if (side !== 'p2') return {side, name: this.encounter.versus ? `${raw} de ${this.encounter.versus}` : raw};
     if (this.encounter.trainer) return {side, name: `${raw} de ${this.encounter.trainer}`};
     return {side, name: `${raw} ${this.encounter.boss ? 'chefe' : 'selvagem'}`};
   }

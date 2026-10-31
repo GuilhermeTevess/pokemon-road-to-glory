@@ -11,6 +11,7 @@ import type {PartyTab} from './screens/RunScreens';
 import {AchievementsScreen, RankingScreen} from './screens/LeagueScreens';
 import {BiomeSelect, RegionSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
 import {CollectionScreen} from './screens/CollectionScreen';
+import {QuickplayScreen} from './screens/QuickplayScreen';
 import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
@@ -32,6 +33,7 @@ export function App() {
   else if (screen === 'tournaments') body = <TourHistoryScreen />;
   else if (screen === 'ranking') body = <RankingScreen />;
   else if (screen === 'achievements') body = <AchievementsScreen />;
+  else if (screen === 'quickplay') body = <QuickplayScreen />;
   else if (!run || run.phase === 'starter') body = <StarterSelect />;
   else if (run.phase === 'biome') body = <BiomeSelect mode="start" />;
   else if (run.phase === 'battle') body = <BattleScreen key={run.encounter?.mon.uid} />;
