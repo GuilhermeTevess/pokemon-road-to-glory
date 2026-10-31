@@ -65,6 +65,8 @@ export function tourInfo(kind: TourKind): TourInfo {
 export interface Entrant extends NarratorCtx {
   avatar?: string;
   player?: boolean;
+  /** Outro jogador da carreira online (time real dele, controlado pela IA). */
+  friend?: boolean;
   /** Time dos bots (o do jogador é o time da run). */
   team: OwnedMon[];
 }
@@ -99,7 +101,7 @@ export interface TourRecord {
   wave: number;
   at: number;
   placement: number;
-  entrants: {name: string; avatar?: string; player?: boolean; team: string[]}[];
+  entrants: {name: string; avatar?: string; player?: boolean; friend?: boolean; team: string[]}[];
   rounds: MatchRec[][];
 }
 
@@ -182,8 +184,8 @@ function pickRivals(kind: TourKind, region?: string): Rival[] {
   return [...local, ...rest].slice(0, 7);
 }
 
-export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string): Tournament {
-  const rivals = pickRivals(info.kind, region);
+export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string, guests: Entrant[] = []): Tournament {
+  const rivals = pickRivals(info.kind, region).slice(0, 7 - guests.length);
   const bots: Entrant[] = rivals.map((rival, i) => {
     const name = rival.name;
     const skill = randInt(-2, 2) + (info.kind === 'worlds' ? 2 : info.kind === 'international' ? 1 : 0);
@@ -199,7 +201,7 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, regi
       team: rivalTeam(rival, info.wave, info.teamSize, skill),
     };
   });
-  const entrants = shuffle([{...me, player: true, team: []}, ...bots]);
+  const entrants = shuffle([{...me, player: true, team: []}, ...guests, ...bots]);
   return {kind: info.kind, wave: info.wave, region, entrants, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro'};
 }
 

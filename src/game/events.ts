@@ -2,6 +2,7 @@
 // às vezes aparece uma escolha. Eventos não gastam ronda.
 import {getItem, ITEMS} from '../data/items';
 import {generateEncounter, isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
+import {waveStep} from './career';
 import {chance, pick} from './rng';
 import {travelerEvent} from './travelers';
 import type {Encounter, RunEvent, RunState} from './types';
@@ -20,7 +21,7 @@ function calmMon(run: RunState): Encounter['mon'] {
 }
 
 export function shouldRollEvent(run: RunState): boolean {
-  const next = run.wave + 1;
+  const next = run.wave + waveStep(run);
   if (run.wave < 2 || next >= SEASON_LENGTH || isBossWave(next)) return false;
   if (run.lastEventWave === run.wave) return false;
   return chance(EVENT_CHANCE);
@@ -62,13 +63,14 @@ export function rollEvent(run: RunState): RunEvent {
 /** Gera os próximos selvagens antes (a Vidente mostra os tipos deles). */
 export function upcomingEncounters(run: RunState, n: number): Encounter[] {
   const out: Encounter[] = [];
-  for (let w = run.wave + 1; w <= run.wave + n && w <= SEASON_LENGTH && !isMilestoneWave(w); w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region));
+  const step = waveStep(run);
+  for (let w = run.wave + step; w <= run.wave + n * step && w <= SEASON_LENGTH && !isMilestoneWave(w); w += step) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region));
   return out;
 }
 
 /** Pokémon do rival: um pouco mais forte que o selvagem da ronda. */
 export function rivalEncounter(run: RunState, name: string): Encounter {
-  const enc = generateEncounter(run.wave + 1, run.biome, false, 0, run.region);
+  const enc = generateEncounter(run.wave + waveStep(run), run.biome, false, 0, run.region);
   enc.mon.level += 3;
   return {...enc, boss: false, trainer: name};
 }
