@@ -3,6 +3,8 @@ import {rivalEncounter, rollEvent, shouldRollEvent, tutorMoves, tutorPrice, upco
 import {MAX_GLOW, loadCollection, lineRoot, registerStarter, shinyGlow, starterIvs} from '../src/game/meta';
 import {createMon} from '../src/game/mon';
 import type {RunState} from '../src/game/types';
+import {newWorld, stepWorld} from '../src/game/world';
+import {species} from '../src/data/dex';
 
 function run(wave: number): RunState {
   return {
@@ -22,7 +24,26 @@ describe('eventos', () => {
   it('sorteia todos os tipos', () => {
     const kinds = new Set<string>();
     for (let i = 0; i < 300; i++) kinds.add(rollEvent(run(6)).kind);
-    expect([...kinds].sort()).toEqual(['berries', 'house', 'hurt', 'merchant', 'rival', 'seer', 'traveler', 'tutor']);
+    expect([...kinds].sort()).toEqual(['berries', 'house', 'hurt', 'life', 'merchant', 'place', 'rival', 'seer', 'traveler', 'tutor']);
+  });
+  it('o lugar muda a cena: fantasma no pântano, ninho nos campos', () => {
+    const swamp = {...run(20), biome: 'swamp'};
+    const places = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      const ev = rollEvent(swamp);
+      if (ev.kind === 'place') places.add(ev.theme);
+      if (ev.kind === 'place' && ev.theme === 'haunted') expect(species(ev.mon!.species).types).toContain('Ghost');
+    }
+    expect(places.has('haunted')).toBe(true);
+  });
+  it('jornal com notícias do mundo e fã para quem é famoso', () => {
+    const r = run(30);
+    r.world = newWorld();
+    stepWorld(r.world, 30);
+    const kinds = new Set<string>();
+    for (let i = 0; i < 400; i++) kinds.add(rollEvent(r, {fame: 500}).kind);
+    expect(kinds.has('news')).toBe(true);
+    expect(kinds.has('fan')).toBe(true);
   });
   it('vidente e rival', () => {
     expect(upcomingEncounters(run(6), 3)).toHaveLength(3);

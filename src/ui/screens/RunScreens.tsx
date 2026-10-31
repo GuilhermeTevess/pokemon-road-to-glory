@@ -1,3 +1,4 @@
+import {CareerStandings} from './CareerScreen';
 import {shinyGlow} from '../../game/meta';
 import {ShinyStar} from '../components';
 import {roundOf, roundsOf, waveStep} from '../../game/career';
@@ -459,6 +460,12 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
             <span style={{color: getBiome(run.biome).color}}>●</span> {getBiome(run.biome).name} · {Math.max(0, Math.ceil((run.biomeLeft ?? 0) / waveStep(run)))} rondas
           </div>}
           {run.wave > 0 && <TrailMeter value={trailOf(run)} />}
+          {run.career && (
+            <details className="sb-career">
+              <summary>🌐 Classificação da carreira</summary>
+              <CareerStandings compact />
+            </details>
+          )}
           {shinyGlow(run.party) > 0 && (
             <div className="sb-glow" title="Shinies no time atraem mais shinies (os mais raros brilham mais).">
               <ShinyStar /> Brilho do time: shiny 1 em {Math.round(256 / (1 + shinyGlow(run.party) + (run.bag.shinycharm ? 2 : 0)))}

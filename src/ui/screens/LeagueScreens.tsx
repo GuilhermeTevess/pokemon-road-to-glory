@@ -11,11 +11,15 @@ import {useGame} from '../../game/store';
 import type {RunState} from '../../game/types';
 import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
+import {ProfileModal} from './ProfileModal';
+import {profileOfBot, profileOfRun} from '../../game/profile';
+import type {Profile} from '../../game/profile';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
-export function RankTable({rows, limit, log}: {rows: RankRow[]; limit?: number; log?: PointEntry[]}) {
+export function RankTable({rows, limit, log, profileOf}: {rows: RankRow[]; limit?: number; log?: PointEntry[]; profileOf?: (r: RankRow) => Profile | null}) {
   const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const meIdx = rows.findIndex(r => r.player);
   const shown = limit && meIdx >= limit ? [...rows.slice(0, limit), rows[meIdx]] : rows.slice(0, limit ?? rows.length);
   return (
@@ -27,7 +31,13 @@ export function RankTable({rows, limit, log}: {rows: RankRow[]; limit?: number; 
             <span className="rank-pos">{MEDAL[pos - 1] ?? `${pos}º`}</span>
             <TrainerAvatar avatar={r.avatar ?? 'red'} name={r.name} size={36} />
             <span className="rank-name">
-              <b>{r.name}</b>
+              {profileOf && profileOf(r) ? (
+                <button className="link" title="Ver perfil" onClick={() => setProfile(profileOf(r))}>
+                  <b>{r.name} ▸</b>
+                </button>
+              ) : (
+                <b>{r.name}</b>
+              )}
               {r.region && <small className="muted">{getRegion(r.region).name}</small>}
             </span>
             {r.fav && <Sprite name={r.fav} size={36} still />}
@@ -41,6 +51,7 @@ export function RankTable({rows, limit, log}: {rows: RankRow[]; limit?: number; 
           </div>
         );
       })}
+      {profile && <ProfileModal profile={profile} onClose={() => setProfile(null)} />}
       {open && log && (
         <Modal onClose={() => setOpen(false)}>
           <h2>De onde vieram seus pontos</h2>
@@ -154,8 +165,19 @@ export function RankingScreen() {
       </div>
       {tab === 'season' && active && run && (
         <>
-          <p className="muted">Ronda {roundOf(run)}/{roundsOf(run)}. Os rivais também vão somando pontos ao longo da temporada.</p>
-          <RankTable rows={seasonRanking(col, run, me)} log={run.pointLog ?? []} />
+          <p className="muted">
+            Ronda {roundOf(run)}/{roundsOf(run)}. Os rivais jogam a temporada junto com você: toque no nome de alguém para ver o perfil (insígnias, parceiro, Pokémon
+            que mais joga).
+          </p>
+          <RankTable
+            rows={seasonRanking(col, run, me)}
+            log={run.pointLog ?? []}
+            profileOf={r => {
+              if (r.player) return profileOfRun(run, me);
+              const b = run.world?.bots.find(x => x.name === r.name);
+              return b ? profileOfBot(b) : null;
+            }}
+          />
           <h3>Seus pontos nesta temporada</h3>
           <Breakdown points={run.points ?? {}} log={run.pointLog ?? []} />
         </>

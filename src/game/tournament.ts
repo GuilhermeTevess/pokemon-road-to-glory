@@ -9,7 +9,9 @@ import {createMon, toSet} from './mon';
 import {RIVALS, rivalsOf} from '../data/rivals';
 import type {Rival} from '../data/rivals';
 import type {NarratorCtx} from './narration';
-import {pick, randInt, shuffle} from './rng';
+import {botLevel} from './world';
+import type {World, WorldBot} from './world';
+import {hashText, pick, randInt, shuffle, withSeed} from './rng';
 import type {OwnedMon} from './types';
 
 export type TourKind = 'cup' | 'regional' | 'international' | 'worlds';
@@ -65,8 +67,10 @@ export function tourInfo(kind: TourKind): TourInfo {
 export interface Entrant extends NarratorCtx {
   avatar?: string;
   player?: boolean;
-  /** Outro jogador da carreira online (time real dele, controlado pela IA). */
+  /** Outro jogador da carreira online: as partidas contra ele são ao vivo. */
   friend?: boolean;
+  /** Id do jogador na carreira (você ou um amigo). */
+  pid?: string;
   /** Time dos bots (o do jogador é o time da run). */
   team: OwnedMon[];
 }
@@ -93,6 +97,18 @@ export interface Tournament {
   stage: 'intro' | 'draw' | 'bracket' | 'done';
   /** Colocação final do jogador (1, 2, 3 ou 5). */
   placement?: number;
+  /** Torneio da carreira online: igual em todos os PCs (`tid`), `me` = seu id de jogador. */
+  shared?: {tid: string; me: string; ready?: boolean};
+}
+
+/** Resultado de uma partida guardado na nuvem (partidas com jogadores). */
+export interface MatchResult {
+  tid: string;
+  key: string;
+  winner: number;
+  teams?: [string[], string[]];
+  highlights?: string[];
+  left?: number;
 }
 
 /** Registro guardado na coleção (histórico de torneios). */
@@ -184,8 +200,17 @@ function pickRivals(kind: TourKind, region?: string): Rival[] {
   return [...local, ...rest].slice(0, 7);
 }
 
-export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string, guests: Entrant[] = []): Tournament {
-  const rivals = pickRivals(info.kind, region).slice(0, 7 - guests.length);
+export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string, guests: Entrant[] = [], world?: World): Tournament {
+  const need = 7 - guests.length;
+  // Com o mundo da temporada, quem joga são os rivais que estão jogando com você (time e nível de agora).
+  const fromWorld = world ? pickWorldBots(world, info.kind, region).slice(0, need) : [];
+  const worldBots: Entrant[] = fromWorld.map(b => ({
+    name: b.name, avatar: b.avatar, titles: {}, runnerUps: 0, fame: b.banked + b.points,
+    team: worldTeam(b, info.wave, info.teamSize),
+  }));
+  const rivals = pickRivals(info.kind, region)
+    .filter(r => !worldBots.some(w => w.name === r.name))
+    .slice(0, need - worldBots.length);
   const bots: Entrant[] = rivals.map((rival, i) => {
     const name = rival.name;
     const skill = randInt(-2, 2) + (info.kind === 'worlds' ? 2 : info.kind === 'international' ? 1 : 0);
@@ -201,8 +226,29 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, regi
       team: rivalTeam(rival, info.wave, info.teamSize, skill),
     };
   });
-  const entrants = shuffle([{...me, player: true, team: []}, ...guests, ...bots]);
+  const entrants = shuffle([{...me, player: true, team: []}, ...guests, ...worldBots, ...bots]);
   return {kind: info.kind, wave: info.wave, region, entrants, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro'};
+}
+
+/** Rivais do mundo para o torneio: nos locais, quem está na região; nos grandes, os mais famosos. */
+function pickWorldBots(world: World, kind: TourKind, region?: string): WorldBot[] {
+  const score = (b: WorldBot) => b.points + b.banked + Math.random() * 120;
+  const ranked = [...world.bots].sort((a, b) => score(b) - score(a));
+  if (kind !== 'cup' && kind !== 'regional') return ranked;
+  return [...ranked.filter(b => b.region === region), ...ranked.filter(b => b.region !== region)];
+}
+
+/** Time de um rival do mundo: o time que ele está usando, no nível dele nesta ronda. */
+export function worldTeam(b: WorldBot, wave: number, size: number): OwnedMon[] {
+  const level = botLevel(b, wave);
+  const team = [...b.team];
+  // Quem abre a luta varia um pouco.
+  if (Math.random() < 0.35 && team.length > 1) team.unshift(...team.splice(randInt(0, Math.min(size, team.length) - 1), 1));
+  return team.slice(0, size).map(name => {
+    const mon = createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
+    mon.item = rivalItem(b.name, name);
+    return mon;
+  });
 }
 
 function pairUp(ids: number[]): MatchRec[] {
@@ -227,8 +273,16 @@ export function currentRound(t: Tournament): number {
 }
 
 /** Simula uma partida entre dois times com a IA dos dois lados. */
-export function simulateMatch(teamA: OwnedMon[], teamB: OwnedMon[], nameA: string, nameB: string): {winner: 0 | 1; highlights: string[]; left: number} {
-  const battle = new Battle({formatid: 'gen9customgame' as never});
+export function simulateMatch(teamA: OwnedMon[], teamB: OwnedMon[], nameA: string, nameB: string, seed?: string): {winner: 0 | 1; highlights: string[]; left: number} {
+  // Com semente, o resultado é o mesmo em qualquer PC (torneio da carreira online).
+  if (seed) {
+    const h = hashText(seed).toString(16).padStart(8, '0');
+    return withSeed(seed, () => runMatch(new Battle({formatid: 'gen9customgame' as never, seed: `gen5,${h}${h}` as never}), teamA, teamB, nameA, nameB));
+  }
+  return runMatch(new Battle({formatid: 'gen9customgame' as never}), teamA, teamB, nameA, nameB);
+}
+
+function runMatch(battle: Battle, teamA: OwnedMon[], teamB: OwnedMon[], nameA: string, nameB: string): {winner: 0 | 1; highlights: string[]; left: number} {
   battle.setPlayer('p1', {name: nameA, team: teamA.map(toSet)});
   battle.setPlayer('p2', {name: nameB, team: teamB.map(toSet)});
   if (battle.p1.requestState === 'teampreview') {
@@ -309,6 +363,12 @@ export function recordPlayerResult(t: Tournament, won: boolean, myTeam: string[]
   m.highlights = highlights;
   m.left = left;
   if (!won) t.placement = [5, 3, 2][currentRound(t)];
+  if (t.shared) {
+    // Carreira online: as partidas dos outros jogadores chegam pela nuvem.
+    if (!won) t.stage = 'done';
+    sharedAdvance(t, {});
+    return;
+  }
   advance(t);
   if (!won) while (t.stage !== 'done') advance(t);
   else if (t.stage === 'done') t.placement = 1;
@@ -338,4 +398,112 @@ export function applyToCareer(c: Career, t: Tournament): void {
     rounds: t.rounds,
   });
   c.history = c.history.slice(0, 20);
+}
+
+/** Posições na chave para os jogadores ficarem o mais longe possível (2 = um em cada ponta, 4 = um por chave). */
+const SPREAD = [0, 4, 2, 6, 1, 5, 3, 7];
+
+/** Chave de uma partida: rodada_índice. */
+export const matchKey = (round: number, index: number) => `${round}_${index}`;
+
+/**
+ * Torneio da carreira online: todo mundo monta a mesma chave (mesma semente), com os
+ * jogadores espalhados para só se cruzarem o mais tarde possível.
+ */
+export function createSharedTournament(
+  info: TourInfo,
+  players: (Omit<Entrant, 'team'> & {pid: string; team: OwnedMon[]})[],
+  me: string,
+  tid: string,
+  region?: string,
+  world?: World,
+): Tournament {
+  return withSeed(tid, () => {
+    // No máximo 8 na chave (a carreira aceita até 8 jogadores); você sempre entra na sua.
+    const others = players.filter(p => p.pid !== me).sort((a, b) => a.pid.localeCompare(b.pid));
+    const humans = [...players.filter(p => p.pid === me), ...others].slice(0, 8).sort((a, b) => a.pid.localeCompare(b.pid));
+    const bots = createTournament(info, {name: '_', titles: {}, runnerUps: 0, fame: 0}, region, [], world).entrants.filter(e => !e.player);
+    const slots: Entrant[] = new Array(8);
+    humans.forEach((p, i) => (slots[SPREAD[i]] = {...p, player: p.pid === me, friend: p.pid !== me}));
+    let b = 0;
+    for (let i = 0; i < 8; i++) if (!slots[i]) slots[i] = bots[b++];
+    return {kind: info.kind, wave: info.wave, region, entrants: slots, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro', shared: {tid, me}};
+  });
+}
+
+/**
+ * Usa a chave que está na nuvem (a primeira que alguém montou): assim todo mundo joga
+ * exatamente o mesmo torneio, com os mesmos bots.
+ */
+export function adoptShared(t: Tournament, doc: {region?: string; entrants: Entrant[]}): void {
+  const me = t.shared!.me;
+  const mine = t.entrants.find(e => e.player);
+  t.region = doc.region;
+  t.entrants = doc.entrants.map(e => (e.pid === me && mine ? {...e, ...mine, pid: me, player: true, friend: false} : {...e, player: e.pid === me, friend: !!e.pid && e.pid !== me}));
+  t.shared!.ready = true;
+  // Ficou fora da chave (mais de 8 jogadores ao mesmo tempo): não segura ninguém.
+  if (!t.entrants.some(e => e.player)) {
+    t.stage = 'done';
+    t.placement = 5;
+  }
+}
+
+/** Partidas entre bots da rodada atual que ainda não têm resultado. */
+export function botPending(t: Tournament): {key: string; round: number; index: number}[] {
+  const r = t.rounds.length - 1;
+  return t.rounds[r].flatMap((m, i) => (m.winner === undefined && !t.entrants[m.a].pid && !t.entrants[m.b].pid ? [{key: matchKey(r, i), round: r, index: i}] : []));
+}
+
+/** Simula uma partida entre bots (quem simular primeiro grava na nuvem; os outros usam esse resultado). */
+export function simulateBotMatch(t: Tournament, round: number, index: number): MatchResult {
+  const m = t.rounds[round][index];
+  const A = t.entrants[m.a];
+  const B = t.entrants[m.b];
+  const sim = simulateMatch(A.team, B.team, A.name, B.name);
+  return {tid: t.shared!.tid, key: matchKey(round, index), winner: sim.winner === 0 ? m.a : m.b, teams: [A.team.map(x => x.species), B.team.map(x => x.species)], highlights: sim.highlights, left: sim.left};
+}
+
+/**
+ * Avança o torneio compartilhado com os resultados da nuvem (bots e jogadores).
+ * Para quando falta algum resultado.
+ */
+export function sharedAdvance(t: Tournament, results: Record<string, MatchResult>): void {
+  const me = playerIndex(t);
+  for (let guard = 0; guard < 4; guard++) {
+    const r = t.rounds.length - 1;
+    const round = t.rounds[r];
+    round.forEach((m, i) => {
+      if (m.winner !== undefined) return;
+      const res = results[matchKey(r, i)];
+      if (!res) return;
+      m.winner = res.winner;
+      m.teams = res.teams;
+      m.highlights = res.highlights;
+      m.left = res.left;
+      if ((m.a === me || m.b === me) && res.winner !== me && t.stage !== 'done') {
+        t.placement = [5, 3, 2][r];
+        t.stage = 'done';
+      }
+    });
+    if (round.some(m => m.winner === undefined)) return;
+    if (round.length === 1) {
+      if (round[0].winner === me) {
+        t.placement = 1;
+        t.stage = 'done';
+      }
+      return;
+    }
+    t.rounds.push(pairUp(round.map(m => m.winner!)));
+  }
+}
+
+/** Partida do jogador que ainda não tem resultado: rodada, índice e adversário. */
+export function myPending(t: Tournament): {round: number; index: number; foe: Entrant; foeIndex: number} | null {
+  const me = playerIndex(t);
+  const r = t.rounds.length - 1;
+  const i = t.rounds[r].findIndex(m => (m.a === me || m.b === me) && m.winner === undefined);
+  if (i < 0) return null;
+  const m = t.rounds[r][i];
+  const foeIndex = m.a === me ? m.b : m.a;
+  return {round: r, index: i, foe: t.entrants[foeIndex], foeIndex};
 }
