@@ -131,9 +131,10 @@ export function movesLearnedAt(s: Species, level: number): string[] {
 }
 
 /** Golpes que o Pokémon pode aprender por MT/tutor/ovo (para o item Disco Técnico). */
-export function teachableMoves(s: Species): string[] {
+/** Golpes por MT/tutor. Sem `status`, só os que causam dano (as MTs da run). */
+export function teachableMoves(s: Species, status = false): string[] {
   return Object.entries(learnsetFor(s))
-    .filter(([m, srcs]) => isUsableMove(m) && srcs.some(x => /^\d[MTE]$/.test(x)) && dex.moves.get(m).basePower > 0)
+    .filter(([m, srcs]) => isUsableMove(m) && srcs.some(x => /^\d[MTE]$/.test(x)) && (status || dex.moves.get(m).basePower > 0))
     .map(([m]) => m);
 }
 
