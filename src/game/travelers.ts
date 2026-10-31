@@ -52,7 +52,7 @@ export function rollHintLegendary(run: RunState): Encounter | null {
   const hint = hintHere(run);
   if (!hint || !chance(HINT_CHANCE)) return null;
   const mon = createMon(hint.species, {level: run.wave + 5, ivMin: 20, shinyChance: (1 + (run.perks?.luck ?? 0)) / 256});
-  return {mon, rarity: 'legendary', boss: true, intro: ['A dica do viajante era verdade...']};
+  return {mon, rarity: 'legendary', boss: true, hinted: true, intro: ['A dica do viajante era verdade...']};
 }
 
 /** Próximo bioma no sorteio: normal, ou o oculto da região (bem mais provável com dica). */

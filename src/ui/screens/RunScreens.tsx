@@ -11,6 +11,8 @@ import {SHOP, moneyValue, rerollCost, shopPrice, travelBlocked} from '../../game
 import {gloryFor, rerollPrice} from '../../game/glory';
 import {TRAIL, TRAIL_CAP, trailOf} from '../../game/legend';
 import {getHint} from '../../data/hints';
+import {seasonPoints} from '../../game/league';
+import {SeasonSummary} from './LeagueScreens';
 import {bookName, getGym, gymsOf} from '../../data/gyms';
 import type {Gym} from '../../data/gyms';
 import {badgesIn, gymStatus, gymWaves, ticketPrice} from '../../game/gym';
@@ -445,7 +447,7 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
           <div className="trainer-name">{trainer?.name}</div>
           <div className="sb-money">₽ {run.money}</div>
           <div className="muted">
-            Ronda {run.wave}/{SEASON_LENGTH}
+            Ronda {run.wave}/{SEASON_LENGTH} · {seasonPoints(run)} pts
           </div>
           {run.wave > 0 && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
             <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, run.regionLeft ?? 0)} rondas
@@ -757,6 +759,7 @@ export function EndScreen({kind}: {kind: 'gameOver' | 'stageClear'}) {
       <p className="muted">
         Derrotados: {run.stats.defeated} · Capturados: {run.stats.caught} · Fugas: {run.stats.fled}
       </p>
+      <SeasonSummary run={run} />
       <p className="glory-earned">
         <PixelIcon name="trophy" color="#e0a100" /> +{run.gloryEarned ?? gloryFor(run.wave, kind === 'stageClear' ? 'stageClear' : 'lost')} de Glória para
         gastar em melhorias gerais

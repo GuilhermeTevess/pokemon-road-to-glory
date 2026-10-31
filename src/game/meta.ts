@@ -2,6 +2,7 @@
 // evolutiva tem uma "ficha": IVs, natures e habilidades já vistas, doces, corações e
 // golpes liberados. A ficha vale quando você COMEÇA com o Pokémon; os selvagens
 // continuam aleatórios e só alimentam a ficha quando capturados.
+import type {League} from './league';
 import type {Species} from '@pkmn/sim';
 import {dex, evolutionLine, isLegendary, levelUpMoves, species, teachableMoves, toID} from '../data/dex';
 import {megaStonesFor} from '../data/items';
@@ -88,6 +89,10 @@ export interface Collection {
   legends?: Record<string, number>;
   /** Cadernetas completas por região (região → vezes). */
   badgeBooks?: Record<string, number>;
+  /** Ranking: rivais do circuito e temporadas passadas. */
+  league?: League;
+  /** Conquistas desbloqueadas (id → quando). */
+  achievements?: Record<string, number>;
 }
 
 export function lineRoot(name: string): string {

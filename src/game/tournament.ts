@@ -32,22 +32,22 @@ export const TOURS: TourInfo[] = [
   {
     kind: 'cup', wave: 30, name: 'League Cup', teamSize: 3,
     about: 'Torneio local, o primeiro degrau do circuito. Vale poucos Championship Points (CP), mas é onde todo campeão começa.',
-    cp: [50, 40, 25, 15], glory: [30, 20, 12, 6], fame: [10, 6, 3, 1], money: [4000, 2500, 1500, 800],
+    cp: [50, 40, 25, 15], glory: [30, 20, 12, 6], fame: [80, 50, 30, 15], money: [4000, 2500, 1500, 800],
   },
   {
     kind: 'regional', wave: 60, name: 'Regional Championship', teamSize: 4,
     about: 'Campeonato regional: muito mais gente, times mais fortes e bem mais CP. Ir bem aqui faz seu nome circular.',
-    cp: [200, 160, 100, 60], glory: [60, 40, 25, 12], fame: [25, 15, 8, 3], money: [8000, 5000, 3000, 1500],
+    cp: [200, 160, 100, 60], glory: [60, 40, 25, 12], fame: [200, 120, 70, 40], money: [8000, 5000, 3000, 1500],
   },
   {
     kind: 'international', wave: 90, name: 'International Championship', teamSize: 5,
     about: 'Um dos grandes internacionais (Europa, América Latina, América do Norte, Oceania). Reúne os melhores de vários países.',
-    cp: [500, 400, 250, 150], glory: [100, 70, 45, 25], fame: [50, 30, 15, 6], money: [15000, 9000, 5000, 2500],
+    cp: [500, 400, 250, 150], glory: [100, 70, 45, 25], fame: [400, 250, 150, 80], money: [15000, 9000, 5000, 2500],
   },
   {
     kind: 'worlds', wave: 120, name: 'World Championship', teamSize: 6,
     about: 'O Campeonato Mundial, o fim da temporada. Só os melhores chegam, e vencer aqui é virar lenda.',
-    cp: [0, 0, 0, 0], glory: [200, 130, 80, 40], fame: [120, 70, 35, 15], money: [30000, 18000, 10000, 5000],
+    cp: [0, 0, 0, 0], glory: [200, 130, 80, 40], fame: [1000, 600, 350, 200], money: [30000, 18000, 10000, 5000],
   },
 ];
 
@@ -118,7 +118,7 @@ export function emptyCareer(): Career {
 }
 
 export const FAME_TIERS: [number, string][] = [
-  [0, 'Desconhecido'], [20, 'Promessa'], [60, 'Conhecido'], [150, 'Estrela'], [300, 'Lenda'],
+  [0, 'Desconhecido'], [100, 'Promessa'], [400, 'Conhecido'], [1200, 'Estrela'], [3000, 'Lenda'],
 ];
 
 export function fameLabel(fame: number): string {
@@ -161,7 +161,7 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, regi
     return {
       name, avatar: pick(AVATARS), titles,
       runnerUps: Math.random() < 0.15 ? randInt(2, 4) : 0,
-      fame: vet ? randInt(30, 120) : randInt(0, 30),
+      fame: vet ? randInt(300, 1200) : randInt(0, 300),
       team: botTeam(info.wave, info.teamSize, skill),
     };
   });

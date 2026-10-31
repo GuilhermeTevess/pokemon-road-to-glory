@@ -1,3 +1,4 @@
+import type {PointSource, SeasonRec} from './league';
 // Modelos persistidos (vão para o localStorage). Mantenha-os serializáveis em JSON.
 import type {Egg} from './daycare';
 import type {Tournament} from './tournament';
@@ -66,6 +67,8 @@ export interface Encounter {
   gym?: string;
   /** Bioma do fundo da batalha (ginásios usam o bioma do tipo). */
   arena?: string;
+  /** Lendário que apareceu pela dica de um viajante. */
+  hinted?: boolean;
   /** Falas do narrador na entrada (dependem da fama e dos títulos). */
   intro?: string[];
 }
@@ -134,6 +137,11 @@ export interface RunState {
   /** Ginásios marcados (ingresso pago) e insígnias ganhas nesta temporada. */
   gyms?: {id: string; wave: number; paid?: number}[];
   badges?: string[];
+  /** Pontos de fama desta temporada, por fonte, e pontos finais dos rivais (NPCs). */
+  points?: Partial<Record<PointSource, number>>;
+  rivalPoints?: Record<string, number>;
+  /** Resultado da temporada (tela final). */
+  season?: SeasonRec;
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
   travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string};
   incenseWaves: number;

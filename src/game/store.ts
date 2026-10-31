@@ -3,6 +3,8 @@ import {create} from 'zustand';
 import {BIOMES, getBiome} from '../data/biomes';
 import {getHint} from '../data/hints';
 import {bookName, getGym, gymsOf} from '../data/gyms';
+import {checkAchievements} from './achievements';
+import {POINTS, addPoints, finishSeason, rollRivalPoints} from './league';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
@@ -80,7 +82,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory' | 'tournaments';
+export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
 
 export interface Toast {
   id: string;
@@ -201,9 +203,12 @@ export const useGame = create<Store>((set, get) => {
     const run = structuredClone(cur);
     const col = structuredClone(get().collection);
     fn(run, col);
+    const fresh = tid() ? checkAchievements(col, run) : [];
     saveRun(tid(), run);
     saveCollection(tid(), col);
     set({run, collection: col});
+    for (const name of fresh.slice(0, 3)) get().toast(`🏅 Conquista: ${name}!`);
+    if (fresh.length > 3) get().toast(`🏅 +${fresh.length - 3} conquistas novas!`);
   };
 
   /** Mexe só na coleção (tela da coleção, fora da run). */
@@ -341,6 +346,8 @@ export const useGame = create<Store>((set, get) => {
   };
 
   const endRun = (run: RunState, col: Collection, result: 'lost' | 'stageClear' | 'abandoned') => {
+    const t = get().trainer;
+    run.season = finishSeason(col, run, {name: t?.name ?? 'Você', avatar: t?.avatar});
     const st = statsOf(col);
     st.runs++;
     const glory = gloryFor(run.wave, result);
@@ -574,6 +581,7 @@ export const useGame = create<Store>((set, get) => {
       if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > teamBudget(col)) return;
       const run = emptyRun();
       applyPerks(run, perksOf(col));
+      run.rivalPoints = rollRivalPoints(col);
       run.party = picked.map(name => {
         const mon = createMon(name, {
           level: START_LEVELS[perksOf(col).level ?? 0] ?? STARTER_LEVEL,
@@ -772,6 +780,7 @@ export const useGame = create<Store>((set, get) => {
                 if (!run.bag[id]) delete run.bag[id];
               }
               run.diary = [...(run.diary ?? []), ev.hint];
+              addPoints(run, col, 'travelers', POINTS.traveler);
               addTrail(run, TRAIL.traveler);
               const h = getHint(ev.hint);
               message = `Dica anotada no diário!${h ? ` (${getRegion(h.region).name} · ${getBiome(h.biome).name})` : ''}`;
@@ -927,15 +936,18 @@ export const useGame = create<Store>((set, get) => {
         const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
         if (outcome === 'won' && enc.boss && !enc.trainer) addTrail(run, TRAIL.boss);
+        if ((outcome === 'won' || outcome === 'caught') && enc.hinted) addPoints(run, col, 'legendaries', POINTS.legendary);
         const gym = outcome === 'won' && enc.gym ? getGym(enc.gym) : undefined;
         if (gym && !run.badges?.includes(gym.id)) {
           run.badges = [...(run.badges ?? []), gym.id];
+          addPoints(run, col, 'gyms', POINTS.badge);
           col.glory = (col.glory ?? 0) + GYM_PRIZE.glory;
           run.tourGlory = (run.tourGlory ?? 0) + GYM_PRIZE.glory;
           get().toast(`Você ganhou a ${gym.badge}! +${GYM_PRIZE.glory} Glória`);
           if (badgesIn(run, gym.region) === gymsOf(gym.region).length) {
             col.glory += GYM_PRIZE.book;
             run.tourGlory += GYM_PRIZE.book;
+            addPoints(run, col, 'books', POINTS.book);
             col.badgeBooks = {...col.badgeBooks, [gym.region]: (col.badgeBooks?.[gym.region] ?? 0) + 1};
             get().toast(`${bookName(gym.region)} de ${getRegion(gym.region).name} completa! +${GYM_PRIZE.book} Glória`);
           }
@@ -943,6 +955,7 @@ export const useGame = create<Store>((set, get) => {
         if (outcome === 'won' && enc.legend) {
           const prize = legendPrize(run.wave);
           col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
+          addPoints(run, col, 'legends', POINTS.legend);
           col.glory = (col.glory ?? 0) + prize.glory;
           run.tourGlory = (run.tourGlory ?? 0) + prize.glory;
           run.money += prize.money;
@@ -1011,6 +1024,7 @@ export const useGame = create<Store>((set, get) => {
         const info = tourInfo(t.kind);
         const i = prizeIndex(t.placement ?? 5);
         applyToCareer(careerOf(col), t);
+        addPoints(run, col, 'tournaments', info.fame[i], false);
         col.glory = (col.glory ?? 0) + info.glory[i];
         run.tourGlory = (run.tourGlory ?? 0) + info.glory[i];
         run.money += info.money[i];
