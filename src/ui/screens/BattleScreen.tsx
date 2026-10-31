@@ -19,7 +19,7 @@ import {
   MatchupPanel,
   MonName,
   MoveInfo,
-  PixelIcon,
+  ShinyStar,
   RarityBadge,
   Sprite,
   StatusBadge,
@@ -310,8 +310,7 @@ export function BattleScreen() {
             <div key={`w${i}`} className="slot-group">
               <div className={`info-box wild-box s${i}`}>
                 <div className="info-name">
-                  {wild.shiny && <PixelIcon name="star" color="#e0a100" />}
-                  {species(wild.species).name} <span className="lv">Nv. {wild.level}</span>
+                  {species(wild.species).name}{wild.shiny && <ShinyStar />} <span className="lv">Nv. {wild.level}</span>
                 </div>
                 <div className="row">
                   <Types name={wild.species} />
@@ -370,7 +369,6 @@ export function BattleScreen() {
                   </div>
                 )}
                 <div className="info-name">
-                  {pv.shiny && <PixelIcon name="star" color="#e0a100" />}
                   <MonName mon={pv} /> <span className="lv">Nv. {pv.level}</span>
                 </div>
                 <div className="row">
