@@ -1,11 +1,12 @@
 // Quickplay: Rush (dois jogadores no mesmo PC) e Campeonato rápido.
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {TYPE_COLORS, dex, species, typeMultiplier} from '../../data/dex';
+import {TYPE_COLORS, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
-import {RUSH_MODES, drawGroups, drawPairs, giveMegaStone, rushMode, rushMon} from '../../game/rush';
+import {RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, rushMode, rushMon} from '../../game/rush';
+import type {DuelReq} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
 import {useGame} from '../../game/store';
 import {AVATARS} from '../../game/trainers';
@@ -17,11 +18,12 @@ import {ArenaBackdrop} from '../scene';
 import {TrainerAvatar} from './StartScreens';
 import {playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
 import {fast} from '../settings';
+import {OnlineRush} from './OnlineRush';
 import {FX, playMoveFx} from '../fx';
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
-interface Player {
+export interface Player {
   name: string;
   avatar: string;
 }
@@ -143,6 +145,8 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
   const [prepFor, setPrepFor] = useState(0);
   const [winner, setWinner] = useState<number | null>(null);
 
+  const [online, setOnline] = useState<{role: 'host' | 'guest'; code?: string} | null>(null);
+  const [joinCode, setJoinCode] = useState('');
   const start = () => {
     setPairs(drawPairs(mode));
     setTeams([[], []]);
@@ -150,6 +154,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
     setStep('draft');
   };
 
+  if (online) return <OnlineRush role={online.role} code={online.code} me={players[0]} mode={mode} onExit={() => setOnline(null)} />;
   if (step === 'setup')
     return (
       <div className="screen quickplay">
@@ -192,8 +197,21 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
           </label>
           <p className="hint">Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez fica com um e o outro vai para o adversário. No fim, cada um tem 6.</p>
           <button className="btn primary big" onClick={start}>
-            Começar o sorteio
+            Começar o sorteio (mesmo PC)
           </button>
+          <div className="rush-online">
+            <h3>Jogar cada um no seu PC</h3>
+            <p className="hint">Crie uma sala e mande o código para o seu amigo. Ele abre o jogo, vai em Quickplay → Rush e entra com o código.</p>
+            <div className="rush-online-row">
+              <button className="btn primary" onClick={() => setOnline({role: 'host'})}>
+                Criar sala online
+              </button>
+              <input placeholder="CÓDIGO" maxLength={5} value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} />
+              <button className="btn" disabled={joinCode.length < 5} onClick={() => setOnline({role: 'guest', code: joinCode})}>
+                Entrar na sala
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -202,6 +220,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
     const who = round % 2;
     const pair = pairs[round];
     const pickMon = (k: 0 | 1) => {
+    void who;
       const mine = rushMon(pair[k], mode);
       const theirs = rushMon(pair[1 - k], mode);
       const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
@@ -214,49 +233,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         setStep('prep');
       } else setRound(round + 1);
     };
-    return (
-      <div className="screen quickplay">
-        <header className="bar">
-          <h2>Rush · {rushMode(mode).name}</h2>
-          <span className="muted">
-            Escolha {round + 1} de {pairs.length}
-          </span>
-        </header>
-        <div className="rush-draft">
-          <div className="rush-turn">
-            <TrainerAvatar avatar={players[who].avatar} name={players[who].name} size={64} />
-            <b>Vez de {players[who].name}</b>
-            <span className="muted">Fique com um. O outro vai para {players[1 - who].name}.</span>
-          </div>
-          <div className="rush-pair">
-            {pair.map((name, k) => (
-              <button key={name} className="rush-pick" onClick={() => pickMon(k as 0 | 1)}>
-                <Sprite name={name} size={120} />
-                <b>{species(name).name}</b>
-                <Types name={name} />
-                <StatLine name={name} />
-                <span className="muted">{abilityLine(name)}</span>
-              </button>
-            ))}
-          </div>
-          <div className="rush-teams">
-            {players.map((p, i) => (
-              <div key={i} className={`rush-team ${who === i ? 'on' : ''}`}>
-                <b>{p.name}</b>
-                <span className="team-row">
-                  {teams[i].map(m => (
-                    <Sprite key={m.uid} name={m.species} size={44} still />
-                  ))}
-                  {Array.from({length: 6 - teams[i].length}, (_, k) => (
-                    <span key={k} className="rush-empty" />
-                  ))}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <DraftView players={players} mode={mode} round={round} total={pairs.length} pair={pair} teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]} canPick onPick={pickMon} />;
   }
 
   if (step === 'prep')
@@ -279,7 +256,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
 
   if (step === 'battle')
     return (
-      <VersusBattle
+      <LocalDuel
         players={players}
         teams={teams}
         curtain={curtain}
@@ -298,6 +275,63 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
       onNew={() => setStep('setup')}
       onExit={onExit}
     />
+  );
+}
+
+/** Sorteio do Rush (o mesmo desenho no mesmo PC e no online). */
+export function DraftView({players, mode, round, total, pair, teams, canPick, onPick}: {
+  players: [Player, Player];
+  mode: RushMode;
+  round: number;
+  total: number;
+  pair: [string, string];
+  teams: [string[], string[]];
+  canPick: boolean;
+  onPick: (k: 0 | 1) => void;
+}) {
+  const who = round % 2;
+  return (
+    <div className="screen quickplay">
+      <header className="bar">
+        <h2>Rush · {rushMode(mode).name}</h2>
+        <span className="muted">
+          Escolha {round + 1} de {total}
+        </span>
+      </header>
+      <div className="rush-draft">
+        <div className="rush-turn">
+          <TrainerAvatar avatar={players[who].avatar} name={players[who].name} size={64} />
+          <b>Vez de {players[who].name}</b>
+          <span className="muted">{canPick ? `Fique com um. O outro vai para ${players[1 - who].name}.` : `Esperando ${players[who].name} escolher...`}</span>
+        </div>
+        <div className="rush-pair">
+          {pair.map((name, k) => (
+            <button key={name} className="rush-pick" disabled={!canPick} onClick={() => onPick(k as 0 | 1)}>
+              <Sprite name={name} size={120} />
+              <b>{species(name).name}</b>
+              <Types name={name} />
+              <StatLine name={name} />
+              <span className="muted">{abilityLine(name)}</span>
+            </button>
+          ))}
+        </div>
+        <div className="rush-teams">
+          {players.map((p, i) => (
+            <div key={i} className={`rush-team ${who === i ? 'on' : ''}`}>
+              <b>{p.name}</b>
+              <span className="team-row">
+                {teams[i].map((sp, k) => (
+                  <Sprite key={k} name={sp} size={44} still />
+                ))}
+                {Array.from({length: 6 - teams[i].length}, (_, k) => (
+                  <span key={k} className="rush-empty" />
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -322,7 +356,7 @@ function abilityLine(name: string): string {
 }
 
 /** Antes da luta: cada um escolhe quem abre (e, no modo Mega, quem leva a pedra). */
-function PrepScreen({player, team, mega, curtain, onDone}: {player: Player; team: OwnedMon[]; mega: boolean; curtain: boolean; onDone: (team: OwnedMon[]) => void}) {
+export function PrepScreen({player, team, mega, curtain, onDone}: {player: Player; team: OwnedMon[]; mega: boolean; curtain: boolean; onDone: (team: OwnedMon[]) => void}) {
   const [hidden, setHidden] = useState(curtain);
   const [lead, setLead] = useState(team[0].uid);
   const megaOk = team.filter(m => giveMegaTest(m));
@@ -394,7 +428,7 @@ function Curtain({player, text, onReady}: {player: Player; text: string; onReady
   );
 }
 
-// ------------------------------------------------------------------ Batalha no mesmo PC
+// ------------------------------------------------------------------ Batalha (mesmo PC ou online)
 
 interface View {
   species: string;
@@ -406,120 +440,143 @@ interface View {
   anim?: string;
 }
 
-function VersusBattle({players, teams, curtain, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; onEnd: (winner: number) => void}) {
-  const ctl = useMemo(
-    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: players[0].name}),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-  const b = ctl.battle;
+/**
+ * Tela da batalha do Rush. Só mostra: quem decide o que acontece é o "driver"
+ * (o mesmo PC revezando, ou a rede no online). `batches` cresce a cada turno resolvido.
+ */
+export function BattleView({players, bottom, batches, balls, req, waiting, curtainFor, onChoose, onIdle}: {
+  players: [Player, Player];
+  /** Lado que aparece embaixo (o seu). */
+  bottom: Side;
+  batches: BattleEvent[][];
+  balls: {p1: boolean[]; p2: boolean[]};
+  /** O que o jogador deste PC pode escolher agora (null = nada). */
+  req: DuelReq | null;
+  /** Texto enquanto espera o outro jogador. */
+  waiting?: string;
+  /** Mostrar cortina antes do menu (mesmo PC). */
+  curtainFor?: Player | null;
+  onChoose: (choice: string, mega: boolean) => void;
+  /** Avisado quando terminou de mostrar tudo o que chegou. */
+  onIdle?: () => void;
+}) {
   const [views, setViews] = useState<Record<Side, View | null>>({p1: null, p2: null});
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(true);
-  const [ready, setReady] = useState<Side | null>(null);
+  const [played, setPlayed] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<'main' | 'switch'>('main');
   const [mega, setMega] = useState(false);
-  const [, force] = useState(0);
+  const [shown, setShown] = useState<string | null>(null);
   const fxRef = useRef<HTMLDivElement>(null);
   const arenaRef = useRef<HTMLDivElement>(null);
+  const top: Side = bottom === 'p1' ? 'p2' : 'p1';
 
-  const play = async (events: BattleEvent[]) => {
+  useEffect(() => {
+    if (busy || played >= batches.length) return;
+    const events = batches[played];
     setBusy(true);
-    for (const ev of events) {
-      if (ev.switchIn) {
-        const s = ev.switchIn;
-        setViews(v => ({...v, [s.side]: {species: s.species, level: s.level ?? 50, hp: s.hp, maxhp: s.maxhp, shiny: s.shiny, anim: 'enter'}}));
-        playCry(s.species);
+    void (async () => {
+      for (const ev of events) {
+        if (ev.switchIn) {
+          const sw = ev.switchIn;
+          setViews(v => ({...v, [sw.side]: {species: sw.species, level: sw.level ?? 50, hp: sw.hp, maxhp: sw.maxhp, shiny: sw.shiny, anim: 'enter'}}));
+          playCry(sw.species);
+        }
+        if (ev.forme) {
+          const f = ev.forme;
+          setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
+          playCry(f.species);
+          await wait(700);
+        }
+        if (ev.move) {
+          const mv = ev.move;
+          if (ev.text) setMessage(ev.text);
+          playMove(mv.move);
+          setViews(v => ({...v, [mv.side]: v[mv.side] ? {...v[mv.side]!, anim: 'attack'} : null}));
+          // A animação usa "p1" para quem está embaixo.
+          const fxSide = mv.side === bottom ? 'p1' : 'p2';
+          // Com a aba em segundo plano a animação pode parar: nunca espera mais que 2,5 s.
+          await Promise.all([
+            fxRef.current && arenaRef.current && !fast() ? Promise.race([playMoveFx(fxRef.current, arenaRef.current, mv.move, fxSide), new Promise(r => setTimeout(r, 2500))]) : Promise.resolve(),
+            wait(450),
+          ]);
+          continue;
+        }
+        if (ev.hit) {
+          const h = ev.hit;
+          playHit(h.effect);
+          setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, anim: 'hit'} : null}));
+        }
+        if (ev.hp) {
+          const h = ev.hp;
+          setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v[h.side]!.maxhp : h.maxhp, status: h.status ?? v[h.side]!.status} : null}));
+        }
+        if (ev.faint) {
+          const side = ev.faint;
+          setViews(v => ({...v, [side]: v[side] ? {...v[side]!, hp: 0, anim: 'faint'} : null}));
+        }
+        if (ev.text) {
+          setMessage(ev.text);
+          await wait(850);
+        } else if (ev.hp) await wait(350);
       }
-      if (ev.forme) {
-        const f = ev.forme;
-        setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
-        playCry(f.species);
-        await wait(700);
-      }
-      if (ev.move) {
-        const mv = ev.move;
-        if (ev.text) setMessage(ev.text);
-        playMove(mv.move);
-        setViews(v => ({...v, [mv.side]: v[mv.side] ? {...v[mv.side]!, anim: 'attack'} : null}));
-        await Promise.all([fxRef.current && arenaRef.current && !fast() ? playMoveFx(fxRef.current, arenaRef.current, mv.move, mv.side) : Promise.resolve(), wait(450)]);
-        continue;
-      }
-      if (ev.hit) {
-        const h = ev.hit;
-        playHit(h.effect);
-        setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, anim: 'hit'} : null}));
-      }
-      if (ev.hp) {
-        const h = ev.hp;
-        setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v[h.side]!.maxhp : h.maxhp, status: h.status ?? v[h.side]!.status} : null}));
-      }
-      if (ev.faint) {
-        const side = ev.faint;
-        setViews(v => ({...v, [side]: v[side] ? {...v[side]!, hp: 0, anim: 'faint'} : null}));
-      }
-      if (ev.text) {
-        setMessage(ev.text);
-        await wait(850);
-      } else if (ev.hp) await wait(350);
-    }
-    setBusy(false);
-    force(x => x + 1);
-  };
+      setPlayed(n => n + 1);
+      setBusy(false);
+    })();
+  }, [batches, played, busy, bottom]);
 
+  const idle = !busy && played >= batches.length;
   useEffect(() => {
-    void play(ctl.initialEvents());
+    if (idle) onIdle?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [idle, batches.length]);
 
+  // Cada pedido novo volta para o menu principal.
+  const reqKey = req ? `${req.side}-${batches.length}-${req.forced}` : null;
   useEffect(() => {
-    if (!busy && ctl.ended) {
-      playFanfare(1);
-      playCrowd(1, 3);
-      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1), 1200);
-      return () => clearTimeout(t);
-    }
-  }, [busy, ctl, onEnd]);
-
-  // Quem precisa escolher agora (jogador 1 primeiro).
-  const needs = (side: Side) => {
-    const s = b[side];
-    return (s.requestState === 'move' || s.requestState === 'switch') && !s.isChoiceDone();
-  };
-  const turn: Side | null = busy || ctl.ended ? null : needs('p1') ? 'p1' : needs('p2') ? 'p2' : null;
-  const who = turn === 'p2' ? 1 : 0;
-  const side = turn ? b[turn] : null;
-  const req = side?.activeRequest as {active?: {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]; trapped?: boolean; canMegaEvo?: boolean}[]; forceSwitch?: boolean[]} | null;
-  const forced = side?.requestState === 'switch';
-  const showCurtain = curtain && turn && ready !== turn;
-
-  const choose = (choice: string) => {
-    if (!turn) return;
-    const events = turn === 'p1' ? choiceP1(choice) : ctl.chooseP2(choice);
     setMenu('main');
     setMega(false);
-    setReady(null);
-    void play(events);
-  };
-  const choiceP1 = (choice: string) => {
-    if (choice.startsWith('switch')) {
-      const idx = Number(choice.split(' ')[1]) - 1;
-      return ctl.chooseSwitch(ctl.partyStatus()[idx].uid);
-    }
-    return ctl.chooseMove(Number(choice.split(' ')[1]), mega);
+  }, [reqKey]);
+
+  const who = req ? (req.side === 'p1' ? 0 : 1) : 0;
+  const showCurtain = idle && req && curtainFor && shown !== reqKey;
+  const choose = (choice: string) => {
+    onChoose(choice, mega);
+    setShown(null);
   };
 
-  const foeOf = (s: Side) => b[s === 'p1' ? 'p2' : 'p1'].active[0];
+  const box = (side: Side, isBottom: boolean) => {
+    const v = views[side];
+    if (!v) return null;
+    const info = (
+      <div className={`info-box ${isBottom ? 'player-box' : 'wild-box'} s0`}>
+        <div className="info-name">
+          {species(v.species).name} <span className="lv">Nv. {v.level}</span>
+        </div>
+        <div className="row">
+          <Types name={v.species} />
+          <StatusBadge status={v.status} />
+        </div>
+        <HpBar hp={v.hp} maxhp={v.maxhp} showNumbers />
+      </div>
+    );
+    const sprite = (
+      <div className={`mon-slot ${isBottom ? 'player-slot' : 'wild-slot'} s0 ${v.anim ?? ''}`}>
+        <Sprite name={v.species} back={isBottom} shiny={v.shiny} />
+      </div>
+    );
+    return <div className="slot-group">{isBottom ? <>{sprite}{info}</> : <>{info}{sprite}</>}</div>;
+  };
 
   return (
     <div className="screen battle versus">
       <div className="versus-head">
-        {players.map((p, i) => (
-          <span key={i} className={`versus-name ${turn && who === i ? 'on' : ''}`}>
-            <TrainerAvatar avatar={p.avatar} name={p.name} size={36} /> {p.name}
+        {(['p1', 'p2'] as Side[]).map((side, i) => (
+          <span key={side} className={`versus-name ${req && req.side === side ? 'on' : ''}`}>
+            <TrainerAvatar avatar={players[i].avatar} name={players[i].name} size={36} /> {players[i].name}
             <span className="foe-balls">
-              {b[i === 0 ? 'p1' : 'p2'].pokemon.map((m, k) => (
-                <i key={k} className={m.fainted ? 'down' : 'up'} />
+              {balls[side].map((up, k) => (
+                <i key={k} className={up ? 'up' : 'down'} />
               ))}
             </span>
           </span>
@@ -528,109 +585,67 @@ function VersusBattle({players, teams, curtain, onEnd}: {players: [Player, Playe
       <div className="arena" ref={arenaRef}>
         <ArenaBackdrop tier={1} color="#7aa860" />
         <div className="fx-layer" ref={fxRef} />
-        {views.p2 && (
-          <div className="slot-group">
-            <div className="info-box wild-box s0">
-              <div className="info-name">
-                {species(views.p2.species).name} <span className="lv">Nv. {views.p2.level}</span>
-              </div>
-              <div className="row">
-                <Types name={views.p2.species} />
-                <StatusBadge status={views.p2.status} />
-              </div>
-              <HpBar hp={views.p2.hp} maxhp={views.p2.maxhp} showNumbers />
-            </div>
-            <div className={`mon-slot wild-slot s0 ${views.p2.anim ?? ''}`}>
-              <Sprite name={views.p2.species} shiny={views.p2.shiny} />
-            </div>
-          </div>
-        )}
-        {views.p1 && (
-          <div className="slot-group">
-            <div className={`mon-slot player-slot s0 ${views.p1.anim ?? ''}`}>
-              <Sprite name={views.p1.species} back shiny={views.p1.shiny} />
-            </div>
-            <div className="info-box player-box s0">
-              <div className="info-name">
-                {species(views.p1.species).name} <span className="lv">Nv. {views.p1.level}</span>
-              </div>
-              <div className="row">
-                <Types name={views.p1.species} />
-                <StatusBadge status={views.p1.status} />
-              </div>
-              <HpBar hp={views.p1.hp} maxhp={views.p1.maxhp} showNumbers />
-            </div>
-          </div>
-        )}
+        {box(top, false)}
+        {box(bottom, true)}
       </div>
       <div className="battle-bottom">
         <div className="message">{message}</div>
         <div className="actions">
-          {showCurtain && turn ? (
+          {!idle ? null : showCurtain && req && curtainFor ? (
             <div className="rush-curtain inline">
-              <b>Vez de {players[who].name}</b>
+              <b>Vez de {curtainFor.name}</b>
               <span className="muted">{players[1 - who].name}, não olhe!</span>
-              <button className="btn primary" onClick={() => setReady(turn)}>
-                Sou {players[who].name}, mostrar golpes
+              <button className="btn primary" onClick={() => setShown(reqKey)}>
+                Sou {curtainFor.name}, mostrar golpes
               </button>
             </div>
-          ) : turn && side ? (
+          ) : req ? (
             <>
               <p className="versus-turn">
-                <b>{players[who].name}</b>, {forced ? 'escolha quem entra' : 'o que vai fazer?'}
+                <b>{players[who].name}</b>, {req.forced ? 'escolha quem entra' : 'o que vai fazer?'}
               </p>
-              {menu === 'main' && !forced ? (
+              {menu === 'main' && !req.forced ? (
                 <div className="move-grid">
-                  {req?.active?.[0]?.canMegaEvo && (
+                  {req.canMega && (
                     <button className={`mega-toggle ${mega ? 'on' : ''}`} onClick={() => setMega(v => !v)}>
                       <span className="mega-box">{mega ? '✓' : ''}</span> Mega evoluir
                     </button>
                   )}
-                  {(req?.active?.[0]?.moves ?? []).map((m, i) => {
-                    const mv = dex.moves.get(m.id);
-                    const foe = foeOf(turn);
-                    const eff = effectivenessLabel(mv.category === 'Status' || !foe ? null : typeMultiplier(mv.type, foe.getTypes()));
+                  {req.moves.map(m => {
+                    const eff = effectivenessLabel(m.eff);
                     return (
-                      <button
-                        key={m.id + i}
-                        className="move-btn"
-                        disabled={m.disabled || (m.pp ?? 1) <= 0}
-                        style={{['--mc' as string]: TYPE_COLORS[mv.type]}}
-                        onClick={() => choose(turn === 'p2' && mega ? `move ${i + 1} mega` : `move ${i + 1}`)}
-                      >
-                        <span className="move-name">{mv.name}</span>
+                      <button key={m.id + m.index} className="move-btn" disabled={m.disabled || m.pp <= 0} style={{['--mc' as string]: TYPE_COLORS[m.type]}} onClick={() => choose(`move ${m.index}`)}>
+                        <span className="move-name">{m.name}</span>
                         <span className="move-meta">
-                          <TypeBadge type={mv.type} small />
-                          <CategoryIcon category={mv.category} />
-                          {mv.basePower > 0 && <span>Poder {mv.basePower}</span>}
+                          <TypeBadge type={m.type} small />
+                          <CategoryIcon category={m.category} />
+                          {m.basePower > 0 && <span>Poder {m.basePower}</span>}
                           <span>
-                            PP {m.pp ?? '?'}/{m.maxpp ?? '?'}
+                            PP {m.pp}/{m.maxpp}
                           </span>
                         </span>
-                        <span className="move-desc">{moveDescPt(mv.name)}</span>
+                        <span className="move-desc">{moveDescPt(m.name)}</span>
                         {eff && <span className={`eff ${eff.cls}`}>{eff.text}</span>}
                       </button>
                     );
                   })}
-                  <button className="btn small back" onClick={() => setMenu('switch')} disabled={!!req?.active?.[0]?.trapped}>
+                  <button className="btn small back" onClick={() => setMenu('switch')} disabled={req.trapped || !req.switches.length}>
                     <img className="act-icon" src={FX('switchright.png')} alt="" /> Trocar
                   </button>
                 </div>
               ) : (
                 <div className="list-actions">
-                  {side.pokemon.map((p, i) =>
-                    p.isActive || p.fainted ? null : (
-                      <button key={i} className="btn item-btn" onClick={() => choose(`switch ${i + 1}`)}>
-                        <Sprite name={p.species.name} size={40} still /> {p.species.name}
-                        <span className="muted">
-                          {' '}
-                          HP {p.hp}/{p.maxhp}
-                          {p.item ? ` · ${getItem(p.item).name ?? p.item}` : ''}
-                        </span>
-                      </button>
-                    ),
-                  )}
-                  {!forced && (
+                  {req.switches.map(sw => (
+                    <button key={sw.index} className="btn item-btn" onClick={() => choose(`switch ${sw.index}`)}>
+                      <Sprite name={sw.species} size={40} still /> {species(sw.species).name}
+                      <span className="muted">
+                        {' '}
+                        HP {sw.hp}/{sw.maxhp}
+                        {sw.item ? ` · ${getItem(sw.item).name ?? sw.item}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                  {!req.forced && (
                     <button className="btn small back" onClick={() => setMenu('main')}>
                       ← Voltar
                     </button>
@@ -638,6 +653,8 @@ function VersusBattle({players, teams, curtain, onEnd}: {players: [Player, Playe
                 </div>
               )}
             </>
+          ) : waiting ? (
+            <p className="hint waiting">{waiting}</p>
           ) : null}
         </div>
       </div>
@@ -645,7 +662,52 @@ function VersusBattle({players, teams, curtain, onEnd}: {players: [Player, Playe
   );
 }
 
-function RushResult({winner, team, onRematch, onNew, onExit}: {winner: Player; team: OwnedMon[]; onRematch: () => void; onNew: () => void; onExit: () => void}) {
+/** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
+function LocalDuel({players, teams, curtain, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; onEnd: (winner: number) => void}) {
+  const ctl = useMemo(
+    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: players[0].name}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [batches, setBatches] = useState<BattleEvent[][]>(() => [ctl.initialEvents()]);
+  const [idle, setIdle] = useState(false);
+  const turn: Side | null = !idle || ctl.ended ? null : duelNeeds(ctl.battle, 'p1') ? 'p1' : duelNeeds(ctl.battle, 'p2') ? 'p2' : null;
+  useEffect(() => {
+    if (idle && ctl.ended) {
+      playFanfare(1);
+      playCrowd(1, 3);
+      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [idle, ctl, onEnd]);
+  return (
+    <BattleView
+      players={players}
+      bottom="p1"
+      batches={batches}
+      balls={duelBalls(ctl.battle)}
+      req={turn ? duelRequest(ctl.battle, turn) : null}
+      curtainFor={curtain && turn ? players[turn === 'p1' ? 0 : 1] : null}
+      onIdle={() => setIdle(true)}
+      onChoose={(choice, mega) => {
+        if (!turn) return;
+        const events = duelChoose(ctl, turn, choice, mega);
+        setIdle(false);
+        setBatches(b => [...b, events]);
+      }}
+    />
+  );
+}
+
+export function RushResult({winner, team, teamNames, onRematch, onNew, onExit}: {
+  winner: Player;
+  team: OwnedMon[];
+  teamNames?: string[];
+  onRematch?: () => void;
+  onNew: () => void;
+  onExit: () => void;
+}) {
+  const names = teamNames ?? team.map(m => m.species);
   return (
     <div className="screen quickplay rush-result">
       <div className="confetti" />
@@ -653,14 +715,16 @@ function RushResult({winner, team, onRematch, onNew, onExit}: {winner: Player; t
       <TrainerAvatar avatar={winner.avatar} name={winner.name} size={140} />
       <h2>{winner.name} venceu o Rush!</h2>
       <span className="team-row">
-        {team.map(m => (
-          <Sprite key={m.uid} name={m.species} size={56} />
+        {names.map((sp, k) => (
+          <Sprite key={k} name={sp} size={56} />
         ))}
       </span>
       <div className="rush-result-actions">
-        <button className="btn" onClick={onRematch}>
-          Revanche (mesmos times)
-        </button>
+        {onRematch && (
+          <button className="btn" onClick={onRematch}>
+            Revanche (mesmos times)
+          </button>
+        )}
         <button className="btn primary" onClick={onNew}>
           Novo Rush
         </button>

@@ -12,6 +12,7 @@
   "dependencies": {
     "@pkmn/img": "^0.3.5",
     "@pkmn/sim": "^0.10.12",
+    "peerjs": "^1.5.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zustand": "^5.0.16"

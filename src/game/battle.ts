@@ -305,6 +305,13 @@ export class BattleController {
     return events;
   }
 
+  /** Troca pela posição atual no time do simulador (1 = primeiro). Usado no Rush. */
+  chooseSwitchSlot(n: number): BattleEvent[] {
+    const events = this.commit(`switch ${n}`);
+    this.markParticipant();
+    return events;
+  }
+
   /** Tenta capturar. Se falhar, o turno é gasto e o selvagem ataca. */
   throwBall(ballId: string): {result: CatchResult; events: BattleEvent[]} {
     const ball = getItem(ballId);
