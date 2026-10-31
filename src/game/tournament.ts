@@ -5,8 +5,9 @@ import {BIOMES} from '../data/biomes';
 import {getRegion} from '../data/regions';
 import {aiMoveChoice, aiSwitchChoice} from './battle';
 import {generateEncounter} from './encounters';
-import {toSet} from './mon';
-import {AVATARS} from './trainers';
+import {createMon, toSet} from './mon';
+import {RIVALS, rivalsOf} from '../data/rivals';
+import type {Rival} from '../data/rivals';
 import type {NarratorCtx} from './narration';
 import {pick, randInt, shuffle} from './rng';
 import type {OwnedMon} from './types';
@@ -125,11 +126,6 @@ export function fameLabel(fame: number): string {
   return [...FAME_TIERS].reverse().find(([min]) => fame >= min)![1];
 }
 
-const BOT_NAMES = [
-  'Bia', 'Caio', 'Duda', 'Léo', 'Mari', 'Rafa', 'Nina', 'Theo', 'Gabi', 'Vini', 'Lara', 'Hugo', 'Iara', 'Davi',
-  'Lia', 'Enzo', 'Malu', 'Juca', 'Tati', 'Beto', 'Yuki', 'Kenji', 'Sofia', 'Marco', 'Aiko', 'Pietro', 'Chloé', 'Sam',
-];
-
 /** Time de um bot: Pokémon de vários biomas, sem repetir espécie. `skill` mexe no nível. */
 export function botTeam(wave: number, size: number, skill: number): OwnedMon[] {
   const team: OwnedMon[] = [];
@@ -149,9 +145,23 @@ export function tourName(t: {kind: TourKind; region?: string}): string {
   return t.region && (t.kind === 'cup' || t.kind === 'regional') ? `${name} de ${getRegion(t.region).name}` : name;
 }
 
+/** Time de um rival conhecido: os Pokémon famosos dele, no nível da ronda. */
+export function rivalTeam(rival: Rival, wave: number, size: number, skill: number): OwnedMon[] {
+  const level = Math.max(5, Math.min(100, Math.round(wave * 0.9) + 1 + skill));
+  return rival.team.slice(0, size).map(name => createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1}));
+}
+
+/** Quem joga: na League Cup e no Regional, os rivais da região primeiro; no Internacional e no Mundial, gente de todo lugar. */
+function pickRivals(kind: TourKind, region?: string): Rival[] {
+  const local = kind === 'cup' || kind === 'regional' ? shuffle(rivalsOf(region)) : [];
+  const rest = shuffle(RIVALS.filter(r => !local.includes(r)));
+  return [...local, ...rest].slice(0, 7);
+}
+
 export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string): Tournament {
-  const names = shuffle(BOT_NAMES).slice(0, 7);
-  const bots: Entrant[] = names.map((name, i) => {
+  const rivals = pickRivals(info.kind, region);
+  const bots: Entrant[] = rivals.map((rival, i) => {
+    const name = rival.name;
     const skill = randInt(-2, 2) + (info.kind === 'worlds' ? 2 : info.kind === 'international' ? 1 : 0);
     const vet = Math.random() < 0.3;
     const titles: Partial<Record<TourKind, number>> = {};
@@ -159,10 +169,10 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, regi
     if (vet && info.kind !== 'cup' && Math.random() < 0.5) titles.regional = 1;
     if (info.kind === 'worlds' && i === 0) titles.worlds = 1;
     return {
-      name, avatar: pick(AVATARS), titles,
+      name, avatar: rival.avatar, titles,
       runnerUps: Math.random() < 0.15 ? randInt(2, 4) : 0,
       fame: vet ? randInt(300, 1200) : randInt(0, 300),
-      team: botTeam(info.wave, info.teamSize, skill),
+      team: rivalTeam(rival, info.wave, info.teamSize, skill),
     };
   });
   const entrants = shuffle([{...me, player: true, team: []}, ...bots]);

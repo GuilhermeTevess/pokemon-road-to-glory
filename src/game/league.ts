@@ -1,10 +1,9 @@
 // Pontos de fama e ranking. Cada run é uma temporada: torneios, lendas, ginásios e viajantes
 // dão pontos. No fim, o ranking da temporada com os treinadores do circuito (NPCs) e o geral.
-import {REGIONS} from '../data/regions';
 import {careerOf} from './meta';
 import type {Collection} from './meta';
-import {pick, randInt, shuffle} from './rng';
-import {AVATARS} from './trainers';
+import {randInt, shuffle} from './rng';
+import {RIVALS} from '../data/rivals';
 import type {RunState} from './types';
 
 export type PointSource = 'tournaments' | 'legends' | 'gyms' | 'books' | 'travelers' | 'legendaries';
@@ -22,6 +21,8 @@ export const SOURCE_LABEL: Record<PointSource, string> = {
 
 export interface Npc {
   name: string;
+  /** Nome antigo (rival genérico de saves velhos), para achar os pontos da temporada em andamento. */
+  was?: string;
   avatar: string;
   region: string;
   fav: string;
@@ -57,19 +58,29 @@ export interface League {
   seasons: SeasonRec[];
 }
 
-const NPC_NAMES = ['Bia', 'Caio', 'Duda', 'Léo', 'Mari', 'Rafa', 'Nina', 'Theo', 'Gabi', 'Vini', 'Lara', 'Hugo', 'Yuki', 'Kenji', 'Sofia', 'Marco', 'Aiko', 'Chloé'];
-const FAVS = ['Garchomp', 'Gardevoir', 'Lucario', 'Dragonite', 'Gengar', 'Tyranitar', 'Sylveon', 'Greninja', 'Metagross', 'Togekiss', 'Volcarona', 'Kingambit', 'Dragapult', 'Umbreon', 'Mimikyu'];
+/** Nomes dos rivais genéricos de antes: viram rivais conhecidos (mantendo os pontos). */
+const OLD_NPC_NAMES = new Set(['Bia', 'Caio', 'Duda', 'Léo', 'Mari', 'Rafa', 'Nina', 'Theo', 'Gabi', 'Vini', 'Lara', 'Hugo', 'Yuki', 'Kenji', 'Sofia', 'Marco', 'Aiko', 'Chloé']);
 
+/** O circuito: 15 rivais conhecidos do anime e dos jogos, de várias regiões. */
 export function leagueOf(col: Collection): League {
   if (!col.league) {
-    const names = shuffle(NPC_NAMES).slice(0, 15);
+    const rivals = shuffle(RIVALS).slice(0, 15);
     col.league = {
-      npcs: names.map((name, i) => ({
-        name, avatar: pick(AVATARS), region: pick(REGIONS).id, fav: pick(FAVS),
-        skill: 0.4 + (i / names.length) * 1.0 + Math.random() * 0.2, total: 0, wins: 0,
+      npcs: rivals.map((r, i) => ({
+        name: r.name, avatar: r.avatar, region: r.region, fav: r.team[0],
+        skill: 0.4 + (i / rivals.length) * 1.0 + Math.random() * 0.2, total: 0, wins: 0,
       })),
       seasons: [],
     };
+  } else if (col.league.npcs.some(n => OLD_NPC_NAMES.has(n.name))) {
+    const taken = new Set(col.league.npcs.map(n => n.name));
+    const free = shuffle(RIVALS.filter(r => !taken.has(r.name)));
+    for (const n of col.league.npcs) {
+      if (!OLD_NPC_NAMES.has(n.name)) continue;
+      const r = free.shift();
+      if (!r) break;
+      Object.assign(n, {was: n.name, name: r.name, avatar: r.avatar, region: r.region, fav: r.team[0]});
+    }
   }
   return col.league;
 }
@@ -106,7 +117,7 @@ export function seasonRanking(col: Collection, run: RunState, me: {name: string;
   const progress = final ? 1 : Math.min(1, run.wave / 120);
   const rivals = run.rivalPoints ?? {};
   const rows: RankRow[] = leagueOf(col).npcs.map(n => ({
-    name: n.name, avatar: n.avatar, region: n.region, fav: n.fav, points: Math.round(((rivals[n.name] ?? 0) * progress) / 10) * 10,
+    name: n.name, avatar: n.avatar, region: n.region, fav: n.fav, points: Math.round(((rivals[n.name] ?? rivals[n.was ?? ''] ?? 0) * progress) / 10) * 10,
   }));
   rows.push({name: me.name, avatar: me.avatar, points: seasonPoints(run), player: true, region: run.region, fav: run.party[0]?.species});
   return rows.sort((a, b) => b.points - a.points || (a.player ? -1 : 1));
@@ -125,7 +136,7 @@ export function overallRanking(col: Collection, me: {name: string; avatar?: stri
 export function finishSeason(col: Collection, run: RunState, me: {name: string; avatar?: string}): SeasonRec {
   const rows = seasonRanking(col, run, me, true);
   const league = leagueOf(col);
-  for (const n of league.npcs) n.total += run.rivalPoints?.[n.name] ?? 0;
+  for (const n of league.npcs) n.total += run.rivalPoints?.[n.name] ?? run.rivalPoints?.[n.was ?? ''] ?? 0;
   const champ = league.npcs.find(n => n.name === rows[0].name && !rows[0].player);
   if (champ) champ.wins++;
   const rec: SeasonRec = {

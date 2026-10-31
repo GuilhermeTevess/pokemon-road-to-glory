@@ -10,6 +10,9 @@ import type {MatchRec, TourKind} from '../../game/tournament';
 import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {fast} from '../settings';
+import {ChampionCelebration} from './ChampionScreen';
+import {scoutReport} from '../../game/scout';
+import {species} from '../../data/dex';
 
 /** Formato comum para a chave ao vivo e para o histórico. */
 interface BracketData {
@@ -38,11 +41,33 @@ function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
   );
 }
 
-/** Detalhe de uma partida (ou do time de alguém, se ainda não jogou). */
-function MatchDetail({data, match, onClose}: {data: BracketData; match: MatchRec; onClose: () => void}) {
+/** Últimas batalhas de um rival: o que já foi visto, sem entregar o time de hoje. */
+export function ScoutPanel({name, wave}: {name: string; wave: number}) {
+  const r = scoutReport(name, wave);
+  if (!r) return <p className="muted">Ninguém sabe muito sobre {name} ainda.</p>;
+  return (
+    <div className="scout">
+      <p className="muted">
+        Mais visto nas últimas lutas: <TeamRow team={r.favorites} size={32} />
+        {r.lead && <> · costuma abrir com <b>{species(r.lead).name}</b></>}
+      </p>
+      {r.matches.map((m, i) => (
+        <div key={i} className="scout-row">
+          <span className={m.won ? 'win-tag' : 'lose-tag'}>{m.won ? 'Venceu' : 'Perdeu'}</span>
+          <span>vs {m.vs}</span>
+          <TeamRow team={m.seen} size={32} />
+          <small className="muted">{m.items.join(', ')}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Detalhe de uma partida. Antes de jogar, cada lado mostra as últimas batalhas (não o time exato). */
+function MatchDetail({data, match, onClose, wave}: {data: BracketData; match: MatchRec; onClose: () => void; wave: number}) {
   const A = data.entrants[match.a];
   const B = data.entrants[match.b];
-  const teams = match.teams ?? [A.team, B.team];
+  const teams = match.teams;
   return (
     <Modal onClose={onClose} wide>
       <h2>
@@ -54,7 +79,7 @@ function MatchDetail({data, match, onClose}: {data: BracketData; match: MatchRec
             <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={56} />
             <b>{e.name}</b>
             {match.winner === (i === 0 ? match.a : match.b) && <span className="win-tag">Venceu</span>}
-            <TeamRow team={teams[i]} size={48} />
+            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} />}
           </div>
         ))}
       </div>
@@ -68,14 +93,14 @@ function MatchDetail({data, match, onClose}: {data: BracketData; match: MatchRec
           </ol>
         </>
       ) : (
-        <p className="hint">Ainda não jogaram. Dá para estudar os times antes!</p>
+        <p className="hint">Ainda não jogaram. Veja as últimas batalhas para ter uma ideia do que cada um costuma usar.</p>
       )}
     </Modal>
   );
 }
 
 /** Chaveamento: quartas → semi → final → campeão. Toque numa partida para ver os detalhes. */
-export function Bracket({data}: {data: BracketData}) {
+export function Bracket({data, wave = 0}: {data: BracketData; wave?: number}) {
   const [open, setOpen] = useState<MatchRec | null>(null);
   const final = data.rounds[2]?.[0];
   const champ = final?.winner !== undefined ? data.entrants[final.winner] : null;
@@ -125,7 +150,7 @@ export function Bracket({data}: {data: BracketData}) {
           )}
         </div>
       </div>
-      {open && <MatchDetail data={data} match={open} onClose={() => setOpen(null)} />}
+      {open && <MatchDetail data={data} match={open} wave={wave} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -164,6 +189,8 @@ function DrawAnimation({names, onDone}: {names: string[]; onDone: () => void}) {
 export function TournamentScreen() {
   const {run, trainer, tourStage, tourFight, tourFinish} = useGame();
   const t = run?.tournament;
+  // Depois da festa de campeão, volta para a chave.
+  const [party, setParty] = useState(false);
   if (!run || !t) return null;
   const info = tourInfo(t.kind);
   const me = playerIndex(t);
@@ -173,6 +200,23 @@ export function TournamentScreen() {
   };
   const next = playerMatch(t);
   const foe = next ? t.entrants[next.a === me ? next.b : next.a] : null;
+  const final = t.rounds[t.rounds.length - 1]?.find(m => m.a === me || m.b === me);
+  const finalFoe = final ? t.entrants[final.a === me ? final.b : final.a] : null;
+  const pi = prizeIndex(t.placement ?? 5);
+  const prize = `+${info.glory[pi]} Glória · +₽ ${info.money[pi]}${info.cp[0] > 0 ? ` · +${info.cp[pi]} CP` : ''}`;
+  if (t.stage === 'done' && t.placement === 1 && !party && finalFoe)
+    return (
+      <ChampionCelebration
+        kind={t.kind}
+        tour={tourName(t)}
+        me={{name: trainer?.name ?? 'Você', avatar: trainer?.avatar ?? ''}}
+        foe={{name: finalFoe.name, avatar: finalFoe.avatar ?? ''}}
+        partner={run.party.find(m => m.partner) ?? run.party[0]}
+        prize={prize}
+        onClose={() => setParty(true)}
+        onFinish={tourFinish}
+      />
+    );
   return (
     <div className="screen tour-screen">
       <header className="bar">
@@ -226,7 +270,7 @@ export function TournamentScreen() {
       {t.stage === 'draw' && <DrawAnimation names={t.entrants.map(e => e.name)} onDone={() => tourStage('bracket')} />}
       {(t.stage === 'bracket' || t.stage === 'done') && (
         <>
-          <Bracket data={data} />
+          <Bracket data={data} wave={t.wave} />
           {t.stage === 'bracket' && next && foe && (
             <div className="panel tour-next">
               <TrainerAvatar avatar={foe.avatar ?? ''} name={foe.name} size={56} />
@@ -234,7 +278,7 @@ export function TournamentScreen() {
                 <b>
                   {ROUND_NAMES[t.rounds.length - 1]}: {trainer?.name ?? 'Você'} vs {foe.name}
                 </b>
-                <TeamRow team={foe.team.map(m => m.species)} />
+                <ScoutToggle name={foe.name} wave={t.wave} />
               </div>
               <button className="btn primary" onClick={tourFight}>
                 Lutar!
@@ -246,10 +290,7 @@ export function TournamentScreen() {
               <h3>
                 <PixelIcon name="trophy" color={t.placement === 1 ? '#e0a100' : '#999'} size={24} /> {placementLabel(t.placement ?? 5)}
               </h3>
-              <p>
-                +{info.glory[prizeIndex(t.placement ?? 5)]} Glória · +₽ {info.money[prizeIndex(t.placement ?? 5)]}
-                {info.cp[0] > 0 && ` · +${info.cp[prizeIndex(t.placement ?? 5)]} CP`}
-              </p>
+              <p>{prize}</p>
               <button className="btn primary" onClick={tourFinish}>
                 Seguir a temporada
               </button>
@@ -335,5 +376,24 @@ export function CareerCard() {
       </span>
       {c.runnerUps > 0 && <span className="muted">Vice {c.runnerUps}×</span>}
     </div>
+  );
+}
+
+/** Botão "Estudar adversário": abre as últimas batalhas dele. */
+function ScoutToggle({name, wave}: {name: string; wave: number}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="link" onClick={() => setOpen(true)}>
+        Estudar {name}: últimas batalhas
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)}>
+          <h2>Últimas batalhas de {name}</h2>
+          <ScoutPanel name={name} wave={wave} />
+          <p className="hint">O time de hoje pode ser diferente: isso é só o que já foi visto em campo.</p>
+        </Modal>
+      )}
+    </>
   );
 }

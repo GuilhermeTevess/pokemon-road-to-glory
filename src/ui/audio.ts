@@ -542,3 +542,52 @@ export function playPlin(): void {
   tone(a, {wave: 'square', from: 1568, to: 1568, dur: 0.07, gain: 0.08});
   tone(a, {wave: 'triangle', from: 2093, to: 2093, dur: 0.35, gain: 0.1, at: 0.07});
 }
+
+/**
+ * Plateia vibrando: um "rumor" de vozes (ruído filtrado) e palmas soltas.
+ * `size` vai de 0 (poucas pessoas) a 3 (estádio do Mundial).
+ */
+export function playCrowd(size: number, seconds = 4): void {
+  const a = audio();
+  if (!a) return;
+  const level = 0.12 + size * 0.08;
+  // Rumor de vozes: duas faixas de ruído que sobem e descem.
+  noise(a, {filter: 'bandpass', from: 500, to: 900, dur: seconds, gain: level, q: 0.7, attack: 0.4});
+  noise(a, {filter: 'bandpass', from: 1400, to: 1100, dur: seconds * 0.8, gain: level * 0.6, q: 0.9, attack: 0.3, at: 0.2});
+  // Palmas: estalos curtos espalhados; mais gente, mais palmas.
+  const claps = Math.round(seconds * (8 + size * 14));
+  for (let i = 0; i < claps; i++) {
+    const at = Math.random() * seconds * 0.95;
+    noise(a, {filter: 'highpass', from: 1500 + Math.random() * 1500, to: 1200, dur: 0.05, gain: 0.05 + Math.random() * 0.05, at});
+  }
+  if (size >= 2) {
+    // Gritos de "uhuu!" ao fundo.
+    for (let i = 0; i < size * 2; i++) {
+      const f = 500 + Math.random() * 300;
+      tone(a, {wave: 'sawtooth', from: f, to: f * 1.5, dur: 0.35, gain: 0.02, at: Math.random() * seconds * 0.7, vibrato: 7});
+    }
+  }
+}
+
+/** Fogos: assobio subindo e o estouro com crepitar. */
+export function playFirework(at = 0): void {
+  const a = audio();
+  if (!a) return;
+  tone(a, {wave: 'sine', from: 600, to: 2200, dur: 0.6, gain: 0.05, at});
+  noise(a, {filter: 'lowpass', from: 1800, to: 120, dur: 0.7, gain: 0.5, at: at + 0.6});
+  for (let i = 0; i < 10; i++) noise(a, {filter: 'highpass', from: 3000, to: 2500, dur: 0.03, gain: 0.08, at: at + 0.75 + Math.random() * 0.6});
+}
+
+/** Fanfarra de campeão (mais longa conforme o torneio). */
+export function playFanfare(size: number): void {
+  const a = audio();
+  if (!a) return;
+  const base = [523, 659, 784, 1047];
+  const notes = size >= 2 ? [...base, 784, 1047, 1319, 1568] : size >= 1 ? [...base, 1319] : base;
+  notes.forEach((f, i) => {
+    tone(a, {wave: 'square', from: f, to: f, dur: 0.22, gain: 0.07, at: i * 0.16});
+    tone(a, {wave: 'triangle', from: f / 2, to: f / 2, dur: 0.26, gain: 0.1, at: i * 0.16});
+  });
+  const end = notes.length * 0.16;
+  [523, 659, 784].forEach(f => tone(a, {wave: 'square', from: f * 2, to: f * 2, dur: 0.9, gain: 0.04, at: end}));
+}
