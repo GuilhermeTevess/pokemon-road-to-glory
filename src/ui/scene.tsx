@@ -60,8 +60,10 @@ export function CrowdLayer({rows, density, seed = 1, silhouette, top = 0, height
             left: `${p.x}%`,
             top: `${(p.row / Math.max(1, rows)) * 78}%`,
             zIndex: p.row,
-            filter: silhouette ? 'brightness(0)' : `brightness(${0.45 + p.row * 0.12}) saturate(.7)`,
-            transform: p.flip ? 'scaleX(-1)' : undefined,
+            // Sempre silhueta (sem rosto nem cor): é plateia de fundo, não personagens.
+            filter: silhouette ? 'brightness(0)' : `brightness(0) opacity(${0.5 + (p.row / Math.max(1, rows)) * 0.45})`,
+            // Mais esguios que o sprite original.
+            transform: `scaleX(${p.flip ? -0.7 : 0.7}) scaleY(1.05)`,
             animationDelay: `${p.delay}s`,
           }}
           onError={e => (e.currentTarget.style.display = 'none')}

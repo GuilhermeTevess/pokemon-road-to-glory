@@ -59,6 +59,19 @@ const each = (fn: (v: SideView) => SideView) => (list: Views): Views => list.map
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
+/** Quem está esperando uma fala terminar; um clique na caixa de texto pula a espera. */
+let skipText: (() => void) | null = null;
+const waitText = (ms: number) =>
+  new Promise<void>(r => {
+    const done = () => {
+      clearTimeout(t);
+      skipText = null;
+      r();
+    };
+    const t = setTimeout(done, fast() ? ms * 0.3 : ms);
+    skipText = done;
+  });
+
 export function BattleScreen() {
   const run = useGame(s => s.run)!;
   const {finishBattle, consume} = useGame();
@@ -148,7 +161,7 @@ export function BattleScreen() {
         if (ev.text) {
           setMessage(ev.text);
           // O narrador fala mais devagar, para dar tempo de ler.
-          await wait(ev.narrator ? Math.min(3800, 1400 + ev.text.length * 28) : 850);
+          await waitText(ev.narrator ? Math.min(3800, 1400 + ev.text.length * 28) : 850);
         } else if (ev.hp) {
           await wait(350);
         }
@@ -280,7 +293,7 @@ export function BattleScreen() {
         )}
         <div className="fx-layer" ref={fxRef} />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
-          {enc?.venue != null ? venueName(enc.venue, getRegion(run.region).name) : (
+          {enc?.tournament && run.tournament ? tourName(run.tournament) : enc?.venue != null ? venueName(enc.venue, getRegion(run.region).name) : (
             <>
               {run.region ? `${getRegion(run.region).name} · ` : ''}
               {enc?.gym ? `Ginásio de ${enc.trainer}` : biome.name}
@@ -370,7 +383,9 @@ export function BattleScreen() {
       </div>
 
       <div className="battle-bottom">
-        <div className={`message ${message.startsWith('🎙️') ? 'narrator' : ''}`}>{message}</div>
+        <div className={`message ${message.startsWith('🎙️') ? 'narrator' : ''}`} onClick={() => skipText?.()} title="Clique para pular a fala">
+          {message}
+        </div>
         <div className="actions">
           {busy ? null : menu === 'main' && !ctl.ended ? (
             <div className="main-actions">

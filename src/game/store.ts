@@ -4,7 +4,7 @@ import {BIOMES, getBiome} from '../data/biomes';
 import {getHint} from '../data/hints';
 import {bookName, getGym, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
-import {checkAchievements} from './achievements';
+import {ACHIEVEMENTS, checkAchievements} from './achievements';
 import {POINTS, addPoints, finishSeason, rollRivalPoints} from './league';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
@@ -105,6 +105,8 @@ interface Store {
   run: RunState | null;
   collection: Collection;
   toasts: Toast[];
+  /** Conquistas recém-desbloqueadas (aparecem na lateral da tela). */
+  achievePops: {id: string; name: string; icon: string; desc: string}[];
   /** Último repetido capturado: IVs antes/depois (teia de IVs). */
   ivGain: {species: string; before: StatTable; after: StatTable} | null;
   clearIvGain(): void;
@@ -229,8 +231,15 @@ export const useGame = create<Store>((set, get) => {
     saveRun(tid(), run);
     saveCollection(tid(), col);
     set({run, collection: col});
-    for (const name of fresh.slice(0, 3)) get().toast(`🏅 Conquista: ${name}!`);
-    if (fresh.length > 3) get().toast(`🏅 +${fresh.length - 3} conquistas novas!`);
+    fresh.forEach((name, i) => {
+      const a = ACHIEVEMENTS.find(x => x.name === name);
+      const pop = {id: uid(), name, icon: a?.icon ?? 'star', desc: a?.desc ?? ''};
+      // Uma de cada vez, com um respiro entre elas.
+      setTimeout(() => {
+        set({achievePops: [...get().achievePops, pop]});
+        setTimeout(() => set({achievePops: get().achievePops.filter(x => x.id !== pop.id)}), 5200);
+      }, i * 900);
+    });
   };
 
   /** Mexe só na coleção (tela da coleção, fora da run). */
@@ -640,6 +649,7 @@ export const useGame = create<Store>((set, get) => {
     run: loadRun(bootTrainer?.id ?? null),
     collection: loadCollection(bootTrainer?.id ?? null),
     toasts: [],
+    achievePops: [],
     ivGain: null,
     clearIvGain: () => set({ivGain: null}),
     typeCalc: null,
@@ -1091,6 +1101,8 @@ export const useGame = create<Store>((set, get) => {
           boss: true,
           trainer: foe.name,
           tournament: true,
+          // Palco do torneio: arena improvisada na League Cup, estádio lotado no Mundial.
+          venue: TOUR_HYPE[t.kind],
           hype: TOUR_HYPE[t.kind],
           intro: introLines({...me, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, foe, info.name, currentRound(t), !!c.defending[t.kind], TOUR_HYPE[t.kind]),
         };

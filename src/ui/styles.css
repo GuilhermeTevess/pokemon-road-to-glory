@@ -244,6 +244,8 @@ button.type-badge.info:hover { filter: brightness(1.1); outline: 2px solid var(-
 
 .battle-bottom { border-top: none; padding: 10px; box-shadow: 4px 4px 0 rgba(59, 51, 85, .18); }
 .message { min-height: 50px; font-size: 19px; font-weight: 600; padding: 8px 12px; background: var(--panel-2); border: var(--px) solid var(--line); margin-bottom: 10px; }
+.message { cursor: pointer; user-select: none; position: relative; }
+.message.narrator::after { content: "▶"; position: absolute; right: 10px; bottom: 6px; font-size: 12px; animation: blink 1s steps(2) infinite; }
 .main-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
 .btn.act { font-size: 17px; padding: 10px; justify-content: flex-start; }
 .btn.act.fight { background: var(--peach); }
@@ -1077,3 +1079,35 @@ table.move-info td { padding: 3px 0; }
 @keyframes champ-trophy { 0%, 100% { transform: translateX(-50%) translateY(0) rotate(-4deg); } 50% { transform: translateX(-50%) translateY(-6px) rotate(4deg); } }
 @keyframes champ-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .champ-spot, .fw i, .champ-hero, .champ-trainer img, .champ-partner, .champ-trophy, .champ-title b { animation: none; } .fw i { opacity: 1; transform: rotate(var(--r)) translateY(-60px); } }
+
+/* Brilhos ao colar a insígnia */
+.book-slot { position: relative; }
+.slot-sparkles { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.slot-sparkles i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; background: #fff7b0; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); filter: drop-shadow(0 0 3px #ffd84a); opacity: 0; animation: slot-spark 1.2s ease-out 2; }
+@keyframes slot-spark { 0% { opacity: 0; transform: rotate(var(--r)) translateY(0) scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--r)) translateY(-34px) scale(1.1); } }
+.screen-sparkles { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.screen-sparkles i { position: absolute; width: 12px; height: 12px; background: #fff; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); filter: drop-shadow(0 0 4px #ffe680); opacity: 0; animation: twinkle 1.1s ease-in-out 3; }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1.2) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) { .slot-sparkles i, .screen-sparkles i { animation: none; } }
+
+/* Conquistas: entram pela lateral direita, abaixo do menu */
+.achieve-pops { position: fixed; top: 64px; right: 16px; z-index: 110; display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 32px)); pointer-events: none; }
+.achieve-pop { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: linear-gradient(135deg, #fff8d8, var(--panel)); border: var(--px) solid #c99a1a; box-shadow: 4px 4px 0 rgba(59, 51, 85, .25), 0 0 18px rgba(255, 210, 80, .45); animation: achieve-in 5.2s ease-out both; }
+.achieve-pop-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; background: #3b3355; border-radius: 50%; animation: achieve-shine 1s ease-in-out 2; }
+.achieve-pop span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.achieve-pop small { color: #a07800; font-size: 11px; }
+.achieve-pop em { font-style: normal; font-size: 12px; opacity: .75; }
+@keyframes achieve-in { 0% { transform: translateX(120%); opacity: 0; } 6% { transform: translateX(-6px); opacity: 1; } 9% { transform: none; } 92% { transform: none; opacity: 1; } 100% { transform: translateX(120%); opacity: 0; } }
+@keyframes achieve-shine { 50% { box-shadow: 0 0 16px #ffd84a; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .achieve-pop { animation: none; } .achieve-pop-icon { animation: none; } }
+.bracket-slot:has(.bracket-team) { flex-wrap: wrap; }
+.bracket-team { flex-basis: 100%; display: flex; gap: 0; margin-left: 22px; }
+.bracket-slot.lose .bracket-team { text-decoration: none; }
+.scout h4 { margin: 8px 0 2px; font-size: 12px; }
+.scout-top { font-size: 15px; }
+.scout-usage { display: flex; flex-direction: column; gap: 3px; }
+.scout-use { display: grid; grid-template-columns: 36px minmax(70px, 120px) 1fr 76px minmax(80px, 130px); align-items: center; gap: 8px; font-size: 13px; }
+.scout-bar { height: 8px; background: rgba(0,0,0,.1); border: 1px solid var(--line); }
+.scout-bar i { display: block; height: 100%; background: #e0a100; }
+.scout-row { grid-template-columns: 64px minmax(80px, 140px) 1fr; }
+@media (max-width: 560px) { .scout-use { grid-template-columns: 36px 1fr 60px; } .scout-use .scout-bar, .scout-use small.muted { display: none; } }

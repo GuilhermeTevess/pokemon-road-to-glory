@@ -591,3 +591,22 @@ export function playFanfare(size: number): void {
   const end = notes.length * 0.16;
   [523, 659, 784].forEach(f => tone(a, {wave: 'square', from: f * 2, to: f * 2, dur: 0.9, gain: 0.04, at: end}));
 }
+
+/** Colar a insígnia: "tuc" do adesivo, um "plim!" bem claro e um brilho subindo. */
+export function playSticker(): void {
+  const a = audio();
+  if (!a) return;
+  noise(a, {filter: 'lowpass', from: 900, to: 200, dur: 0.08, gain: 0.35});
+  tone(a, {wave: 'square', from: 1568, to: 1568, dur: 0.09, gain: 0.1, at: 0.08});
+  tone(a, {wave: 'triangle', from: 2093, to: 2093, dur: 0.6, gain: 0.16, at: 0.16});
+  tone(a, {wave: 'sine', from: 4186, to: 4186, dur: 0.5, gain: 0.05, at: 0.16});
+  [2637, 3136, 3520, 4186].forEach((f, i) => tone(a, {wave: 'sine', from: f, to: f * 1.02, dur: 0.18, gain: 0.05, at: 0.4 + i * 0.07}));
+}
+
+/** Conquista desbloqueada: arpejo curtinho e brilhante. */
+export function playAchievement(): void {
+  const a = audio();
+  if (!a) return;
+  [784, 988, 1175, 1568].forEach((f, i) => tone(a, {wave: 'square', from: f, to: f, dur: 0.12, gain: 0.06, at: i * 0.08}));
+  tone(a, {wave: 'triangle', from: 2093, to: 2093, dur: 0.5, gain: 0.1, at: 0.34});
+}

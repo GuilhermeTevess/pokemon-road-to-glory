@@ -6,7 +6,7 @@ import type {Gym} from '../../data/gyms';
 import {REGIONS, getRegion} from '../../data/regions';
 import {GYM_PRIZE, badgesIn, gymDifficulty, gymLines, gymStatus, gymWaves, leaderAvatar, leaderWinLine, ticketPrice} from '../../game/gym';
 import {useGame} from '../../game/store';
-import {playCoins, playJingle, playPlin} from '../audio';
+import {playCoins, playJingle, playSticker} from '../audio';
 import {Modal, Sprite, TypeBadge} from '../components';
 import {fast} from '../settings';
 import {fameNow} from './LegendScreens';
@@ -88,7 +88,7 @@ export function BadgeCeremony() {
       return () => clearTimeout(t);
     }
     if (step === 'book') {
-      const t = setTimeout(() => (playPlin(), setStep('bye')), fast() ? 200 : 1400);
+      const t = setTimeout(() => (playSticker(), setStep('bye')), fast() ? 200 : 1400);
       return () => clearTimeout(t);
     }
   }, [step]);
@@ -127,6 +127,7 @@ export function BadgeCeremony() {
             <TrainerAvatar avatar={leader.avatar} name={leader.name} size={140} />
           </div>
           {!inBook && step !== 'talk' && <img className={`ceremony-badge2 ${step}`} src={badgeImg(gym)} alt={gym.badge} />}
+          {step === 'bye' && <div className="screen-sparkles" aria-hidden>{Array.from({length: 18}, (_, i) => <i key={i} style={{left: `${(i * 37) % 100}%`, top: `${(i * 53) % 90}%`, animationDelay: `${(i % 6) * 0.18}s`}} />)}</div>}
           {inBook && (
             <div className="ceremony-book open" style={{['--cover' as string]: skin.cover, ['--trim' as string]: skin.trim, ['--felt' as string]: skin.felt}}>
               {list.map(g => {
@@ -134,6 +135,7 @@ export function BadgeCeremony() {
                 return (
                   <span key={g.id} className={`book-slot ${has ? 'has' : ''} ${g.id === gym.id && step === 'bye' ? 'stamped' : ''}`}>
                     {has && <img src={badgeImg(g)} alt="" />}
+                    {g.id === gym.id && step === 'bye' && <Sparkles />}
                   </span>
                 );
               })}
@@ -309,3 +311,14 @@ function BadgeBook({region}: {region: string}) {
 
 /** Total de insígnias na caderneta (todas as regiões). */
 export const badgeTotal = (log: Record<string, unknown> | undefined) => GYMS.filter(g => log?.[g.id]).length;
+
+/** Estrelinhas em volta da insígnia que acabou de ser colada. */
+function Sparkles() {
+  return (
+    <span className="slot-sparkles" aria-hidden>
+      {Array.from({length: 8}, (_, i) => (
+        <i key={i} style={{['--r' as string]: `${i * 45}deg`, animationDelay: `${(i % 2) * 0.12}s`}} />
+      ))}
+    </span>
+  );
+}
