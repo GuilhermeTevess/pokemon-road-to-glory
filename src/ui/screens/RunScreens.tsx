@@ -94,8 +94,57 @@ function RewardCard({id, wave, onClick}: {id: string; wave: number; onClick: () 
 
 const TIER_LABEL: Record<string, string> = {common: 'Comum', great: 'Bom', ultra: 'Raro', master: 'Lendário'};
 
+/** Prateleiras da loja da run (na tela da recompensa e no botão Loja do painel). */
+export function ShopShelves() {
+  const {run, buy} = useGame();
+  if (!run) return null;
+  return (
+    <>
+          {SHOP.map(shelf => (
+        <section key={shelf.title} className="shelf">
+          <h3>{shelf.title}</h3>
+          <div className="shelf-items">
+            {shelf.items.map(id => {
+              const it = getItem(id);
+              return (
+                <div key={id} className="shop-card panel">
+                  <ItemIcon id={id} size={40} />
+                  <div className="shop-text">
+                    <strong>{it.name}</strong>
+                    <span className="muted">{it.desc}</span>
+                    <span className="muted">Na mochila: {run.bag[id] ?? 0}</span>
+                  </div>
+                  <button className="btn small primary" disabled={run.money < discounted(run, it.price)} onClick={() => { playCoins(); buy(id); }}>
+                    ₽ {discounted(run, it.price)}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+/** Loja aberta pelo painel lateral (fora da batalha). */
+export function ShopModal({onClose}: {onClose: () => void}) {
+  const run = useGame(s => s.run);
+  if (!run) return null;
+  return (
+    <Modal onClose={onClose} wide>
+      <h2>
+        <ItemIcon id="money" size={28} /> Loja · ₽ {run.money}
+      </h2>
+      <div className="shop">
+        <ShopShelves />
+      </div>
+    </Modal>
+  );
+}
+
 export function RewardScreen() {
-  const {run, pickReward, reroll, buy, skipReward} = useGame();
+  const {run, pickReward, reroll, skipReward} = useGame();
   const [tab, setTab] = useState<'reward' | 'shop'>('reward');
   const [choosing, setChoosing] = useState<string | null>(null);
   if (!run) return null;
@@ -157,7 +206,10 @@ export function RewardScreen() {
           </div>
         ) : (
           <>
-            <p className="hint">Escolha 1 item de graça.</p>
+            <p className="hint">
+              Escolha 1 item de graça.
+              {run.skipStreak ? ` ★ Bônus por pular: itens melhores mais comuns (${run.skipStreak}/2).` : ''}
+            </p>
             <div className="rewards">
               {run.rewardOptions.map(id => (
                 <RewardCard key={id} id={id} wave={run.wave} onClick={() => choose(id)} />
@@ -167,8 +219,8 @@ export function RewardScreen() {
               <button className="btn" disabled={run.money < cost} onClick={reroll}>
                 <PixelIcon name="dice" /> Sortear de novo · {cost ? `₽ ${cost}` : 'grátis'}
               </button>
-              <button className="btn ghost" onClick={skipReward}>
-                Pular
+              <button className="btn ghost" onClick={skipReward} title="Pular deixa a próxima recompensa um pouco melhor (acumula até 2 vezes)">
+                Pular (próxima melhor)
               </button>
             </div>
           </>
@@ -179,29 +231,7 @@ export function RewardScreen() {
             <ItemIcon id="money" size={32} /> Você tem <strong>₽ {run.money}</strong>
 
           </div>
-          {SHOP.map(shelf => (
-            <section key={shelf.title} className="shelf">
-              <h3>{shelf.title}</h3>
-              <div className="shelf-items">
-                {shelf.items.map(id => {
-                  const it = getItem(id);
-                  return (
-                    <div key={id} className="shop-card panel">
-                      <ItemIcon id={id} size={40} />
-                      <div className="shop-text">
-                        <strong>{it.name}</strong>
-                        <span className="muted">{it.desc}</span>
-                        <span className="muted">Na mochila: {run.bag[id] ?? 0}</span>
-                      </div>
-                      <button className="btn small primary" disabled={run.money < discounted(run, it.price)} onClick={() => { playCoins(); buy(id); }}>
-                        ₽ {discounted(run, it.price)}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+          <ShopShelves />
           <div className="row center wrap">
             <button className="btn" onClick={() => setTab('reward')}>
               Voltar
@@ -388,6 +418,7 @@ export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose
 /** Painel fixo ao lado da run: treinador, dinheiro, time, mochila, PC e fraquezas. */
 export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => void}) {
   const {run, trainer} = useGame();
+  const [shop, setShop] = useState(false);
   if (!run) return null;
   const bagCount = Object.values(run.bag).reduce((a, n) => a + n, 0);
   return (
@@ -429,13 +460,23 @@ export function RunSidebar({onOpen}: {onOpen: (tab: PartyTab, mon?: string) => v
         <button className="btn" onClick={() => onOpen('box')}>
           <PixelIcon name="home" /> PC · {run.box.length}
         </button>
+        <button
+          className="btn sb-shop"
+          onClick={() => setShop(true)}
+          disabled={run.phase === 'battle'}
+          title={run.phase === 'battle' ? 'A loja abre entre as rondas' : 'Comprar itens'}
+        >
+          <ItemIcon id="money" size={24} /> Loja{run.phase === 'battle' ? ' (depois da luta)' : ''}
+        </button>
       </div>
+      {shop && <ShopModal onClose={() => setShop(false)} />}
       <div className="panel sb-weak">
         <h3>Fraquezas do time</h3>
-        <TeamWeakness party={run.party} compact />
-        <button className="btn small ghost" onClick={() => onOpen('weak')}>
-          Ver tabela completa
-        </button>
+        <TeamWeakness party={run.party} compact>
+          <button className="btn small ghost" onClick={() => onOpen('weak')}>
+            Ver tabela completa
+          </button>
+        </TeamWeakness>
       </div>
     </aside>
   );

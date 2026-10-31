@@ -313,7 +313,7 @@ export function IvWeb({before, after, size = 260}: {before: Record<string, numbe
  * dano dobrado e quantos resistem. Tipos que pegam metade do time sem ninguém
  * resistindo ficam marcados como perigo.
  */
-export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boolean}) {
+export function TeamWeakness({party, compact, children}: {party: OwnedMon[]; compact?: boolean; children?: ReactNode}) {
   if (!party.length) return null;
   const rows = ALL_TYPES.map(t => {
     let weak = 0;
@@ -355,6 +355,7 @@ export function TeamWeakness({party, compact}: {party: OwnedMon[]; compact?: boo
           </div>
         ))}
       </div>
+      {children}
       <button className="btn small calc-open" onClick={() => useGame.getState().openTypeCalc([])}>
         Calculadora de Tipos
       </button>
@@ -392,44 +393,51 @@ export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => 
   );
 }
 
-const MULT_LABEL = (x: number) => (x === 0 ? 'imune' : x === 0.25 ? '¼' : x === 0.5 ? '½' : x === 1 ? '' : `${x}x`);
-const MULT_CLS = (x: number) => (x === 0 ? 'mu-immune' : x > 1 ? 'mu-x2' : x < 1 ? 'mu-half' : '');
-
-/** Um card só: para cada tipo, quanto o(s) tipo(s) escolhido(s) toma(m) e quanto cada um dá. */
-function CalcTable({sel}: {sel: string[]}) {
-  const rows = ALL_TYPES.map(t => ({t, takes: typeMultiplier(t, sel), gives: sel.map(a => typeMultiplier(a, [t]))})).filter(
-    r => r.takes !== 1 || r.gives.some(g => g !== 1),
+/** Um cartãozinho por multiplicador; só aparece se tiver algum tipo. */
+function MultCard({label, cls, types}: {label: string; cls: string; types: string[]}) {
+  if (!types.length) return null;
+  return (
+    <div className={`mult-card ${cls}`}>
+      <div className="mult-label">{label}</div>
+      <div className="mult-types">
+        {types.map(t => (
+          <TypeBadge key={t} type={t} small />
+        ))}
+      </div>
+    </div>
   );
+}
+
+/** Calculadora em cartões: quanto o(s) tipo(s) toma(m) e quanto cada tipo dá. */
+function CalcTable({sel}: {sel: string[]}) {
+  const d = defensiveMatchups(sel);
   const name = sel.map(t => TYPE_PT[t] ?? t).join('/');
   return (
-    <div className="calc-table-wrap">
-      <table className="calc-table">
-        <thead>
-          <tr>
-            <th>Tipo</th>
-            <th>{name} toma</th>
-            {sel.map(a => (
-              <th key={a}>{TYPE_PT[a] ?? a} dá</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.t}>
-              <td>
-                <TypeBadge type={r.t} small />
-              </td>
-              <td className={MULT_CLS(r.takes)}>{MULT_LABEL(r.takes)}</td>
-              {r.gives.map((g, i) => (
-                <td key={i} className={MULT_CLS(g)}>
-                  {MULT_LABEL(g)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="hint small">Só aparecem os tipos com alguma diferença. Vazio = normal (1x).</p>
+    <div className="calc-cards">
+      <section>
+        <h3>{name} defendendo</h3>
+        <div className="mult-cards">
+          <MultCard label="Toma 4x de" cls="mu-x4" types={d.x4} />
+          <MultCard label="Toma 2x de" cls="mu-x2" types={d.x2} />
+          <MultCard label="Toma ½ de" cls="mu-half" types={d.half} />
+          <MultCard label="Toma ¼ de" cls="mu-quarter" types={d.quarter} />
+          <MultCard label="Imune a" cls="mu-immune" types={d.immune} />
+        </div>
+      </section>
+      {sel.map(a => {
+        const by = (f: (x: number) => boolean) => ALL_TYPES.filter(t => f(typeMultiplier(a, [t])));
+        return (
+          <section key={a}>
+            <h3>Golpes de {TYPE_PT[a] ?? a}</h3>
+            <div className="mult-cards">
+              <MultCard label="Dá 2x em" cls="mu-x2" types={by(x => x > 1)} />
+              <MultCard label="Dá ½ em" cls="mu-half" types={by(x => x > 0 && x < 1)} />
+              <MultCard label="Não afeta" cls="mu-immune" types={by(x => x === 0)} />
+            </div>
+          </section>
+        );
+      })}
+      <p className="hint small">São 18 tipos. Os que não aparecem num cartão dão ou tomam dano normal (1x).</p>
     </div>
   );
 }

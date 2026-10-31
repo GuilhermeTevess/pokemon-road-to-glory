@@ -237,9 +237,6 @@ export function BattleScreen() {
       {moveInfo && <MoveInfo move={moveInfo} onClose={() => setMoveInfo(null)} />}
       <div className="battle-top">
         <span>{header}</span>
-        <span>
-          {biome.name}
-        </span>
         <span>₽ {run.money}</span>
       </div>
       {partner && (
@@ -254,6 +251,9 @@ export function BattleScreen() {
       <div className="arena" ref={arenaRef} style={{backgroundColor: biome.color}}>
         <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         <div className="fx-layer" ref={fxRef} />
+        <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
+          {biome.name}
+        </div>
         {wild && (
           <>
             <div className="info-box wild-box">

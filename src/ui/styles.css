@@ -778,3 +778,17 @@ table.move-info td { padding: 3px 0; }
 .nat-down { color: #2f6fb5; font-size: 11px; }
 .stats-help { font-size: 13px; background: var(--panel-2); border: 2px solid var(--line); padding: 6px 8px; margin-top: 6px; }
 .stats-help p { margin: 2px 0; }
+.sb-shop { grid-column: 1 / -1; }
+.arena-biome { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 4; font-family: 'Press Start 2P', monospace; font-size: 13px; padding: 6px 18px 8px; background: var(--bc, var(--panel)); border: var(--px) solid var(--line); border-top: none; box-shadow: 2px 2px 0 rgba(0,0,0,.2); white-space: nowrap; }
+@media (max-width: 640px) { .arena-biome { font-size: 10px; padding: 4px 10px 6px; } }
+.calc-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.calc-cards h3 { font-size: 11px; margin: 0 0 6px; }
+.mult-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.mult-card { border: var(--px) solid var(--line); background: var(--panel); }
+.mult-label { font-weight: 700; padding: 4px 8px; font-size: 14px; }
+.mult-types { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
+.mult-card.mu-x4 .mult-label { background: #f5b3aa; color: #8a1c14; }
+.mult-card.mu-x2 .mult-label { background: #ffd9d4; color: #b3261e; }
+.mult-card.mu-half .mult-label { background: #d8ecff; color: #1f5f9e; }
+.mult-card.mu-quarter .mult-label { background: #b9dcff; color: #174a7c; }
+.mult-card.mu-immune .mult-label { background: #e3e0ea; color: #555; }
