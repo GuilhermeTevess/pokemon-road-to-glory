@@ -2,6 +2,7 @@
 // Cada documento guarda um único campo `json` com o objeto inteiro.
 import {FIREBASE} from '../data/firebase';
 import type {CareerDoc, PlayerDoc} from './career';
+import type {World} from './world';
 import type {Entrant, MatchResult} from './tournament';
 
 function localMode(): boolean {
@@ -131,6 +132,11 @@ export interface SharedTourDoc {
   region?: string;
   entrants: Entrant[];
 }
+
+/** Mundo da temporada (os bots) em cada ronda: o primeiro a chegar grava, os outros usam o mesmo. */
+export const cloudWorld = {
+  createOnce: (c: string, season: number, wave: number, w: World) => createOnce(`careers/${code(c)}/world/s${season}-w${wave}`, w),
+};
 
 export const cloudTours = {
   createOnce: (c: string, tid: string, doc: SharedTourDoc) => createOnce(`careers/${code(c)}/tours/${encodeURIComponent(tid)}`, doc),

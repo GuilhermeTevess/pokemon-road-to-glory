@@ -9,6 +9,8 @@ import {createMon, toSet} from './mon';
 import {RIVALS, rivalsOf} from '../data/rivals';
 import type {Rival} from '../data/rivals';
 import type {NarratorCtx} from './narration';
+import {botLevel} from './world';
+import type {World, WorldBot} from './world';
 import {hashText, pick, randInt, shuffle, withSeed} from './rng';
 import type {OwnedMon} from './types';
 
@@ -198,8 +200,17 @@ function pickRivals(kind: TourKind, region?: string): Rival[] {
   return [...local, ...rest].slice(0, 7);
 }
 
-export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string, guests: Entrant[] = []): Tournament {
-  const rivals = pickRivals(info.kind, region).slice(0, 7 - guests.length);
+export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, region?: string, guests: Entrant[] = [], world?: World): Tournament {
+  const need = 7 - guests.length;
+  // Com o mundo da temporada, quem joga são os rivais que estão jogando com você (time e nível de agora).
+  const fromWorld = world ? pickWorldBots(world, info.kind, region).slice(0, need) : [];
+  const worldBots: Entrant[] = fromWorld.map(b => ({
+    name: b.name, avatar: b.avatar, titles: {}, runnerUps: 0, fame: b.banked + b.points,
+    team: worldTeam(b, info.wave, info.teamSize),
+  }));
+  const rivals = pickRivals(info.kind, region)
+    .filter(r => !worldBots.some(w => w.name === r.name))
+    .slice(0, need - worldBots.length);
   const bots: Entrant[] = rivals.map((rival, i) => {
     const name = rival.name;
     const skill = randInt(-2, 2) + (info.kind === 'worlds' ? 2 : info.kind === 'international' ? 1 : 0);
@@ -215,8 +226,29 @@ export function createTournament(info: TourInfo, me: Omit<Entrant, 'team'>, regi
       team: rivalTeam(rival, info.wave, info.teamSize, skill),
     };
   });
-  const entrants = shuffle([{...me, player: true, team: []}, ...guests, ...bots]);
+  const entrants = shuffle([{...me, player: true, team: []}, ...guests, ...worldBots, ...bots]);
   return {kind: info.kind, wave: info.wave, region, entrants, rounds: [pairUp([0, 1, 2, 3, 4, 5, 6, 7])], stage: 'intro'};
+}
+
+/** Rivais do mundo para o torneio: nos locais, quem está na região; nos grandes, os mais famosos. */
+function pickWorldBots(world: World, kind: TourKind, region?: string): WorldBot[] {
+  const score = (b: WorldBot) => b.points + b.banked + Math.random() * 120;
+  const ranked = [...world.bots].sort((a, b) => score(b) - score(a));
+  if (kind !== 'cup' && kind !== 'regional') return ranked;
+  return [...ranked.filter(b => b.region === region), ...ranked.filter(b => b.region !== region)];
+}
+
+/** Time de um rival do mundo: o time que ele está usando, no nível dele nesta ronda. */
+export function worldTeam(b: WorldBot, wave: number, size: number): OwnedMon[] {
+  const level = botLevel(b, wave);
+  const team = [...b.team];
+  // Quem abre a luta varia um pouco.
+  if (Math.random() < 0.35 && team.length > 1) team.unshift(...team.splice(randInt(0, Math.min(size, team.length) - 1), 1));
+  return team.slice(0, size).map(name => {
+    const mon = createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
+    mon.item = rivalItem(b.name, name);
+    return mon;
+  });
 }
 
 function pairUp(ids: number[]): MatchRec[] {
@@ -384,10 +416,11 @@ export function createSharedTournament(
   me: string,
   tid: string,
   region?: string,
+  world?: World,
 ): Tournament {
   return withSeed(tid, () => {
     const humans = [...players].sort((a, b) => a.pid.localeCompare(b.pid)).slice(0, 8);
-    const bots = createTournament(info, {name: '_', titles: {}, runnerUps: 0, fame: 0}, region).entrants.filter(e => !e.player);
+    const bots = createTournament(info, {name: '_', titles: {}, runnerUps: 0, fame: 0}, region, [], world).entrants.filter(e => !e.player);
     const slots: Entrant[] = new Array(8);
     humans.forEach((p, i) => (slots[SPREAD[i]] = {...p, player: p.pid === me, friend: p.pid !== me}));
     let b = 0;

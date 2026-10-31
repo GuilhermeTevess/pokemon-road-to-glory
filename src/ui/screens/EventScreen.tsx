@@ -8,7 +8,7 @@ import {tutorMoves, tutorPrice} from '../../game/events';
 import {displayName} from '../../game/mon';
 import {species} from '../../data/dex';
 import {getItem} from '../../data/items';
-import {cheapestHeal} from '../../game/events';
+import {cheapestHeal, getPlace} from '../../game/events';
 import {AVATARS} from '../../game/trainers';
 import {useGame} from '../../game/store';
 import {ItemIcon, MonName, Sprite, TypeBadge} from '../components';
@@ -194,6 +194,107 @@ export function EventScreen() {
             {pay}
           </button>
           {next('Agora não')}
+        </Scene>
+      );
+    }
+    case 'news':
+      return (
+        <Scene
+          title="Jornal da região"
+          art={<TrainerAvatar avatar="reporter" name="Jornal" size={96} />}
+          text={<p>Um jornaleiro grita as manchetes do dia. Todo mundo para pra ler.</p>}
+        >
+          <div className="news-list">
+            {ev.items.map((n, i) => (
+              <div key={i} className="news-item">
+                <b>📰</b> {n.text}
+              </div>
+            ))}
+          </div>
+          <button className="btn primary" onClick={() => resolveEvent('read')}>
+            Ler o jornal inteiro
+          </button>
+          {next('Só as manchetes, valeu')}
+        </Scene>
+      );
+    case 'fan':
+      return (
+        <Scene
+          title="Um fã!"
+          art={<TrainerAvatar avatar={ev.avatar} name="Fã" size={96} />}
+          text={
+            <p>
+              "É você! Eu vi sua batalha no jornal!" Um fã quer um autógrafo e uma foto com o seu parceiro.
+              {ev.heard && (
+                <>
+                  <br />
+                  <small className="muted">Ele conta, empolgado: "{ev.heard}"</small>
+                </>
+              )}
+            </p>
+          }
+        >
+          <button className="btn primary" onClick={() => resolveEvent('sign')}>
+            Dar autógrafo e tirar foto
+          </button>
+          {next('Agora não, desculpa')}
+        </Scene>
+      );
+    case 'place': {
+      const t = getPlace(ev.theme);
+      const mon = ev.mon ? species(ev.mon.species).name : '';
+      const text: Record<string, ReactNode> = {
+        haunted: <>Uma casa velha, janelas quebradas, risadinhas lá dentro... Uma sombra passa correndo: parece um <b>{mon}</b> querendo brincar.</>,
+        cavein: <>Pedras rolaram e bloquearam o caminho. Dá pra ouvir um <b>{mon}</b> preso do outro lado.</>,
+        wreck: <>Um navio antigo afundado perto da margem. Dizem que ainda tem coisa boa no porão.</>,
+        hotspring: <>Uma fonte de água quente no meio das rochas. O vapor deixa todo mundo com sono.</>,
+        nest: <>Um filhote de <b>{mon}</b> caiu do ninho e está chorando no chão.</>,
+        blackout: <>A energia da região caiu. Um <b>{mon}</b> assustado está perto do gerador, soltando faíscas.</>,
+        blizzard: <>Uma nevasca forte. Numa caverninha, um <b>{mon}</b> também se protege do frio.</>,
+        dojo: <>Um velho mestre está treinando sozinho na beira da estrada e te chama para um treino.</>,
+        cliff: <>No alto do penhasco, um <b>{mon}</b> está com a asa presa num galho.</>,
+      };
+      return (
+        <Scene title={t.title} art={ev.mon ? <Sprite name={ev.mon.species} shiny={ev.mon.shiny} /> : <span className="seer-ball">{t.id === 'wreck' ? '⚓' : t.id === 'hotspring' ? '♨️' : '🥋'}</span>} text={<p>{text[t.id]}</p>}>
+          <button className="btn primary" onClick={() => resolveEvent('yes')}>
+            {t.yes}
+          </button>
+          {next(t.no)}
+        </Scene>
+      );
+    }
+    case 'life': {
+      const mon = run.party.find(m => m.uid === ev.uid);
+      if (ev.theme === 'mom')
+        return (
+          <Scene title="Mensagem da mãe" art={<TrainerAvatar avatar="mom-johto" name="Mãe" size={96} />} text={<p>"Filho(a), te vi no jornal! Tô tão orgulhosa. Come direito e não esquece de curar seus Pokémon. Mandei uma coisinha."</p>}>
+            <button className="btn primary" onClick={() => resolveEvent('ok')}>
+              Responder "Te amo, mãe!"
+            </button>
+          </Scene>
+        );
+      if (ev.theme === 'birthday' && mon)
+        return (
+          <Scene title="Aniversário do parceiro" art={<Sprite name={mon.species} shiny={mon.shiny} />} text={<p>Hoje faz um ano que você e <b>{displayName(mon)}</b> estão juntos! Que tal uma festinha?</p>}>
+            <button className="btn primary" onClick={() => resolveEvent('ok')}>
+              Fazer a festa 🎂
+            </button>
+          </Scene>
+        );
+      return (
+        <Scene
+          title="Noite no Centro Pokémon"
+          art={<TrainerAvatar avatar="pokemoncenterlady" name="Enfermeira" size={96} />}
+          text={
+            <p>
+              Você passa a noite no Centro Pokémon. Na sala de espera, os treinadores só falam de uma coisa:
+              {ev.chat ? <> <i>"{ev.chat}"</i></> : ' o próximo torneio.'}
+            </p>
+          }
+        >
+          <button className="btn primary" onClick={() => resolveEvent('ok')}>
+            Dormir e seguir viagem
+          </button>
         </Scene>
       );
     }

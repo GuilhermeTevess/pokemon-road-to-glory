@@ -1293,3 +1293,24 @@ table.move-info td { padding: 3px 0; }
 .duel-vs { display: flex; align-items: center; gap: 24px; }
 .duel-vs > span:not(.vs) { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .duel-vs .vs { font-family: 'Press Start 2P', monospace; font-size: 22px; color: var(--pink-d); }
+
+/* Mundo compartilhado: rivais no ranking, perfis e jornal */
+.mini-standing.bot, .standing-row.bot { background: var(--panel); border-style: dashed; }
+.standing-row .who.link { text-align: left; text-decoration: none; display: flex; flex-direction: column; gap: 2px; }
+.profile { display: flex; flex-direction: column; gap: 10px; }
+.profile h3 { margin: 6px 0 0; }
+.profile-head { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.profile-head > div:nth-child(2) { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.profile-head h2 { margin: 0; }
+.profile-mons { display: flex; gap: 14px; }
+.profile-mons > span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; }
+.profile-book { display: flex; flex-direction: column; gap: 4px; }
+.profile-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.profile-badge { width: 44px; height: 44px; padding: 4px; background: var(--panel-2); border: 2px solid var(--line); cursor: pointer; }
+.profile-badge.on { background: var(--butter); }
+.profile-badge img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.profile-badge-detail { padding: 8px 12px; }
+.profile-badge-detail .row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.points-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
+.news-list { display: flex; flex-direction: column; gap: 6px; text-align: left; margin-bottom: 8px; }
+.news-item { background: var(--panel-2); border: 2px solid var(--line); padding: 6px 10px; font-size: 14px; }

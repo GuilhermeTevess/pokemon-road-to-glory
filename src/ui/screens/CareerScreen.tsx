@@ -10,6 +10,10 @@ import {tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
 import {Modal, Sprite} from '../components';
 import {AvatarEditor, TrainerAvatar} from './StartScreens';
+import {ProfileModal} from './ProfileModal';
+import {profileOfBot, profileOfPeer} from '../../game/profile';
+import type {Profile} from '../../game/profile';
+import type {WorldBot} from '../../game/world';
 
 export function CareerScreen() {
   const trainer = useGame(s => s.trainer);
@@ -229,17 +233,19 @@ function CareerSetup() {
 
 const MEDAL: Record<number, string> = {1: '🥇', 2: '🥈', 3: '🥉'};
 
-function PlayerRow({p, pos, me, seasons, rounds, onPoints}: {p: PlayerDoc; pos: number; me: boolean; seasons: number; rounds: number; onPoints: () => void}) {
+function PlayerRow({p, pos, me, seasons, rounds, onPoints, onProfile}: {p: PlayerDoc; pos: number; me: boolean; seasons: number; rounds: number; onPoints: () => void; onProfile?: () => void}) {
   const titles = p.results.filter(r => r.placement === 1);
   return (
     <div className={`standing-row ${me ? 'me' : ''}`}>
       <span className="pos">{pos}º</span>
       <TrainerAvatar avatar={p.avatar} name={p.name} size={44} />
       <div className="who">
-        <b>
-          {p.name}
-          {me ? ' (você)' : ''}
-        </b>
+        <button className="link" onClick={onProfile} disabled={!onProfile} title="Ver perfil">
+          <b>
+            {p.name}
+            {me ? ' (você)' : ''}
+          </b>
+        </button>
         <small className="hint">
           {p.done ? 'Terminou a carreira' : `Temporada ${p.season}/${seasons} · ronda ${p.round}/${rounds}`}
           {titles.length > 0 && ` · ${titles.map(t => `🏆 ${tourInfo(t.kind as TourKind).name}`).join(', ')}`}
@@ -351,29 +357,51 @@ function PointsModal({p, onClose}: {p: PlayerDoc; onClose: () => void}) {
   );
 }
 
-/** Classificação da carreira (todos os jogadores), com o extrato de pontos de cada um. */
+/** Classificação da carreira: os jogadores e os rivais (bots) que jogam a temporada junto. */
 export function CareerStandings({compact}: {compact?: boolean}) {
-  const {trainer, career, careerPeers} = useGame();
+  const {trainer, career, careerPeers, run} = useGame();
   const [open, setOpen] = useState<PlayerDoc | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   if (!trainer?.career) return null;
   const myId = playerId(trainer.id);
-  const rows = standings(careerPeers);
+  const bots = run?.career?.code === trainer.career.code ? (run.world?.bots ?? []) : [];
+  type Row = {key: string; total: number; p?: PlayerDoc; b?: WorldBot};
+  const rows: Row[] = [
+    ...standings(careerPeers).map((p): Row => ({key: p.id, total: p.banked + p.points, p})),
+    ...bots.map((b): Row => ({key: "bot-" + b.name, total: b.banked + b.points, b})),
+  ].sort((x, y) => y.total - x.total || (x.p ? -1 : 1));
+  const show = (r: Row) => setProfile(r.p ? profileOfPeer(r.p) : profileOfBot(r.b!));
   return (
     <div className={compact ? 'standings-compact' : undefined}>
-      {rows.length === 0 && <p className="hint">Ninguém jogou ainda. Manda o código para os amigos!</p>}
-      {rows.map((p, i) =>
+      {careerPeers.length === 0 && <p className="hint">Ninguém jogou ainda. Manda o código para os amigos!</p>}
+      {rows.map((r, i) =>
         compact ? (
-          <button key={p.id} className={`mini-standing ${p.id === myId ? 'me' : ''}`} onClick={() => setOpen(p)}>
+          <button key={r.key} className={`mini-standing ${r.p?.id === myId ? 'me' : ''} ${r.b ? 'bot' : ''}`} onClick={() => show(r)}>
             <span>{i + 1}º</span>
-            <b>{p.name}</b>
-            <small>{p.out ? 'fora da temporada' : `ronda ${p.round}`}</small>
-            <span className="pts">{p.banked + p.points}</span>
+            <b>{r.p?.name ?? r.b!.name}</b>
+            <small>{r.b ? 'rival' : r.p!.out ? 'fora da temporada' : `ronda ${r.p!.round}`}</small>
+            <span className="pts">{r.total}</span>
           </button>
+        ) : r.p ? (
+          <PlayerRow key={r.key} p={r.p} pos={i + 1} me={r.p.id === myId} seasons={career?.rules.seasons ?? 1} rounds={career?.rules.rounds ?? 120} onPoints={() => setOpen(r.p!)} onProfile={() => show(r)} />
         ) : (
-          <PlayerRow key={p.id} p={p} pos={i + 1} me={p.id === myId} seasons={career?.rules.seasons ?? 1} rounds={career?.rules.rounds ?? 120} onPoints={() => setOpen(p)} />
+          <div key={r.key} className="standing-row bot">
+            <span className="pos">{i + 1}º</span>
+            <TrainerAvatar avatar={r.b!.avatar} name={r.b!.name} size={44} />
+            <button className="who link" onClick={() => show(r)}>
+              <b>{r.b!.name}</b>
+              <small className="hint">
+                Rival · {r.b!.badges.length} insígnia{r.b!.badges.length === 1 ? '' : 's'} · parceiro {r.b!.partner}
+              </small>
+            </button>
+            <button className="pts link-pts" onClick={() => show(r)} title="Ver o perfil e de onde vêm os pontos">
+              {r.total} pts
+            </button>
+          </div>
         ),
       )}
       {open && <PointsModal p={open} onClose={() => setOpen(null)} />}
+      {profile && <ProfileModal profile={profile} onClose={() => setProfile(null)} />}
     </div>
   );
 }

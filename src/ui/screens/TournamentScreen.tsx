@@ -15,7 +15,9 @@ import {Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {fast} from '../settings';
 import {ChampionCelebration} from './ChampionScreen';
-import {playerScout, scoutReport} from '../../game/scout';
+import {botScout, playerScout, scoutReport} from '../../game/scout';
+import {profileOfBot, profileOfPeer} from '../../game/profile';
+import {ProfileModal} from './ProfileModal';
 import {species} from '../../data/dex';
 
 /** Formato comum para a chave ao vivo e para o histórico. */
@@ -48,12 +50,20 @@ function TeamRow({team, size = 40}: {team: string[]; size?: number}) {
 /** Estatísticas da temporada de um rival: dá uma ideia do que vem, sem entregar o time de hoje. */
 export function ScoutPanel({name, wave, team, pid}: {name: string; wave: number; team: string[]; pid?: string}) {
   const peer = useGame(s => (pid ? s.careerPeers.find(p => p.id === pid) : undefined));
-  const r = peer ? playerScout(peer) : scoutReport(name, wave, team);
+  const bot = useGame(s => (pid ? undefined : s.run?.world?.bots.find(b => b.name === name)));
+  const [profile, setProfile] = useState(false);
+  const r = peer ? playerScout(peer) : bot ? botScout(bot) : scoutReport(name, wave, team);
   if (r && !r.usage.length) return <p className="muted">{name} ainda não jogou nenhuma ronda.</p>;
   if (!r) return <p className="muted">Ninguém sabe muito sobre {name} ainda.</p>;
   const top = r.usage[0];
   return (
     <div className="scout">
+      {(peer || bot) && (
+        <button className="btn small ghost" onClick={() => setProfile(true)}>
+          Ver perfil de {name} ▸
+        </button>
+      )}
+      {profile && (peer || bot) && <ProfileModal profile={peer ? profileOfPeer(peer) : profileOfBot(bot!)} onClose={() => setProfile(false)} />}
       <p className="scout-top">
         Pokémon mais jogado: <Sprite name={top.species} size={32} still /> <b>{species(top.species).name}</b> · {top.rounds} rondas
       </p>

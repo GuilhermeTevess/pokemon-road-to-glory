@@ -4,7 +4,8 @@
 import {RIVALS, getRival} from '../data/rivals';
 import {getItem} from '../data/items';
 import {rivalItem} from './tournament';
-import type {PlayerDoc} from './career';
+import type {CareerFight, PlayerDoc} from './career';
+import type {WorldBot} from './world';
 
 export interface ScoutUse {
   species: string;
@@ -70,9 +71,18 @@ const FIGHT_LABEL = {gym: 'Ginásio', tour: 'Torneio', legend: 'Lenda', boss: 'C
 /** Estudo de um jogador da carreira: números reais da temporada dele (uso, lutas importantes). */
 export function playerScout(p: PlayerDoc): ScoutReport {
   const items = new Map(p.team.map(m => [m.species, m.item ? getItem(m.item).name : '—']));
-  const usage = Object.entries(p.usage ?? {})
-    .map(([sp, rounds]) => ({species: sp, rounds, item: items.get(sp) ?? '—'}))
+  return realScout(p.usage ?? {}, p.fights ?? [], sp => items.get(sp) ?? '—', p.round, p.team[0]?.species);
+}
+
+/** Estudo de um rival do mundo da temporada: o que ele jogou de verdade. */
+export function botScout(b: WorldBot): ScoutReport {
+  return realScout(b.usage, b.fights, sp => getItem(rivalItem(b.name, sp)).name, 1, b.team[0]);
+}
+
+function realScout(usageMap: Record<string, number>, fights: CareerFight[], item: (sp: string) => string, round: number, lead?: string): ScoutReport {
+  const usage = Object.entries(usageMap)
+    .map(([sp, rounds]) => ({species: sp, rounds, item: item(sp)}))
     .sort((a, b) => b.rounds - a.rounds);
-  const matches = (p.fights ?? []).slice(0, 6).map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: f.seen}));
-  return {usage, matches, season: Math.max(1, p.round, ...usage.map(u => u.rounds)), lead: p.team[0]?.species};
+  const matches = fights.slice(0, 6).map(f => ({label: FIGHT_LABEL[f.kind], vs: f.vs, won: f.won, seen: f.seen}));
+  return {usage, matches, season: Math.max(1, round, ...usage.map(u => u.rounds)), lead};
 }
