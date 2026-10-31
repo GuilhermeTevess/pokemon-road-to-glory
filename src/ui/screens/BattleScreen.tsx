@@ -1,10 +1,11 @@
+import {roundOf, roundsOf} from '../../game/career';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getBiome} from '../../data/biomes';
 import {TYPE_COLORS, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
-import {isBossWave, isMilestoneWave, SEASON_LENGTH} from '../../game/encounters';
+import {isBossWave, isMilestoneWave} from '../../game/encounters';
 import {getBattle, useGame} from '../../game/store';
 import {ROUND_NAMES, tourName} from '../../game/tournament';
 import {getRegion} from '../../data/regions';
@@ -262,10 +263,10 @@ export function BattleScreen() {
     : enc.trainer
     ? `Desafio do rival ${enc.trainer}`
     : isMilestoneWave(run.wave)
-    ? `Ronda ${run.wave} · Desafio final da etapa`
+    ? `Ronda ${roundOf(run)} · Desafio final da etapa`
     : isBossWave(run.wave)
-      ? `Ronda ${run.wave} · Chefe de ${getRegion(run.region).name}`
-      : `Ronda ${run.wave}/${SEASON_LENGTH}`;
+      ? `Ronda ${roundOf(run)} · Chefe de ${getRegion(run.region).name}`
+      : `Ronda ${roundOf(run)}/${roundsOf(run)}`;
 
   return (
     <div className="screen battle-screen">
@@ -422,7 +423,7 @@ export function BattleScreen() {
             </div>
           ) : menu === 'fight' ? (
             <div className="move-grid">
-              {ctl.canMega() && (
+              {ctl.canMega() && run.career?.rules.megas !== false && (
                 <button className={`mega-toggle ${megaOn ? 'on' : ''}`} onClick={() => setMegaOn(v => !v)}>
                   <span className="mega-box">{megaOn ? '✓' : ''}</span> Mega evoluir → <MonName mon={{species: ctl.canMega()!}} />
                 </button>

@@ -37,6 +37,11 @@ import {
 import type {TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
+import type {TrainerCareer} from './trainers';
+import {careerBoost, deviceId, enforceRules, fromSnap, snapMon, waveStep} from './career';
+import type {CareerDoc, PlayerDoc} from './career';
+import {cacheCareer, cachedCareer, cloud} from './cloud';
+import {seasonPoints} from './league';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
 import type {Encounter, OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
@@ -85,7 +90,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'quickplay' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
+export type Screen = 'title' | 'run' | 'quickplay' | 'career' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
 
 export interface Toast {
   id: string;
@@ -101,6 +106,15 @@ interface Store {
   /** Muda nome e/ou visual de um treinador. */
   updateTrainer(id: string, patch: {name?: string; avatar?: string}): void;
   removeTrainer(id: string): void;
+  /** Carreira online do treinador atual e os outros jogadores dela (última leitura). */
+  career: CareerDoc | null;
+  careerPeers: PlayerDoc[];
+  /** Cria (host) ou entra numa carreira: vira um treinador novo ligado a ela. */
+  enterCareer(doc: CareerDoc, name: string, avatar: string, colFrom?: string): void;
+  /** Busca a carreira e os jogadores na nuvem. */
+  refreshCareer(): Promise<void>;
+  /** Manda o seu progresso para a nuvem. */
+  pushCareer(): void;
   screen: Screen;
   run: RunState | null;
   collection: Collection;
@@ -222,6 +236,84 @@ const bootTrainer = boot.list.find(t => t.id === boot.current) ?? null;
 
 export const useGame = create<Store>((set, get) => {
   const tid = () => get().trainer?.id ?? null;
+  /** De quem é a coleção (numa carreira com coleção liberada, a do treinador escolhido). */
+  const cid = () => get().trainer?.career?.colFrom ?? tid();
+  /** Muda os dados de carreira do treinador atual (temporada, pontos guardados, resultados). */
+  const patchCareer = (patch: Partial<TrainerCareer>) => {
+    const t = get().trainer;
+    if (!t?.career) return;
+    const trainer = {...t, career: {...t.career, ...patch}};
+    const trainers = get().trainers.map(x => (x.id === t.id ? trainer : x));
+    saveTrainers(trainers, trainer.id);
+    set({trainers, trainer});
+  };
+
+  /** Seu progresso como os outros jogadores veem. */
+  const playerDoc = (run: RunState | null, ended: boolean): PlayerDoc | null => {
+    const t = get().trainer;
+    if (!t?.career) return null;
+    const live = run?.career && !ended && run.career.season === t.career.season ? run : null;
+    return {
+      id: deviceId() + '-' + t.id,
+      name: t.name,
+      avatar: t.avatar,
+      season: Math.min(t.career.season, get().career?.rules.seasons ?? t.career.season),
+      round: live ? Math.ceil(live.wave / waveStep(live)) : 0,
+      points: live ? seasonPoints(live) : 0,
+      banked: t.career.banked,
+      team: (live ?? run)?.party.map(snapMon) ?? [],
+      tours: live?.career?.tours ?? {},
+      results: t.career.results,
+      done: t.career.done,
+      updatedAt: Date.now(),
+    };
+  };
+
+  const pushNow = (run: RunState | null, ended = false) => {
+    const t = get().trainer;
+    const doc = playerDoc(run, ended);
+    if (!t?.career || !doc) return;
+    cloud.putPlayer(t.career.code, doc).catch(() => undefined);
+  };
+
+  let pushTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Junta várias mudanças seguidas num envio só. */
+  const schedulePush = () => {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      pushTimer = null;
+      pushNow(get().run);
+    }, 2500);
+  };
+
+  /**
+   * Os outros jogadores da carreira entram na chave do torneio com o time real deles:
+   * o que levaram para este mesmo torneio ou, se ainda não chegaram lá, o time de agora.
+   */
+  const guestsFor = (kind: TourKind, size: number, wave: number) => {
+    const me = get().trainer;
+    const myId = me ? deviceId() + '-' + me.id : '';
+    return get()
+      .careerPeers.filter(p => p.id !== myId)
+      .map(p => {
+        const snap = p.tours?.[kind]?.length ? p.tours[kind]! : p.team;
+        if (!snap.length) return null;
+        // Quem está atrás no jogo sobe até o nível dos bots do torneio, para a luta valer.
+        const floor = Math.max(5, Math.round(wave * 0.9) + 1);
+        const team = snap.slice(0, size).map(s => {
+          const m = fromSnap(s);
+          if (!p.tours?.[kind]?.length) m.level = Math.min(get().run?.career?.rules.levelCap ?? 100, Math.max(m.level, floor));
+          return m;
+        });
+        const wins = p.results.filter(r => r.placement === 1);
+        const titles: Partial<Record<TourKind, number>> = {};
+        for (const r of wins) titles[r.kind as TourKind] = (titles[r.kind as TourKind] ?? 0) + 1;
+        return {name: p.name, avatar: p.avatar, titles, runnerUps: p.results.filter(r => r.placement === 2).length, fame: p.banked + p.points, team, friend: true};
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x)
+      .slice(0, 7);
+  };
+
   /** Aplica uma mudança numa cópia do run e salva. */
   const mutate = (fn: (run: RunState, col: Collection) => void) => {
     const cur = get().run;
@@ -234,9 +326,11 @@ export const useGame = create<Store>((set, get) => {
       set({run});
       return;
     }
+    if (run.career) enforceRules(run).forEach(n => get().toast(n));
     const fresh = tid() ? checkAchievements(col, run) : [];
     saveRun(tid(), run);
-    saveCollection(tid(), col);
+    if (run.career) schedulePush();
+    saveCollection(cid(), col);
     set({run, collection: col});
     fresh.forEach((name, i) => {
       const a = ACHIEVEMENTS.find(x => x.name === name);
@@ -253,7 +347,7 @@ export const useGame = create<Store>((set, get) => {
   const editCollection = (fn: (col: Collection) => boolean | void) => {
     const col = structuredClone(get().collection);
     if (fn(col) === false) return;
-    saveCollection(tid(), col);
+    saveCollection(cid(), col);
     set({collection: col});
   };
 
@@ -296,17 +390,19 @@ export const useGame = create<Store>((set, get) => {
   };
 
   const startWave = (run: RunState) => {
-    run.wave++;
+    run.wave += waveStep(run);
     run.event = undefined;
     // Runs antigas, de antes das regiões, começam em Kanto.
     if (!run.region) Object.assign(run, {region: REGIONS[0].id, regionLeft: REGION_STAY, biomeLeft: BIOME_STAY});
-    run.regionLeft = (run.regionLeft ?? REGION_STAY) - 1;
-    run.biomeLeft = (run.biomeLeft ?? BIOME_STAY) - 1;
+    // Estadias contam em rondas de jogo: numa carreira curta, cada ronda gasta mais.
+    run.regionLeft = (run.regionLeft ?? REGION_STAY) - waveStep(run);
+    run.biomeLeft = (run.biomeLeft ?? BIOME_STAY) - waveStep(run);
     const info = tourAt(run.wave);
     if (info) {
+      if (run.career) run.career.tours = {...run.career.tours, [info.kind]: run.party.map(snapMon)};
       const t = get().trainer;
       const c = careerOf(get().collection);
-      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, run.region);
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, run.region, run.career ? guestsFor(info.kind, info.teamSize, info.wave) : []);
       run.encounter = undefined;
       run.upcoming = undefined;
       run.phase = 'tournament';
@@ -426,7 +522,7 @@ export const useGame = create<Store>((set, get) => {
     run.travel = undefined;
     if (run.regionMapReady) run.phase = 'regionChoice';
     else if (run.mapReady) run.phase = 'biomeChoice';
-    else if (shouldRollEvent(run) && !run.gyms?.some(g => g.wave === run.wave + 1)) {
+    else if (shouldRollEvent(run) && !run.gyms?.some(g => g.wave === run.wave + waveStep(run))) {
       run.event = rollEvent(run);
       run.lastEventWave = run.wave;
       if (run.event.kind === 'seer') run.upcoming = run.event.upcoming;
@@ -436,6 +532,14 @@ export const useGame = create<Store>((set, get) => {
 
   const endRun = (run: RunState, col: Collection, result: 'lost' | 'stageClear' | 'abandoned') => {
     const t = get().trainer;
+    if (run.career && t?.career && t.career.season === run.career.season) {
+      // Fim da temporada da carreira: guarda os pontos e passa para a próxima.
+      const pts = seasonPoints(run);
+      const season = t.career.season + 1;
+      patchCareer({banked: t.career.banked + pts, season, done: season > run.career.rules.seasons});
+      pushNow(run, true);
+      void pts;
+    }
     run.season = finishSeason(col, run, {name: t?.name ?? 'Você', avatar: t?.avatar});
     const st = statsOf(col);
     st.runs++;
@@ -632,10 +736,12 @@ export const useGame = create<Store>((set, get) => {
       const trainer = get().trainers.find(t => t.id === id) ?? null;
       saveTrainers(get().trainers, trainer?.id ?? null);
       battle = null;
-      set({trainer, run: loadRun(trainer?.id ?? null), collection: loadCollection(trainer?.id ?? null), screen: 'title'});
+      const cached = trainer?.career ? cachedCareer(trainer.career.code) : {doc: null, peers: []};
+      set({trainer, run: loadRun(trainer?.id ?? null), collection: loadCollection(trainer?.career?.colFrom ?? trainer?.id ?? null), screen: 'title', career: cached.doc, careerPeers: cached.peers});
+      if (trainer?.career) void get().refreshCareer();
     },
     createTrainer(name, avatar) {
-      if (get().trainers.length >= MAX_TRAINERS) return;
+      if (get().trainers.filter(t => !t.career).length >= MAX_TRAINERS) return;
       const t = newTrainer(name, avatar);
       set({trainers: [...get().trainers, t]});
       get().selectTrainer(t.id);
@@ -654,9 +760,37 @@ export const useGame = create<Store>((set, get) => {
       if (get().trainer?.id === id) get().selectTrainer(null);
       else saveTrainers(trainers, tid());
     },
+    career: bootTrainer?.career ? cachedCareer(bootTrainer.career.code).doc : null,
+    careerPeers: bootTrainer?.career ? cachedCareer(bootTrainer.career.code).peers : [],
+    enterCareer(doc, name, avatar, colFrom) {
+      const base = newTrainer(name, avatar);
+      const t: Trainer = {...base, career: {code: doc.code, colFrom, season: 1, banked: 0, results: []}};
+      const trainers = [...get().trainers, t];
+      saveTrainers(trainers, t.id);
+      battle = null;
+      set({trainers, trainer: t, run: null, collection: loadCollection(colFrom ?? t.id), career: doc, careerPeers: [], screen: 'career'});
+      cacheCareer(doc.code, doc, []);
+      pushNow(null);
+      setTimeout(() => void get().refreshCareer(), 600);
+    },
+    async refreshCareer() {
+      const t = get().trainer;
+      if (!t?.career) return;
+      try {
+        const [doc, peers] = await Promise.all([cloud.getCareer(t.career.code), cloud.players(t.career.code)]);
+        if (get().trainer?.id !== t.id) return;
+        set({career: doc ?? get().career, careerPeers: peers});
+        cacheCareer(t.career.code, get().career, peers);
+      } catch {
+        /* sem internet: fica com a última leitura */
+      }
+    },
+    pushCareer() {
+      pushNow(get().run);
+    },
     screen: 'title',
     run: loadRun(bootTrainer?.id ?? null),
-    collection: loadCollection(bootTrainer?.id ?? null),
+    collection: loadCollection(bootTrainer?.career?.colFrom ?? bootTrainer?.id ?? null),
     toasts: [],
     achievePops: [],
     ivGain: null,
@@ -684,6 +818,12 @@ export const useGame = create<Store>((set, get) => {
       const picked = team.slice(0, PARTY_SIZE);
       if (!picked.length || picked.reduce((n, s) => n + teamCost(col, s), 0) > teamBudget(col)) return;
       const run = emptyRun();
+      const tc = get().trainer?.career;
+      if (tc) {
+        const doc = get().career;
+        if (!doc || tc.done) return;
+        run.career = {code: tc.code, season: tc.season, rules: doc.rules};
+      }
       applyPerks(run, perksOf(col));
       run.regionLeft = regionStay(run);
       run.rivalPoints = rollRivalPoints(col);
@@ -719,7 +859,7 @@ export const useGame = create<Store>((set, get) => {
       run.phase = 'biome';
       battle = null;
       saveRun(tid(), run);
-      saveCollection(tid(), col);
+      saveCollection(cid(), col);
       set({run, collection: col, screen: 'run'});
     },
 
@@ -1021,7 +1161,7 @@ export const useGame = create<Store>((set, get) => {
             }
             const share = (fought ? 1 : run.bag.expall ? 0.8 : 0.5) * (run.bag.luckyegg ? 1.5 : 1);
             const bonus = expBonus(heartsOf(col.entries[lineRoot(m.species)]));
-            const r = gainExp(m, Math.floor(exp * share * bonus));
+            const r = gainExp(m, Math.floor(exp * share * bonus * careerBoost(run)));
             if (r.levelsGained) run.log.push(`${m.species} subiu para o nível ${m.level}!`);
             events.push(...r.events);
           }
@@ -1047,7 +1187,7 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
           }
         }
-        const money = enc.tournament ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1));
+        const money = enc.tournament ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1) * careerBoost(run));
         run.money += money;
         // Chefe vencido ou capturado deixa a lenda da região de olho em você.
         if ((outcome === 'won' || outcome === 'caught') && enc.boss && !enc.trainer && !enc.hinted) {
@@ -1157,6 +1297,8 @@ export const useGame = create<Store>((set, get) => {
         const info = tourInfo(t.kind);
         const i = prizeIndex(t.placement ?? 5);
         applyToCareer(careerOf(col), t);
+        const tc = get().trainer?.career;
+        if (run.career && tc) patchCareer({results: [...tc.results, {season: run.career.season, kind: t.kind, placement: t.placement ?? 5}]});
         addPoints(run, col, 'tournaments', info.fame[i], false, `${tourName(t)}: ${placementLabel(t.placement ?? 5)}`);
         col.glory = (col.glory ?? 0) + info.glory[i];
         run.tourGlory = (run.tourGlory ?? 0) + info.glory[i];

@@ -1,3 +1,4 @@
+import {roundOf} from '../../game/career';
 // Eventos entre as rondas: uma cena curta com escolhas.
 import type {ReactNode} from 'react';
 import {species} from '../../data/dex';
@@ -199,7 +200,7 @@ export function EventScreen() {
           <div className="seer-list">
             {ev.upcoming.map((e, i) => (
               <div key={i} className="seer-row">
-                <span>Ronda {run.wave + i + 1}</span>
+                <span>Ronda {roundOf(run) + i + 1}</span>
                 <span className="row">
                   {species(e.mon.species).types.map(t => (
                     <TypeBadge key={t} type={t} small />

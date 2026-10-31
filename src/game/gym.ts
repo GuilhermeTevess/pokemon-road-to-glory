@@ -3,6 +3,7 @@
 import {GYM_BIOME, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
 import {isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
+import {waveStep} from './career';
 import {discounted} from './glory';
 import {createMon} from './mon';
 import {LEADER_TALK} from '../data/gymTalk';
@@ -27,8 +28,9 @@ export function badgesIn(run: RunState, region = run.region): number {
 export function gymWaves(run: RunState): number[] {
   const out: number[] = [];
   const taken = new Set((run.gyms ?? []).map(g => g.wave));
+  const step = waveStep(run);
   const last = Math.min(SEASON_LENGTH, run.wave + (run.regionLeft ?? 0));
-  for (let w = run.wave + 1; w <= last; w++) if (!isMilestoneWave(w) && !isBossWave(w) && !taken.has(w)) out.push(w);
+  for (let w = run.wave + step; w <= last; w += step) if (!isMilestoneWave(w) && !isBossWave(w) && !taken.has(w)) out.push(w);
   return out;
 }
 
