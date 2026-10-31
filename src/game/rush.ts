@@ -85,3 +85,76 @@ export function giveMegaStone(mon: OwnedMon): void {
   const stone = megaStonesFor(mon.species)[0];
   if (stone) mon.item = stone.id;
 }
+
+// ------------------------------------------------------------------ Duelo (mesmo PC ou online)
+
+import type {Battle} from '@pkmn/sim';
+import {dex, typeMultiplier} from '../data/dex';
+import type {BattleController, BattleEvent, Side} from './battle';
+
+export interface DuelMove {
+  index: number;
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  basePower: number;
+  pp: number;
+  maxpp: number;
+  disabled: boolean;
+  /** Eficácia contra quem está em campo do outro lado (null = golpe de status). */
+  eff: number | null;
+}
+
+/** O que um lado pode fazer agora (vai pela rede para o amigo no online). */
+export interface DuelReq {
+  side: Side;
+  forced: boolean;
+  trapped: boolean;
+  canMega: boolean;
+  moves: DuelMove[];
+  switches: {index: number; species: string; hp: number; maxhp: number; item?: string}[];
+}
+
+export function duelNeeds(b: Battle, side: Side): boolean {
+  const s = b[side];
+  return !b.ended && (s.requestState === 'move' || s.requestState === 'switch') && !s.isChoiceDone();
+}
+
+export function duelRequest(b: Battle, side: Side): DuelReq {
+  const s = b[side];
+  const req = s.activeRequest as {active?: {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]; trapped?: boolean; canMegaEvo?: boolean}[]} | null;
+  const act = req?.active?.[0];
+  const foe = b[side === 'p1' ? 'p2' : 'p1'].active[0];
+  return {
+    side,
+    forced: s.requestState === 'switch',
+    trapped: !!act?.trapped,
+    canMega: !!act?.canMegaEvo,
+    moves: (act?.moves ?? []).map((m, i) => {
+      const mv = dex.moves.get(m.id);
+      return {
+        index: i + 1, id: mv.id, name: mv.name, type: mv.type, category: mv.category, basePower: mv.basePower,
+        pp: m.pp ?? 0, maxpp: m.maxpp ?? 0, disabled: !!m.disabled,
+        eff: mv.category === 'Status' || !foe ? null : typeMultiplier(mv.type, foe.getTypes()),
+      };
+    }),
+    switches: s.pokemon
+      .map((p, i) => ({p, i}))
+      .filter(({p}) => !p.isActive && !p.fainted)
+      .map(({p, i}) => ({index: i + 1, species: p.species.name, hp: p.hp, maxhp: p.maxhp, item: p.item || undefined})),
+  };
+}
+
+/** Quem ainda está de pé em cada lado (as bolinhas do placar). */
+export function duelBalls(b: Battle): {p1: boolean[]; p2: boolean[]} {
+  return {p1: b.p1.pokemon.map(p => !p.fainted), p2: b.p2.pokemon.map(p => !p.fainted)};
+}
+
+/** Aplica a escolha ("move 2", "switch 3") de um lado e devolve o que aconteceu. */
+export function duelChoose(ctl: BattleController, side: Side, choice: string, mega: boolean): BattleEvent[] {
+  const [kind, n] = choice.split(' ');
+  if (side === 'p2') return ctl.chooseP2(kind === 'move' && mega ? `${choice} mega` : choice);
+  if (kind === 'switch') return ctl.chooseSwitchSlot(Number(n));
+  return ctl.chooseMove(Number(n), mega);
+}

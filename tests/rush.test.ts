@@ -29,7 +29,7 @@ describe('rush', () => {
       if (ctl.ended) break;
       if (bat.p1.requestState === 'switch') {
         const i = bat.p1.pokemon.findIndex((p, k) => k > 0 && !p.fainted);
-        ctl.chooseSwitch(ctl.partyStatus()[i].uid);
+        ctl.chooseSwitchSlot(i + 1);
       } else if (bat.p1.requestState === 'move') ctl.chooseMove(1, true);
     }
     expect(ctl.ended).toBe(true);

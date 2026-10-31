@@ -1200,3 +1200,11 @@ table.move-info td { padding: 3px 0; }
 .venue-bg .bleachers { z-index: 0; }
 .venue-bg.tier0 .crowd { z-index: 0; }
 @media (prefers-reduced-motion: reduce) { .mass-row, .flashes i { animation: none; } }
+.rush-online { margin-top: 6px; padding-top: 12px; border-top: 2px dashed rgba(0,0,0,.15); }
+.rush-online h3 { margin: 0 0 4px; }
+.rush-online-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rush-online-row input { font: inherit; width: 120px; padding: 6px 8px; text-align: center; letter-spacing: .2em; text-transform: uppercase; }
+.rush-lobby { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; max-width: 520px; margin: 20px auto; }
+.room-code { font-size: 40px; letter-spacing: .3em; padding: 10px 18px 10px 26px; background: #3b3355; color: #ffd84a; border: var(--px) solid var(--line); user-select: all; }
+.error { color: #b5473f; font-weight: 700; }
+.waiting { animation: blink 1.6s steps(2) infinite; }
