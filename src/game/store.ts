@@ -95,6 +95,8 @@ interface Store {
   trainer: Trainer | null;
   selectTrainer(id: string | null): void;
   createTrainer(name: string, avatar: string): void;
+  /** Muda nome e/ou visual de um treinador. */
+  updateTrainer(id: string, patch: {name?: string; avatar?: string}): void;
   removeTrainer(id: string): void;
   screen: Screen;
   run: RunState | null;
@@ -559,6 +561,13 @@ export const useGame = create<Store>((set, get) => {
       const t = newTrainer(name, avatar);
       set({trainers: [...get().trainers, t]});
       get().selectTrainer(t.id);
+    },
+    updateTrainer(id, patch) {
+      const trainers = get().trainers.map(t =>
+        t.id === id ? {...t, avatar: patch.avatar ?? t.avatar, name: patch.name?.trim().slice(0, 16) || t.name} : t,
+      );
+      saveTrainers(trainers, tid());
+      set({trainers, trainer: trainers.find(t => t.id === get().trainer?.id) ?? null});
     },
     removeTrainer(id) {
       deleteTrainerData(id);

@@ -5,7 +5,7 @@ import {uid} from './rng';
 export interface Trainer {
   id: string;
   name: string;
-  /** Sprite de treinador do Showdown (ex.: "juliana"). */
+  /** Sprite de treinador do Showdown (ex.: "dawn") ou visual próprio ("custom:..."). */
   avatar: string;
   createdAt: number;
 }
@@ -20,12 +20,15 @@ const KEY = 'rtg-trainers';
 
 /** Protagonistas de cada geração, em pares. */
 export const AVATARS = [
-  'red', 'leaf', 'ethan', 'lyra', 'brendan', 'may', 'lucas', 'dawn', 'hilbert', 'hilda',
-  'calem', 'serena', 'elio', 'selene', 'victor', 'gloria', 'florian', 'juliana',
+  'red', 'ethan', 'lyra', 'brendan', 'may', 'lucas', 'dawn', 'hilbert', 'hilda',
+  'nate', 'rosa', 'calem', 'serena', 'elio', 'selene', 'victor', 'gloria',
 ];
 
+/** Sprites que o Showdown não tem: saves antigos com eles mostram um parecido. */
+const LEGACY: Record<string, string> = {leaf: 'lyra', florian: 'victor', juliana: 'gloria'};
+
 export function avatarUrl(avatar: string): string {
-  return `https://play.pokemonshowdown.com/sprites/trainers/${avatar}.png`;
+  return `https://play.pokemonshowdown.com/sprites/trainers/${LEGACY[avatar] ?? avatar}.png`;
 }
 
 export const collectionKey = (trainerId: string) => `rtg-collection-${trainerId}`;
