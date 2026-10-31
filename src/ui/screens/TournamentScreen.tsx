@@ -411,13 +411,32 @@ function ScoutToggle({name, wave, team}: {name: string; wave: number; team: stri
   return (
     <>
       <button className="link" onClick={() => setOpen(true)}>
-        Estudar {name}: últimas batalhas
+        💻 Estudar {name} no PC
       </button>
       {open && (
-        <Modal onClose={() => setOpen(false)}>
-          <h2>Últimas batalhas de {name}</h2>
-          <ScoutPanel name={name} wave={wave} team={team} />
-          <p className="hint">O elenco dele é maior que o time: quem joga hoje deve sair dos mais usados, mas não dá para ter certeza.</p>
+        <Modal onClose={() => setOpen(false)} wide>
+          <div className="pc-device">
+            <div className="pc-lid">
+              <div className="pc-cam" />
+              <div className="pc-screen">
+                <div className="pc-titlebar">
+                  <span>📁 Banco de dados · {name}</span>
+                  <span className="pc-dots">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
+                <div className="pc-body">
+                  <ScoutPanel name={name} wave={wave} team={team} />
+                  <p className="hint">O elenco dele é maior que o time: quem joga hoje deve sair dos mais usados, mas não dá para ter certeza.</p>
+                </div>
+              </div>
+            </div>
+            <div className="pc-base">
+              <span className="pc-brand">PokéPC</span>
+            </div>
+          </div>
         </Modal>
       )}
     </>

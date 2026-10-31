@@ -1,7 +1,7 @@
 // Itens do jogo. Os "held" são itens reais do Showdown e funcionam dentro da batalha.
 import {Dex, toID} from '@pkmn/sim';
 
-export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin' | 'mega' | 'breed';
+export type ItemKind = 'ball' | 'heal' | 'revive' | 'candy' | 'evolution' | 'tm' | 'held' | 'map' | 'incense' | 'money' | 'battle' | 'mint' | 'ability' | 'vitamin' | 'mega' | 'breed' | 'key';
 export type ItemTier = 'common' | 'great' | 'ultra' | 'master';
 
 export interface ItemDef {
@@ -87,6 +87,12 @@ const typeBoost = (id: string, name: string, showdown: string, type: string, spr
   held(id, name, showdown, `Golpes do tipo ${type} 20% mais fortes.`, 'great', sprite, 0.12);
 
 export const ITEMS: ItemDef[] = [
+  // Itens-chave: funcionam só de estar na mochila, até o fim da run (só 1 de cada).
+  {id: 'expall', name: 'Exp. All', desc: 'Quem não lutou ganha 80% da EXP (sem ele, 50%).', kind: 'key', tier: 'master', sprite: 'exp-share', price: 0, minWave: 10, weight: 2},
+  {id: 'luckyegg', name: 'Ovo da Sorte', desc: 'Todo o time ganha 50% a mais de EXP.', kind: 'key', tier: 'ultra', sprite: 'lucky-egg', price: 0, minWave: 8, weight: 0.4},
+  {id: 'amuletcoin', name: 'Moeda Amuleto', desc: 'Dinheiro das batalhas x1,5.', kind: 'key', tier: 'ultra', sprite: 'amulet-coin', price: 0, minWave: 5, weight: 0.4},
+  {id: 'shinycharm', name: 'Amuleto Brilhante', desc: 'Pokémon shiny aparecem 3x mais.', kind: 'key', tier: 'master', sprite: 'shiny-charm', price: 0, minWave: 20, weight: 1},
+
   {id: 'pokeball', name: 'Poké Ball', desc: 'Captura Pokémon selvagens.', kind: 'ball', tier: 'common', sprite: 'poke-ball', price: 200, power: 1},
   {id: 'greatball', name: 'Great Ball', desc: 'Captura com chance 1,5x maior.', kind: 'ball', tier: 'great', sprite: 'great-ball', price: 600, power: 1.5},
   {id: 'ultraball', name: 'Ultra Ball', desc: 'Captura com chance 2x maior.', kind: 'ball', tier: 'ultra', sprite: 'ultra-ball', price: 1200, power: 2},
@@ -248,6 +254,8 @@ export function itemUsage(item: ItemDef): string {
       return 'Vira dinheiro na hora.';
     case 'breed':
       return 'Vai direto para a Creche (no menu inicial). Serve para fazer ovos.';
+    case 'key':
+      return 'Item-chave: funciona sozinho, só de estar na mochila, até o fim da run.';
   }
 }
 

@@ -34,7 +34,7 @@ import {
   prizeIndex, recordPlayerResult, tourAt, tourInfo,
   tourName,
 } from './tournament';
-import type {Tournament} from './tournament';
+import type {TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {Trainer} from './trainers';
@@ -85,7 +85,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
+export type Screen = 'title' | 'run' | 'quickplay' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
 
 export interface Toast {
   id: string;
@@ -178,6 +178,8 @@ interface Store {
   tourFight(): void;
   /** Torneio acabou: prêmios, carreira e segue a run. */
   tourFinish(): void;
+  /** Quickplay: começa um campeonato avulso com o time escolhido. */
+  startQuickTour(kind: TourKind, team: string[]): void;
   /** Atualiza o run atual após mexer no controlador de batalha. */
   touch(): void;
 }
@@ -227,6 +229,11 @@ export const useGame = create<Store>((set, get) => {
     const run = structuredClone(cur);
     const col = structuredClone(get().collection);
     fn(run, col);
+    if (run.quick) {
+      // Campeonato rápido: nada vai para a coleção nem para o save da run de verdade.
+      set({run});
+      return;
+    }
     const fresh = tid() ? checkAchievements(col, run) : [];
     saveRun(tid(), run);
     saveCollection(tid(), col);
@@ -349,6 +356,8 @@ export const useGame = create<Store>((set, get) => {
         if (!run.recent?.includes(run.encounter.mon.species)) break;
       }
     }
+    // Amuleto Brilhante: chance extra de shiny (fica ~3x mais comum).
+    if (run.bag.shinycharm && !run.encounter!.trainer && !run.encounter!.mon.shiny && Math.random() < 2 / 256) run.encounter!.mon.shiny = true;
     // Dupla: às vezes (5%) dois selvagens aparecem juntos. Nunca com chefes, lendas ou ginásios.
     const enc0 = run.encounter!;
     if (!enc0.boss && !enc0.trainer && !enc0.team && run.wave >= 5 && run.party.filter(m => m.hp > 0).length >= 2 && Math.random() < DOUBLE_CHANCE) {
@@ -365,7 +374,7 @@ export const useGame = create<Store>((set, get) => {
 
   const goToReward = (run: RunState) => {
     run.rewardTaken = undefined;
-    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0);
+    run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0, run.bag);
     run.phase = 'reward';
   };
 
@@ -655,7 +664,14 @@ export const useGame = create<Store>((set, get) => {
     typeCalc: null,
     openTypeCalc: types => set({typeCalc: types}),
 
-    setScreen: screen => set({screen}),
+    setScreen: screen => {
+      // Sair de um campeonato rápido no meio encerra ele e volta para a run de verdade.
+      if (screen !== 'run' && get().run?.quick) {
+        battle = null;
+        return set({screen, run: loadRun(tid())});
+      }
+      set({screen});
+    },
 
     toast(text) {
       const t = {id: uid(), text};
@@ -816,7 +832,7 @@ export const useGame = create<Store>((set, get) => {
               ev.mon.hp = maxHp(ev.mon);
               join(ev.mon, HEART_STEPS[1]);
             } else {
-              const gift = rollRewards(run.wave, 1).find(id => getItem(id).kind !== 'money') ?? 'potion';
+              const gift = rollRewards(run.wave, 1, 0, run.bag).find(id => getItem(id).kind !== 'money') ?? 'potion';
               run.bag[gift] = (run.bag[gift] ?? 0) + 1;
               message = `${species(ev.mon.species).name} deixou um presente: ${getItem(gift).name}.`;
             }
@@ -1003,7 +1019,7 @@ export const useGame = create<Store>((set, get) => {
               if (add > 0) m.evs[power] += add;
               addStatEvs(col, m.species, power, POWER_EVS);
             }
-            const share = fought ? 1 : 0.5;
+            const share = (fought ? 1 : run.bag.expall ? 0.8 : 0.5) * (run.bag.luckyegg ? 1.5 : 1);
             const bonus = expBonus(heartsOf(col.entries[lineRoot(m.species)]));
             const r = gainExp(m, Math.floor(exp * share * bonus));
             if (r.levelsGained) run.log.push(`${m.species} subiu para o nível ${m.level}!`);
@@ -1031,7 +1047,7 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
           }
         }
-        const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
+        const money = enc.tournament ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1));
         run.money += money;
         // Chefe vencido ou capturado deixa a lenda da região de olho em você.
         if ((outcome === 'won' || outcome === 'caught') && enc.boss && !enc.trainer && !enc.hinted) {
@@ -1111,7 +1127,30 @@ export const useGame = create<Store>((set, get) => {
       });
     },
 
+    startQuickTour(kind, team) {
+      const info = tourInfo(kind);
+      const run = emptyRun();
+      run.quick = true;
+      run.wave = info.wave;
+      const level = Math.max(5, Math.round(info.wave * 0.9) + 1);
+      run.party = team.map(name => createMon(name, {level, ivMin: 15, shinyChance: 0.01, hiddenAbilityChance: 0.1}));
+      const t = get().trainer;
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: {}, runnerUps: 0, fame: 0}, run.region);
+      run.phase = 'tournament';
+      battle = null;
+      set({run, screen: 'run'});
+    },
+
     tourFinish() {
+      const quick = get().run;
+      if (quick?.quick) {
+        const t = quick.tournament;
+        if (t) get().toast(`${tourName(t)}: ${placementLabel(t.placement ?? 5)}! Fim do campeonato rápido.`);
+        // Volta para a run de verdade (que ficou guardada).
+        set({run: loadRun(tid()), screen: 'quickplay'});
+        battle = null;
+        return;
+      }
       mutate((run, col) => {
         const t = run.tournament;
         if (!t || t.stage !== 'done') return;
@@ -1192,7 +1231,7 @@ export const useGame = create<Store>((set, get) => {
         if (run.money < cost) return;
         run.money -= cost;
         run.rerolls++;
-        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0);
+        run.rewardOptions = rollRewards(run.wave, 3 + (run.perks?.rewards ?? 0), run.skipStreak ?? 0, run.bag);
       });
     },
 

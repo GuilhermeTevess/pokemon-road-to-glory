@@ -298,6 +298,7 @@ const BAG_GROUPS: {title: string; kinds: string[]}[] = [
   {title: 'Para melhorar Pokémon', kinds: ['candy', 'evolution', 'tm', 'mint', 'ability', 'vitamin']},
   {title: 'Itens para segurar', kinds: ['held']},
   {title: 'Viagem', kinds: ['map', 'incense']},
+  {title: 'Itens-chave (funcionam sozinhos)', kinds: ['key']},
 ];
 
 export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose: () => void; initialTab?: PartyTab; initialMon?: string}) {
@@ -357,7 +358,7 @@ export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose
                   <h3>{g.title}</h3>
                   {list.map(([id, n]) => {
                     const it = getItem(id);
-                    const usable = !inBattle && !['ball', 'battle'].includes(it.kind);
+                    const usable = !inBattle && !['ball', 'battle', 'key'].includes(it.kind);
                     return (
                       <div key={id} className="bag-row">
                         <ItemIcon id={id} />

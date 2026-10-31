@@ -258,6 +258,9 @@ export function TitleScreen() {
           >
             {active && confirm ? 'Certeza? A run atual será perdida' : active ? 'Nova run' : '▶ Nova run'}
           </button>
+          <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>
+            ⚡ Quickplay <small>Rush com amigo · Campeonato rápido</small>
+          </button>
           <div className="menu-tiles">
             {tiles.map(t => (
               <button key={t.label} className="menu-tile" onClick={() => setScreen(t.go)}>
