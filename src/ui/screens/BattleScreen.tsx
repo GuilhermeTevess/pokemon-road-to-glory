@@ -44,7 +44,16 @@ interface SideView {
   anim?: string;
 }
 
-type Menu = 'main' | 'fight' | 'bag' | 'balls' | 'switch' | 'healTarget';
+type Menu = 'main' | 'fight' | 'bag' | 'balls' | 'switch' | 'healTarget' | 'target';
+
+type Views = (SideView | null)[];
+/** Troca a visão de uma posição (0 ou 1) do lado. */
+const at = (fn: (v: SideView | null) => SideView | null, slot = 0) => (list: Views): Views => {
+  const out = [...list];
+  out[slot] = fn(list[slot] ?? null);
+  return out;
+};
+const each = (fn: (v: SideView) => SideView) => (list: Views): Views => list.map(v => (v ? fn(v) : v));
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
@@ -52,13 +61,15 @@ export function BattleScreen() {
   const run = useGame(s => s.run)!;
   const {finishBattle, consume} = useGame();
   const ctl = useMemo(() => getBattle(run), [run.encounter?.mon.uid]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [player, setPlayer] = useState<SideView | null>(null);
-  const [wild, setWild] = useState<SideView | null>(null);
+  const [players, setPlayers] = useState<Views>([]);
+  const [wilds, setWilds] = useState<Views>([]);
+  const [targetMove, setTargetMove] = useState<number | null>(null);
+  const [ballSlot, setBallSlot] = useState(0);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(true);
   const [menu, setMenu] = useState<Menu>('main');
   const [healItem, setHealItem] = useState<string | null>(null);
-  const [showInfo, setShowInfo] = useState<'wild' | 'player' | null>(null);
+  const [showInfo, setShowInfo] = useState<string | null>(null);
   /** Pokébola no lugar do selvagem: número = balançada, 'caught' = fechou. */
   const [ballAnim, setBallAnim] = useState<number | 'caught' | null>(null);
   const [ballId, setBallId] = useState('pokeball');
@@ -83,23 +94,25 @@ export function BattleScreen() {
   const play = useCallback(
     async (events: BattleEvent[]) => {
       setBusy(true);
+      const setterOf = (side: 'p1' | 'p2') => (side === 'p1' ? setPlayers : setWilds);
       for (const ev of events) {
+        const slot = ev.slot ?? 0;
         if (ev.switchIn) {
           const s = ev.switchIn;
           if (s.side === 'p1') {
             const mon = lookupPlayer(s.uid);
-            setPlayer({
+            setPlayers(at(() => ({
               species: mon?.species ?? s.species, nickname: mon?.nickname, partner: mon?.partner,
               level: mon?.level ?? 1, hp: s.hp, maxhp: s.maxhp, shiny: !!mon?.shiny, anim: 'enter',
-            });
+            }), slot));
           } else {
-            setWild({species: s.species, level: s.level ?? enc.mon.level, hp: s.hp, maxhp: s.maxhp, shiny: s.shiny ?? enc.mon.shiny, anim: 'enter'});
+            setWilds(at(() => ({species: s.species, level: s.level ?? enc.mon.level, hp: s.hp, maxhp: s.maxhp, shiny: s.shiny ?? enc.mon.shiny, anim: 'enter'}), slot));
           }
           playCry(s.species);
         }
         if (ev.forme) {
           const f = ev.forme;
-          (f.side === 'p1' ? setPlayer : setWild)(v => (v ? {...v, species: f.species, anim: 'enter'} : v));
+          setterOf(f.side)(at(v => (v ? {...v, species: f.species, anim: 'enter'} : v), slot));
           playCry(f.species);
           await wait(700);
         }
@@ -107,30 +120,28 @@ export function BattleScreen() {
           const mv = ev.move;
           if (ev.text) setMessage(ev.text);
           playMove(mv.move);
-          const set = mv.side === 'p1' ? setPlayer : setWild;
-          set(v => (v ? {...v, anim: 'attack'} : v));
+          setterOf(mv.side)(at(v => (v ? {...v, anim: 'attack'} : v), slot));
           await Promise.all([
             fxRef.current && arenaRef.current && !fast() ? playMoveFx(fxRef.current, arenaRef.current, mv.move, mv.side) : Promise.resolve(),
             wait(450),
           ]);
-          setPlayer(v => (v && v.anim === 'attack' ? {...v, anim: undefined} : v));
-          setWild(v => (v && v.anim === 'attack' ? {...v, anim: undefined} : v));
+          setPlayers(each(v => (v.anim === 'attack' ? {...v, anim: undefined} : v)));
+          setWilds(each(v => (v.anim === 'attack' ? {...v, anim: undefined} : v)));
           continue;
         }
         if (ev.hit) {
           playHit(ev.hit.effect);
-          const set = ev.hit.side === 'p1' ? setPlayer : setWild;
-          set(v => (v ? {...v, anim: 'hit'} : v));
+          setterOf(ev.hit.side)(at(v => (v ? {...v, anim: 'hit'} : v), slot));
         }
         if (ev.hp) {
           const h = ev.hp;
-          const set = h.side === 'p1' ? setPlayer : setWild;
-          set(v => (v ? {...v, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v.maxhp : h.maxhp, status: h.status ?? v.status} : v));
+          setterOf(h.side)(at(v => (v ? {...v, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v.maxhp : h.maxhp, status: h.status ?? v.status} : v), slot));
         }
         if (ev.faint) {
-          const set = ev.faint === 'p1' ? setPlayer : setWild;
-          set(v => (v ? {...v, hp: 0, anim: 'faint'} : v));
-          if (ev.faint === 'p1' && player) playCry(player.species);
+          setterOf(ev.faint)(at(v => {
+            if (v && ev.faint === 'p1') playCry(v.species);
+            return v ? {...v, hp: 0, anim: 'faint'} : v;
+          }, slot));
         }
         if (ev.text) {
           setMessage(ev.text);
@@ -138,14 +149,15 @@ export function BattleScreen() {
         } else if (ev.hp) {
           await wait(350);
         }
-        setPlayer(v => (v && v.anim !== 'faint' ? {...v, anim: undefined} : v));
-        setWild(v => (v && v.anim !== 'faint' ? {...v, anim: undefined} : v));
+        setPlayers(each(v => (v.anim !== 'faint' ? {...v, anim: undefined} : v)));
+        setWilds(each(v => (v.anim !== 'faint' ? {...v, anim: undefined} : v)));
       }
       setBusy(false);
       force(x => x + 1);
     },
-    [enc, lookupPlayer, player],
+    [enc, lookupPlayer],
   );
+  const player = players[ctl?.slot ?? 0] ?? players.find(Boolean) ?? null;
 
   // Começo da batalha.
   useEffect(() => {
@@ -172,7 +184,7 @@ export function BattleScreen() {
     } else {
       setMessage(`O que ${player ? player.nickname || species(player.species).name : 'seu Pokémon'} vai fazer?`);
     }
-  }, [busy, ctl, finishBattle, player?.species]);
+  }, [busy, ctl, finishBattle, player?.species, player?.nickname, player]);
 
   if (!ctl) return null;
 
@@ -187,13 +199,14 @@ export function BattleScreen() {
   const heals = Object.entries(run.bag).filter(([id, n]) => n > 0 && ['heal', 'revive', 'battle'].includes(getItem(id).kind));
   const moves = ctl.moveOptions();
   const party = ctl.partyStatus();
-  const wildTypes = ctl.wildActive.getTypes();
-  const playerActive = ctl.playerActive;
+  // Em dupla: Pokébola só quando sobra um selvagem; itens só na escolha do primeiro Pokémon (gastam o turno dos dois).
+  const ballBlock = enc.trainer ? 'Não dá para capturar o Pokémon de um treinador' : ctl.doubles && ctl.foesUp().length > 1 ? 'Na dupla, derrote um selvagem antes de capturar o outro' : ctl.hasPending ? 'Só na escolha do primeiro Pokémon' : undefined;
 
   const throwBall = async (id: string) => {
     if (!consume(id)) return;
     setMenu('main');
     setBusy(true);
+    setBallSlot(Math.max(0, ctl.battle.p2.active.indexOf(ctl.wildActive)));
     const {result, events} = ctl.throwBall(id);
     const ballSrc = itemSpriteUrl(getItem(id).sprite);
     setBallId(id);
@@ -212,7 +225,7 @@ export function BattleScreen() {
       caughtRef.current = true;
       setBallAnim('caught');
       playPlin();
-      setMessage(`Gotcha! ${enc.mon.species} foi capturado!`);
+      setMessage(`Gotcha! ${ctl.wildActive.species.name} foi capturado!`);
       await wait(500);
       playJingle('catch');
       await wait(1400);
@@ -254,88 +267,92 @@ export function BattleScreen() {
           </span>
         </div>
       )}
-      <div className="arena" ref={arenaRef} style={{backgroundColor: biome.color}}>
+      <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
         <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         <div className="fx-layer" ref={fxRef} />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
           {run.region ? `${getRegion(run.region).name} · ` : ''}
           {enc?.gym ? `Ginásio de ${enc.trainer}` : biome.name}
         </div>
-        {wild && (
-          <>
-            <div className="info-box wild-box">
-              <div className="info-name">
-                {wild.shiny && <PixelIcon name="star" color="#e0a100" />}
-                {species(wild.species).name} <span className="lv">Nv. {wild.level}</span>
+        {wilds.map((wild, i) =>
+          wild ? (
+            <div key={`w${i}`} className="slot-group">
+              <div className={`info-box wild-box s${i}`}>
+                <div className="info-name">
+                  {wild.shiny && <PixelIcon name="star" color="#e0a100" />}
+                  {species(wild.species).name} <span className="lv">Nv. {wild.level}</span>
+                </div>
+                <div className="row">
+                  <Types name={wild.species} />
+                  {enc.team && !enc.double ? (
+                    <span className="foe-balls" title="Pokémon do treinador ainda de pé">
+                      {ctl.foeStatus().map((up, j) => (
+                        <i key={j} className={up ? 'up' : 'down'} />
+                      ))}
+                    </span>
+                  ) : (
+                    !ctl.doubles && <RarityBadge rarity={enc.rarity} />
+                  )}
+                  <StatusBadge status={wild.status} />
+                </div>
+                <HpBar hp={wild.hp} maxhp={wild.maxhp} />
+                <button className={`weak-btn ${showInfo === `w${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `w${i}` ? null : `w${i}`)}>
+                  Fraquezas {showInfo === `w${i}` ? '▴' : '▾'}
+                </button>
+                {showInfo === `w${i}` && (
+                  <div className="weak-pop below">
+                    <MatchupPanel types={[...species(wild.species).types]} />
+                    <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
+                  </div>
+                )}
               </div>
-              <div className="row">
-                <Types name={wild.species} />
-                {enc.team ? (
-                  <span className="foe-balls" title="Pokémon do treinador ainda de pé">
-                    {ctl.foeStatus().map((up, i) => (
-                      <i key={i} className={up ? 'up' : 'down'} />
-                    ))}
+              <div className={`mon-slot wild-slot s${i} ${wild.anim ?? ''} ${enc.boss ? 'boss' : ''}`}>
+                {ballAnim !== null && ballSlot === i ? (
+                  <span className={`ball-wrap ${ballAnim === 'caught' ? 'caught' : ''}`}>
+                    <img className={`ball-sprite shake-${ballAnim}`} src={itemSpriteUrl(getItem(ballId).sprite)} alt={getItem(ballId).name} />
+                    {ballAnim === 'caught' && (
+                      <span className="catch-stars">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    )}
                   </span>
                 ) : (
-                  <RarityBadge rarity={enc.rarity} />
+                  <Sprite name={wild.species} shiny={wild.shiny} />
                 )}
-                <StatusBadge status={wild.status} />
               </div>
-              <HpBar hp={wild.hp} maxhp={wild.maxhp} />
-              <button className={`weak-btn ${showInfo === 'wild' ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === 'wild' ? null : 'wild')}>
-                Fraquezas {showInfo === 'wild' ? '▴' : '▾'}
-              </button>
-              {showInfo === 'wild' && (
-                <div className="weak-pop below">
-                  <MatchupPanel types={wildTypes} />
-                  <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
-                </div>
-              )}
             </div>
-            <div className={`mon-slot wild-slot ${wild.anim ?? ''} ${enc.boss ? 'boss' : ''}`}>
-              {ballAnim !== null ? (
-                <span className={`ball-wrap ${ballAnim === 'caught' ? 'caught' : ''}`}>
-                  <img className={`ball-sprite shake-${ballAnim}`} src={itemSpriteUrl(getItem(ballId).sprite)} alt={getItem(ballId).name} />
-                  {ballAnim === 'caught' && (
-                    <span className="catch-stars">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                  )}
-                </span>
-              ) : (
-                <Sprite name={wild.species} shiny={wild.shiny} />
-              )}
-            </div>
-          </>
+          ) : null,
         )}
-        {player && (
-          <>
-            <div className={`mon-slot player-slot ${player.anim ?? ''}`}>
-              <Sprite name={player.species} back shiny={player.shiny} />
-            </div>
-            <div className="info-box player-box">
-              {showInfo === 'player' && playerActive && (
-                <div className="weak-pop above">
-                  <MatchupPanel types={playerActive.getTypes()} />
-                  <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
+        {players.map((pv, i) =>
+          pv ? (
+            <div key={`p${i}`} className="slot-group">
+              <div className={`mon-slot player-slot s${i} ${pv.anim ?? ''} ${ctl.doubles && !busy && ctl.slot === i ? 'choosing' : ''}`}>
+                <Sprite name={pv.species} back shiny={pv.shiny} />
+              </div>
+              <div className={`info-box player-box s${i}`}>
+                {showInfo === `p${i}` && (
+                  <div className="weak-pop above">
+                    <MatchupPanel types={[...species(pv.species).types]} />
+                    <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
+                  </div>
+                )}
+                <div className="info-name">
+                  {pv.shiny && <PixelIcon name="star" color="#e0a100" />}
+                  <MonName mon={pv} /> <span className="lv">Nv. {pv.level}</span>
                 </div>
-              )}
-              <div className="info-name">
-                {player.shiny && <PixelIcon name="star" color="#e0a100" />}
-                <MonName mon={player} /> <span className="lv">Nv. {player.level}</span>
+                <div className="row">
+                  <Types name={pv.species} />
+                  <StatusBadge status={pv.status} />
+                </div>
+                <HpBar hp={pv.hp} maxhp={pv.maxhp} showNumbers />
+                <button className={`weak-btn ${showInfo === `p${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `p${i}` ? null : `p${i}`)}>
+                  Fraquezas {showInfo === `p${i}` ? '▴' : '▾'}
+                </button>
               </div>
-              <div className="row">
-                <Types name={player.species} />
-                <StatusBadge status={player.status} />
-              </div>
-              <HpBar hp={player.hp} maxhp={player.maxhp} showNumbers />
-              <button className={`weak-btn ${showInfo === 'player' ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === 'player' ? null : 'player')}>
-                Fraquezas {showInfo === 'player' ? '▴' : '▾'}
-              </button>
             </div>
-          </>
+          ) : null,
         )}
       </div>
 
@@ -347,10 +364,10 @@ export function BattleScreen() {
               <button className="btn act fight" onClick={() => setMenu('fight')}>
                 <img className="act-icon" src={FX('fist.png')} alt="" /> Lutar
               </button>
-              <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length || !!enc.trainer} title={enc.trainer ? 'Não dá para capturar o Pokémon de um treinador' : undefined}>
+              <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length || !!ballBlock} title={ballBlock}>
                 <img className="act-icon" src={itemSpriteUrl('poke-ball')} alt="" /> Pokébola
               </button>
-              <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length}>
+              <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length || ctl.hasPending}>
                 <img className="act-icon" src={itemSpriteUrl('potion')} alt="" /> Mochila
               </button>
               <button className="btn act" onClick={() => setMenu('switch')} disabled={!ctl.canSwitch() || party.filter(p => p.hp > 0).length < 2}>
@@ -359,6 +376,17 @@ export function BattleScreen() {
               <button className="btn act" onClick={() => finishBattle('fled')} disabled={!ctl.canFlee()}>
                 <img className="act-icon" src={itemSpriteUrl('escape-rope')} alt="" /> Fugir
               </button>
+              {ctl.hasPending && (
+                <button
+                  className="btn small back"
+                  onClick={() => {
+                    ctl.undoChoice();
+                    force(x => x + 1);
+                  }}
+                >
+                  ← Mudar a escolha do Pokémon anterior
+                </button>
+              )}
             </div>
           ) : menu === 'fight' ? (
             <div className="move-grid">
@@ -375,7 +403,12 @@ export function BattleScreen() {
                     className="move-btn"
                     disabled={m.disabled || m.pp <= 0}
                     style={{['--mc' as string]: TYPE_COLORS[m.type]}}
-                    onClick={() => act(() => ctl.chooseMove(m.index, megaOn))}
+                    onClick={() => {
+                      if (m.needsTarget) {
+                        setTargetMove(m.index);
+                        setMenu('target');
+                      } else act(() => ctl.chooseMove(m.index, megaOn));
+                    }}
                   >
                     <span className="move-name">
                       {m.name}
@@ -405,6 +438,22 @@ export function BattleScreen() {
                 );
               })}
               <button className="btn small back" onClick={() => setMenu('main')}>
+                ← Voltar
+              </button>
+            </div>
+          ) : menu === 'target' && targetMove !== null ? (
+            <div className="list-actions">
+              <p className="hint">Em quem?</p>
+              {ctl.targetOptions(targetMove).map(t => {
+                const eff = effectivenessLabel(t.effectiveness);
+                return (
+                  <button key={t.loc} className="btn item-btn" onClick={() => act(() => ctl.chooseMove(targetMove, megaOn, t.loc))}>
+                    <Sprite name={t.species} size={40} /> {species(t.species).name}
+                    {eff && <span className={`eff ${eff.cls}`}>{eff.text}</span>}
+                  </button>
+                );
+              })}
+              <button className="btn small back" onClick={() => setMenu('fight')}>
                 ← Voltar
               </button>
             </div>

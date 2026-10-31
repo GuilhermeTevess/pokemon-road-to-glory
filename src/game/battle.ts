@@ -36,6 +36,8 @@ export type Side = 'p1' | 'p2';
 
 export interface BattleEvent {
   text?: string;
+  /** Posição em campo (0 ou 1, só muda em batalhas em dupla). */
+  slot?: number;
   /** Atualização de HP de quem está em campo. */
   hp?: {side: Side; hp: number; maxhp: number; status?: string};
   switchIn?: {side: Side; species: string; hp: number; maxhp: number; uid?: string; level?: number; shiny?: boolean};
@@ -60,6 +62,16 @@ export interface MoveOption {
   maxpp: number;
   disabled: boolean;
   /** Multiplicador de tipo contra o selvagem em campo (null para golpes de status). */
+  effectiveness: number | null;
+  /** Em dupla: o golpe pede para escolher qual selvagem atacar. */
+  needsTarget?: boolean;
+}
+
+/** Alvo possível de um golpe em batalha dupla. */
+export interface TargetOption {
+  loc: number;
+  name: string;
+  species: string;
   effectiveness: number | null;
 }
 
@@ -105,6 +117,12 @@ export class BattleController {
   readonly participants = new Set<string>();
   private readonly uidOf = new Map<Pokemon, string>();
   private cursor = 0;
+  /** Batalha em dupla (2 contra 2). */
+  readonly doubles: boolean;
+  /** Em dupla: escolhas já feitas neste turno (uma por Pokémon em campo). */
+  private pending: string[] = [];
+  /** Qual Pokémon do oponente foi capturado (índice no time, para a dupla). */
+  caughtIndex = 0;
 
   /** `hearts`: corações de amizade de cada Pokémon do jogador (por uid). */
   /** `catchBonus`: multiplicador de captura das melhorias (Mão boa). */
@@ -112,7 +130,8 @@ export class BattleController {
     this.encounter = encounter;
     const alive = party.filter(m => m.hp > 0);
     if (!alive.length) throw new Error('Nenhum Pokémon em condições de lutar');
-    this.battle = new Battle({formatid: 'gen9customgame' as never});
+    this.doubles = !!encounter.double;
+    this.battle = new Battle({formatid: (this.doubles ? 'gen9doublescustomgame' : 'gen9customgame') as never});
     this.battle.setPlayer('p1', {name: 'Você', team: alive.map(toSet)});
     this.battle.p1.pokemon.forEach((p, i) => {
       this.uidOf.set(p, alive[i].uid);
@@ -138,13 +157,36 @@ export class BattleController {
     return this.battle.ended && this.battle.winner === 'Você';
   }
 
-  get playerActive(): Pokemon | undefined {
-    return this.battle.p1.active[0];
+  /** Posições do jogador que precisam de uma escolha neste turno. */
+  private slotsToChoose(): number[] {
+    const side = this.battle.p1;
+    if (side.requestState === 'switch') return side.active.map((p, i) => (p?.switchFlag ? i : -1)).filter(i => i >= 0);
+    return side.active.map((p, i) => (p && !p.fainted ? i : -1)).filter(i => i >= 0);
   }
 
-  /** Pokémon do oponente em campo (selvagem ou do treinador). */
+  /** Posição em campo que está escolhendo agora (0 em batalhas simples). */
+  get slot(): number {
+    return this.slotsToChoose()[this.pending.length] ?? 0;
+  }
+
+  /** Já escolheu a ação de algum Pokémon neste turno (dupla). */
+  get hasPending(): boolean {
+    return this.pending.length > 0;
+  }
+
+  get playerActive(): Pokemon | undefined {
+    return this.battle.p1.active[this.slot] ?? this.battle.p1.active[0];
+  }
+
+  /** Pokémon do oponente em campo (selvagem ou do treinador). Em dupla, o primeiro de pé. */
   get wildActive(): Pokemon {
-    return this.battle.p2.active[0] ?? this.battle.p2.pokemon[0];
+    const b = this.battle.p2;
+    return b.active.find(p => p && !p.fainted) ?? b.active[0] ?? b.pokemon[0];
+  }
+
+  /** Selvagens de pé em campo (dupla). */
+  foesUp(): Pokemon[] {
+    return this.battle.p2.active.filter(p => p && !p.fainted);
   }
 
   /** Quantos Pokémon o oponente ainda tem de pé (para as bolinhas do treinador). */
@@ -163,13 +205,14 @@ export class BattleController {
 
   canSwitch(): boolean {
     const req = this.battle.p1.activeRequest as {active?: {trapped?: boolean}[]} | null;
-    return this.mustSwitch || !req?.active?.[0]?.trapped;
+    return this.mustSwitch || !req?.active?.[this.slot]?.trapped;
   }
 
   moveOptions(): MoveOption[] {
     const req = this.battle.p1.activeRequest as {active?: {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]}[]} | null;
-    const moves = req?.active?.[0]?.moves ?? [];
+    const moves = req?.active?.[this.slot]?.moves ?? [];
     const target = this.wildActive;
+    const foes = this.doubles ? this.foesUp() : [target];
     return moves
       .map((m, i) => {
         const data = dex.moves.get(m.id);
@@ -185,7 +228,8 @@ export class BattleController {
           pp: m.pp ?? 0,
           maxpp: m.maxpp ?? 0,
           disabled: !!m.disabled,
-          effectiveness: data.category === 'Status' ? null : typeMultiplier(type, target.getTypes()),
+          effectiveness: data.category === 'Status' ? null : Math.max(...foes.map(f => typeMultiplier(type, f.getTypes()))),
+          needsTarget: this.doubles && ['normal', 'any', 'adjacentFoe'].includes(this.battle.dex.moves.get(m.id).target) && foes.length > 1,
         };
       })
       .filter(m => m.id !== ACTION_MOVE);
@@ -193,9 +237,51 @@ export class BattleController {
 
   // ------------------------------------------------------------ Ações
 
-  /** Com `mega`, o Pokémon mega-evolui antes de atacar (se puder). */
-  chooseMove(index: number, mega = false): BattleEvent[] {
-    return this.commit(`move ${index}`, mega);
+  /** Com `mega`, o Pokémon mega-evolui antes de atacar (se puder). Em dupla, `target` é o selvagem (1 ou 2). */
+  chooseMove(index: number, mega = false, target?: number): BattleEvent[] {
+    if (!this.doubles) return this.commit(`move ${index}`, mega);
+    return this.queue(`move ${index}${this.targetFor(index, target)}${mega && this.canMega() ? ' mega' : ''}`);
+  }
+
+  /** Alvos possíveis (selvagens de pé) para o golpe, com a eficácia contra cada um. */
+  targetOptions(index: number): TargetOption[] {
+    const req = this.battle.p1.activeRequest as {active?: {moves: {id: string}[]}[]} | null;
+    const id = req?.active?.[this.slot]?.moves?.[index - 1]?.id ?? '';
+    const move = this.battle.dex.moves.get(id);
+    return this.battle.p2.active
+      .map((p, i) => ({p, i}))
+      .filter(({p}) => p && !p.fainted)
+      .map(({p, i}) => ({
+        loc: i + 1, name: p.name, species: p.species.name,
+        effectiveness: move.category === 'Status' ? null : typeMultiplier(move.type, p.getTypes()),
+      }));
+  }
+
+  /** Volta a escolha do Pokémon anterior (dupla). */
+  undoChoice(): void {
+    this.pending.pop();
+  }
+
+  /** Sufixo de alvo da escolha em dupla. */
+  private targetFor(index: number, target?: number): string {
+    const req = this.battle.p1.activeRequest as {active?: {moves: {id: string}[]}[]} | null;
+    const id = req?.active?.[this.slot]?.moves?.[index - 1]?.id ?? '';
+    const kind = this.battle.dex.moves.get(id).target;
+    if (kind === 'adjacentAlly') return ` -${2 - this.slot}`;
+    if (kind === 'adjacentAllyOrSelf') return ` -${this.slot + 1}`;
+    if (!this.battle.actions.targetTypeChoices(kind)) return '';
+    const up = this.targetOptions(index);
+    const loc = up.find(t => t.loc === target)?.loc ?? up[0]?.loc ?? 1;
+    return ` ${loc}`;
+  }
+
+  /** Dupla: guarda a escolha deste Pokémon e só roda o turno quando todos escolheram. */
+  private queue(choice: string): BattleEvent[] {
+    this.pending.push(choice);
+    if (this.pending.length < this.slotsToChoose().length) return [];
+    const all = this.pending.join(', ');
+    this.pending = [];
+    return this.commit(all);
   }
 
   /** Nome da forma mega, se o Pokémon em campo pode mega-evoluir agora. */
@@ -207,6 +293,13 @@ export class BattleController {
   chooseSwitch(uid: string): BattleEvent[] {
     const idx = this.battle.p1.pokemon.findIndex(p => this.uidOf.get(p) === uid);
     if (idx < 0) return [];
+    if (this.doubles) {
+      // Não deixa o mesmo Pokémon entrar em duas posições.
+      if (this.pending.includes(`switch ${idx + 1}`)) return [];
+      const events = this.queue(`switch ${idx + 1}`);
+      this.markParticipant();
+      return events;
+    }
     const events = this.commit(`switch ${idx + 1}`);
     this.markParticipant();
     return events;
@@ -216,6 +309,7 @@ export class BattleController {
   throwBall(ballId: string): {result: CatchResult; events: BattleEvent[]} {
     const ball = getItem(ballId);
     const wild = this.wildActive;
+    this.caughtIndex = this.battle.p2.pokemon.indexOf(wild);
     const intro: BattleEvent[] = [{text: `Você jogou uma ${ball.name}!`}];
     let p: number;
     if ((ball.power ?? 1) >= 255) p = 1;
@@ -265,7 +359,7 @@ export class BattleController {
   /** Itens X: +2 estágios no atributo do Pokémon ativo, gastando o turno. */
   useBoostItem(itemId: string): BattleEvent[] {
     const item = getItem(itemId);
-    const p = this.battle.p1.active[0];
+    const p = this.playerActive;
     if (!p || p.fainted || !item.stat) return [];
     const cur = p.boosts[item.stat];
     if (cur >= 6) return [{text: `O atributo de ${p.name} já está no máximo.`}];
@@ -310,22 +404,32 @@ export class BattleController {
   // ------------------------------------------------------------ Internos
 
   private spendTurn(): BattleEvent[] {
-    const active = this.playerActive;
-    if (!active || this.mustSwitch) return [];
-    active.moveSlots.push({
-      move: ACTION_NAME, id: ACTION_MOVE as never, pp: 64, maxpp: 64, target: 'self', disabled: false, used: false,
-    } as never);
+    if (this.mustSwitch) return [];
+    this.pending = [];
+    // Todos os Pokémon do jogador em campo gastam o turno com a "ação do treinador".
+    const slots = this.slotsToChoose();
+    const actives = slots.map(i => this.battle.p1.active[i]).filter(Boolean);
+    if (!actives.length) return [];
+    for (const a of actives) {
+      a.moveSlots.push({
+        move: ACTION_NAME, id: ACTION_MOVE as never, pp: 64, maxpp: 64, target: 'self', disabled: false, used: false,
+      } as never);
+    }
     this.battle.makeRequest();
-    const opts = (this.battle.p1.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]}[]} | null)?.active?.[0]?.moves ?? [];
-    const idx = opts.findIndex(m => m.id === ACTION_MOVE);
+    const req = (this.battle.p1.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]}[]} | null)?.active ?? [];
+    const choices = slots.map(i => {
+      const opts = req[i]?.moves ?? [];
+      const idx = opts.findIndex(m => m.id === ACTION_MOVE);
+      return idx >= 0 && !opts[idx].disabled ? `move ${idx + 1}` : null;
+    });
     let events: BattleEvent[];
-    if (idx >= 0 && !opts[idx].disabled) {
-      events = this.commit(`move ${idx + 1}`);
+    if (choices.every(Boolean)) {
+      events = this.commit(choices.join(', '));
     } else {
       // Preso a um golpe (ex.: Choice Band): o item é usado sem gastar o turno.
       events = this.readLog();
     }
-    active.moveSlots = active.moveSlots.filter(m => m.id !== ACTION_MOVE);
+    for (const a of actives) a.moveSlots = a.moveSlots.filter(m => m.id !== ACTION_MOVE);
     if (!this.battle.ended && this.battle.p1.requestState === 'move') this.battle.makeRequest();
     return events;
   }
@@ -371,22 +475,36 @@ export class BattleController {
   }
 
   private friendshipCure(): void {
-    const p = this.playerActive;
-    if (this.battle.ended || !p || p.fainted || !p.status || ((p.m.hearts as number) || 0) < 2) return;
-    if (!chance(FRIEND_CURE)) return;
-    this.battle.add('-message', `${p.name} se esforçou para não deixar você preocupado!`);
-    p.cureStatus();
+    for (const p of this.battle.p1.active) {
+      if (this.battle.ended || !p || p.fainted || !p.status || ((p.m.hearts as number) || 0) < 2) continue;
+      if (!chance(FRIEND_CURE)) continue;
+      this.battle.add('-message', `${p.name} se esforçou para não deixar você preocupado!`);
+      p.cureStatus();
+    }
   }
 
   private markParticipant(): void {
-    const uid = this.activeUid();
-    if (uid) this.participants.add(uid);
+    for (const p of this.battle.p1.active) {
+      const uid = p ? this.uidOf.get(p) : undefined;
+      if (uid) this.participants.add(uid);
+    }
   }
 
   /** Treinador com o Pokémon em campo desmaiado: manda o próximo (o melhor contra o seu). */
   private foeSwitch(): void {
     const b = this.battle;
     if (!b.ended && b.p2.requestState === 'switch' && !b.p2.isChoiceDone()) b.choose('p2', aiSwitchChoice(b, 'p2'));
+  }
+
+  /** Posição em campo a partir do "p2a"/"p2b" do log. */
+  private slotOf(ident: string): number {
+    return ident[2] === 'b' ? 1 : 0;
+  }
+
+  /** Pokémon em campo a partir do "p1a: Nome" do log. */
+  private pokeOf(ident: string): Pokemon | undefined {
+    const side = this.battle[ident.slice(0, 2) as Side];
+    return side?.active[this.slotOf(ident)];
   }
 
   private name(ident: string): {side: Side; name: string} {
@@ -407,8 +525,14 @@ export class BattleController {
         line = lines[i + 1]; // versão "secreta" (com HP exato)
         i += 2;
       }
-      const ev = this.translate(line.split('|').slice(1));
-      if (ev) out.push(...ev);
+      const parts = line.split('|').slice(1);
+      const ev = this.translate(parts);
+      if (ev) {
+        // Marca a posição em campo (dupla) de quem fez a ação.
+        const ident = /^p[12][ab]/.test(parts[1] ?? '') ? parts[1] : '';
+        if (ident) for (const e of ev) e.slot ??= this.slotOf(ident);
+        out.push(...ev);
+      }
     }
     if (this.encounter.tournament || this.encounter.legend) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length);
     return out;
@@ -432,7 +556,7 @@ export class BattleController {
         const speciesName = b.split(',')[0];
         const level = Number(/, L(\d+)/.exec(b)?.[1] ?? 100);
         const shiny = b.includes('shiny');
-        const poke = side === 'p1' ? this.battle.p1.pokemon.find(p => p.name === a.replace(/^p1a: /, '')) : undefined;
+        const poke = side === 'p1' ? this.pokeOf(a) : undefined;
         return [
           {
             switchIn: {side, species: speciesName, hp: hp.hp, maxhp: hp.maxhp, uid: poke ? this.uidOf.get(poke) : undefined, level, shiny},
@@ -488,12 +612,12 @@ export class BattleController {
         return [{text: 'Mas falhou!'}];
       case '-status': {
         const {side, name} = this.name(a);
-        const poke = side === 'p1' ? this.playerActive : this.wildActive;
+        const poke = this.pokeOf(a);
         return [{text: `${name} ${STATUS_TEXT[b] ?? b}!`, hp: poke ? {side, hp: poke.hp, maxhp: poke.maxhp, status: b} : undefined}];
       }
       case '-curestatus': {
         const {side, name} = this.name(a);
-        const poke = side === 'p1' ? this.playerActive : this.wildActive;
+        const poke = this.pokeOf(a);
         return [{text: `${name} se curou.`, hp: poke ? {side, hp: poke.hp, maxhp: poke.maxhp, status: ''} : undefined}];
       }
       case '-boost':
@@ -540,50 +664,69 @@ export function aiMoveChoice(battle: Battle, side: Side): string {
   const me = battle[side];
   const foe = battle[side === 'p1' ? 'p2' : 'p1'];
   const req = me.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]}[]} | null;
-  const moves = req?.active?.[0]?.moves ?? [];
-  const target = foe.active[0];
-  const self = me.active[0];
-  let best = 'default';
-  let bestScore = -1;
-  moves.forEach((m, i) => {
-    if (m.disabled || m.id === ACTION_MOVE) return;
-    const move = dex.moves.get(m.id);
-    let score: number;
-    if (move.category === 'Status' || !target || !self) score = 35;
-    else {
-      const stab = self.getTypes().includes(move.type) ? 1.5 : 1;
-      score = (move.basePower || 60) * stab * typeMultiplier(move.type, target.getTypes());
-    }
-    score *= 0.6 + Math.random() * 0.8;
-    if (score > bestScore) {
-      bestScore = score;
-      best = `move ${i + 1}`;
-    }
+  const doubles = me.active.length > 1;
+  const choices: string[] = [];
+  me.active.forEach((self, slot) => {
+    if (!self || self.fainted) return;
+    const moves = req?.active?.[slot]?.moves ?? [];
+    const targets = foe.active.map((t, i) => ({t, loc: i + 1})).filter(x => x.t && !x.t.fainted);
+    let best = 'default';
+    let bestScore = -1;
+    moves.forEach((m, i) => {
+      if (m.disabled || m.id === ACTION_MOVE) return;
+      const move = dex.moves.get(m.id);
+      const kind = battle.dex.moves.get(m.id).target;
+      for (const {t, loc} of targets.length ? targets : [{t: undefined, loc: 1}]) {
+        let score: number;
+        if (move.category === 'Status' || !t) score = 35;
+        else {
+          const stab = self.getTypes().includes(move.type) ? 1.5 : 1;
+          score = (move.basePower || 60) * stab * typeMultiplier(move.type, t.getTypes());
+        }
+        score *= 0.6 + Math.random() * 0.8;
+        if (score > bestScore) {
+          bestScore = score;
+          const aim = doubles && battle.actions.targetTypeChoices(kind) ? (kind.startsWith('adjacentAlly') ? ` -${slot + 1}` : ` ${loc}`) : '';
+          best = `move ${i + 1}${aim}`;
+        }
+      }
+    });
+    choices.push(best);
   });
-  return best;
+  return choices.length ? choices.join(', ') : 'default';
 }
 
 /** Escolhe quem entra depois de um desmaio: o que tem os melhores golpes contra o adversário em campo. */
 export function aiSwitchChoice(battle: Battle, side: Side): string {
   const me = battle[side];
-  const target = battle[side === 'p1' ? 'p2' : 'p1'].active[0];
-  let best = 'default';
-  let bestScore = -1;
-  me.pokemon.forEach((p, i) => {
-    if (p.fainted || p.isActive) return;
-    let score = p.hp / p.maxhp;
-    if (target && !target.fainted) {
-      for (const slot of p.moveSlots) {
-        const mv = dex.moves.get(slot.id);
-        if (mv.category === 'Status') continue;
-        score = Math.max(score, typeMultiplier(mv.type, target.getTypes()) * (p.hp / p.maxhp));
+  const target = battle[side === 'p1' ? 'p2' : 'p1'].active.find(p => p && !p.fainted);
+  const used = new Set<number>();
+  const pickOne = (): string => {
+    let best = '';
+    let bestScore = -1;
+    me.pokemon.forEach((p, i) => {
+      if (p.fainted || p.isActive || used.has(i)) return;
+      let score = p.hp / p.maxhp;
+      if (target) {
+        for (const slot of p.moveSlots) {
+          const mv = dex.moves.get(slot.id);
+          if (mv.category === 'Status') continue;
+          score = Math.max(score, typeMultiplier(mv.type, target.getTypes()) * (p.hp / p.maxhp));
+        }
       }
-    }
-    score *= 0.8 + Math.random() * 0.4;
-    if (score > bestScore) {
-      bestScore = score;
-      best = `switch ${i + 1}`;
-    }
-  });
-  return best;
+      score *= 0.8 + Math.random() * 0.4;
+      if (score > bestScore) {
+        bestScore = score;
+        best = `switch ${i + 1}`;
+      }
+    });
+    if (best) used.add(Number(best.split(' ')[1]) - 1);
+    return best || 'pass';
+  };
+  if (me.active.length < 2) {
+    const one = pickOne();
+    return one === 'pass' ? 'default' : one;
+  }
+  const out = me.active.map(p => (p?.switchFlag ? pickOne() : null)).filter((c): c is string => c !== null);
+  return out.length ? out.join(', ') : 'default';
 }

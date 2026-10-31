@@ -191,6 +191,9 @@ function emptyRun(): RunState {
   };
 }
 
+/** Chance de dois selvagens aparecerem juntos (batalha em dupla). */
+const DOUBLE_CHANCE = 0.05;
+
 const boot = loadTrainers();
 const bootTrainer = boot.list.find(t => t.id === boot.current) ?? null;
 
@@ -278,6 +281,12 @@ export const useGame = create<Store>((set, get) => {
         run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0 || !!getBiome(run.biome).region, run.perks?.luck, run.region);
         if (!run.recent?.includes(run.encounter.mon.species)) break;
       }
+    }
+    // Dupla: às vezes (5%) dois selvagens aparecem juntos. Nunca com chefes, lendas ou ginásios.
+    const enc0 = run.encounter!;
+    if (!enc0.boss && !enc0.trainer && !enc0.team && run.wave >= 5 && run.party.filter(m => m.hp > 0).length >= 2 && Math.random() < DOUBLE_CHANCE) {
+      const second = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region).mon;
+      run.encounter = {...enc0, team: [enc0.mon, second], double: true};
     }
     if (!run.encounter!.legend) run.recent = [run.encounter!.mon.species, ...(run.recent ?? [])].slice(0, 8);
     if (!run.upcoming?.length) run.upcoming = undefined;
@@ -890,7 +899,8 @@ export const useGame = create<Store>((set, get) => {
         if (outcome === 'won') {
           run.stats.defeated++;
           statsOf(col).defeated++;
-          const exp = expYield(enc.mon, enc.boss || !!enc.trainer);
+          // Em dupla, a EXP soma os dois selvagens.
+          const exp = enc.double ? (enc.team ?? [enc.mon]).reduce((a, m) => a + expYield(m, false), 0) : expYield(enc.mon, enc.boss || !!enc.trainer);
           for (const m of run.party) {
             if (m.hp <= 0) continue;
             const fought = ctl?.participants.has(m.uid);
@@ -916,7 +926,8 @@ export const useGame = create<Store>((set, get) => {
         }
         if (outcome === 'caught') {
           run.stats.caught++;
-          const mon = structuredClone(enc.mon);
+          // Em dupla, captura o selvagem que sobrou em campo.
+          const mon = structuredClone(enc.double && ctl ? enc.team?.[ctl.caughtIndex] ?? enc.mon : enc.mon);
           if (ctl) mon.hp = Math.max(1, ctl.wildActive.hp);
           mon.uid = uid();
           mon.metWave = run.wave;

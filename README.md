@@ -50,6 +50,9 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
   pódio, sua posição e de onde vieram os pontos. (No online, o host vai escolher quantas
   temporadas.)
 - **Conquistas** (menu inicial): 37 objetivos permanentes, sem bônus.
+- **Batalha em dupla**: às vezes (5%) dois selvagens aparecem juntos e você luta com os dois
+  primeiros do time ao mesmo tempo. Cada Pokémon escolhe o golpe e, se precisar, em quem bater.
+  Para capturar, derrote um e jogue a Pokébola no outro. Nunca acontece com chefes, lendas ou ginásios.
 - **Novas melhorias de Glória**: Mapa detalhado (mais regiões no Mapa de Região), Estadia longa
   (+5/+10 rondas por região), Faro de lenda (rastro sobe mais rápido), Ouvido atento (lendário da
   dica mais provável), Trilha oculta (biomas ocultos 2x/3x) e Sócio dos ginásios (ingressos mais baratos).

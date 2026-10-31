@@ -23,6 +23,7 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>O Rastro da lenda (no painel) sobe vencendo chefes e ajudando nos eventos. Quanto maior, mais chance de uma lenda da região te desafiar. Perder para ela não acaba a run.</li>
         <li>Viajantes pedem ajuda nos eventos. Ajudar dá uma dica sobre um lendário no Diário (no painel), com a região e o bioma onde procurar. Alguns ficam em biomas ocultos, que quase nunca aparecem sem a dica.</li>
         <li>Ginásios: no botão Ginásios do painel, compre o ingresso e escolha a ronda da luta. Junte as insígnias da região para completar a caderneta.</li>
+        <li>Às vezes dois selvagens aparecem juntos (dupla): escolha o golpe de cada um dos seus dois Pokémon em campo. Para capturar, derrote um e jogue a Pokébola no outro.</li>
         <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo e o que faz.</li>
         <li>O painel ao lado mostra seu time, a Mochila, o PC e as fraquezas do time. Toque num Pokémon para ver detalhes.</li>
         <li>Cada treinador tem sua coleção. Monte o time inicial com 6 pontos: cada Pokémon tem um custo (o número no canto). Tudo que você capturar vira opção.</li>
