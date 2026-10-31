@@ -410,7 +410,7 @@ export class BattleController {
       const ev = this.translate(line.split('|').slice(1));
       if (ev) out.push(...ev);
     }
-    if (this.encounter.tournament) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length);
+    if (this.encounter.tournament || this.encounter.legend) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length);
     return out;
   }
 

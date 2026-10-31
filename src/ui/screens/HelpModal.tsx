@@ -20,6 +20,7 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Vença para ganhar XP e dinheiro, ou capture com Pokébolas (até 6 no time; o resto vai para o PC).</li>
         <li>Depois de cada ronda, escolha 1 de 3 itens. Dá para sortear de novo ou comprar na Loja.</li>
         <li>Você fica 20 rondas em cada região e 10 em cada bioma; depois o próximo é sorteado. A cada 10 rondas o time é curado e aparece um chefe da região. Torneios nas rondas 30, 60, 90 e 120.</li>
+        <li>O Rastro da lenda (no painel) sobe vencendo chefes e ajudando nos eventos. Quanto maior, mais chance de uma lenda da região te desafiar. Perder para ela não acaba a run.</li>
         <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo e o que faz.</li>
         <li>O painel ao lado mostra seu time, a Mochila, o PC e as fraquezas do time. Toque num Pokémon para ver detalhes.</li>
         <li>Cada treinador tem sua coleção. Monte o time inicial com 6 pontos: cada Pokémon tem um custo (o número no canto). Tudo que você capturar vira opção.</li>

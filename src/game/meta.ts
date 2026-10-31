@@ -84,6 +84,8 @@ export interface Collection {
   favorite?: string;
   /** Carreira nos torneios: CP, fama, títulos e histórico. */
   career?: Career;
+  /** Vitórias contra cada treinador lendário (id → vezes). */
+  legends?: Record<string, number>;
 }
 
 export function lineRoot(name: string): string {

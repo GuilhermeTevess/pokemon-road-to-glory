@@ -4,7 +4,8 @@ import {BIOMES} from '../data/biomes';
 import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
-import {HEAL_EVERY, SEASON_LENGTH, generateEncounter} from './encounters';
+import {HEAL_EVERY, SEASON_LENGTH, generateEncounter, isBossWave} from './encounters';
+import {TRAIL, addTrail, legendEncounter, legendPrize, rollLegend} from './legend';
 import {BIOME_STAY, REGIONS, REGION_STAY, getRegion} from '../data/regions';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
@@ -233,6 +234,11 @@ export const useGame = create<Store>((set, get) => {
       return;
     }
     run.encounter = run.upcoming?.shift();
+    const legend = !run.encounter && !isBossWave(run.wave) ? rollLegend(run) : null;
+    if (legend) {
+      run.encounter = legendEncounter(legend, run.party);
+      run.trail = {...run.trail, [run.region!]: 0};
+    }
     if (!run.encounter) {
       // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
       for (let i = 0; i < 4; i++) {
@@ -240,7 +246,7 @@ export const useGame = create<Store>((set, get) => {
         if (!run.recent?.includes(run.encounter.mon.species)) break;
       }
     }
-    run.recent = [run.encounter!.mon.species, ...(run.recent ?? [])].slice(0, 8);
+    if (!run.encounter!.legend) run.recent = [run.encounter!.mon.species, ...(run.recent ?? [])].slice(0, 8);
     if (!run.upcoming?.length) run.upcoming = undefined;
     if (run.incenseWaves > 0) run.incenseWaves--;
     run.phase = 'battle';
@@ -681,6 +687,7 @@ export const useGame = create<Store>((set, get) => {
         switch (ev.kind) {
           case 'house':
             if (choice === 'care') {
+              addTrail(run, TRAIL.event);
               ev.mon.hp = maxHp(ev.mon);
               join(ev.mon, HEART_STEPS[1]);
             } else {
@@ -695,6 +702,7 @@ export const useGame = create<Store>((set, get) => {
               if (!heal) return;
               run.bag[heal]--;
               if (!run.bag[heal]) delete run.bag[heal];
+              addTrail(run, TRAIL.event);
               ev.mon.hp = maxHp(ev.mon);
               join(ev.mon, HEART_STEPS[0]);
             }
@@ -788,6 +796,12 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`${foe} venceu. Fim do torneio para você, mas a temporada continua!`);
             return;
           }
+        } else if (outcome === 'lost' && enc.legend) {
+          // Perder para uma lenda não acaba a run: o time é curado e a jornada segue.
+          healAll(run);
+          get().toast(`${enc.trainer} venceu desta vez. Seu time foi curado: a jornada continua!`);
+          afterReward(run);
+          return;
         } else if (outcome === 'lost') {
           run.phase = 'gameOver';
           endRun(run, col, 'lost');
@@ -862,6 +876,17 @@ export const useGame = create<Store>((set, get) => {
         }
         const money = enc.tournament ? 0 : moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1);
         run.money += money;
+        if (outcome === 'won' && enc.boss && !enc.trainer) addTrail(run, TRAIL.boss);
+        if (outcome === 'won' && enc.legend) {
+          const prize = legendPrize(run.wave);
+          col.legends = {...col.legends, [enc.legend]: (col.legends?.[enc.legend] ?? 0) + 1};
+          col.glory = (col.glory ?? 0) + prize.glory;
+          run.tourGlory = (run.tourGlory ?? 0) + prize.glory;
+          run.money += prize.money;
+          statsOf(col).moneyEarned += prize.money;
+          for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
+          get().toast(`Você venceu ${enc.trainer}! +₽ ${prize.money} · +${prize.glory} Glória`);
+        }
         statsOf(col).moneyEarned += money;
         if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
         for (const n of newHearts) get().toast(`❤ ${n} ganhou um coração de amizade!`);
