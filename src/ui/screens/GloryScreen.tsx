@@ -19,7 +19,7 @@ export function GloryScreen() {
       </header>
       <p className="hint">
         Toda run dá Glória quando acaba: 1 por ronda, +5 a cada 10 rondas e +20 se completar a temporada de 120 rondas. Os torneios dão
-        Glória extra pela colocação (uma League Cup vencida dá 30). Ela fica com o treinador para sempre e compra melhorias para todas as próximas runs.
+        Glória extra pela colocação (uma League Cup vencida dá 30), e lendas, insígnias e cadernetas também dão. Ela fica com o treinador para sempre e compra melhorias para todas as próximas runs.
       </p>
       <div className="upgrade-list">
         {UPGRADES.map(u => {

@@ -50,7 +50,7 @@ export function hintHere(run: RunState): Hint | undefined {
 /** Lendário da dica aparece nesta ronda? */
 export function rollHintLegendary(run: RunState): Encounter | null {
   const hint = hintHere(run);
-  if (!hint || !chance(HINT_CHANCE)) return null;
+  if (!hint || !chance(HINT_CHANCE + 0.1 * (run.perks?.hint ?? 0))) return null;
   const mon = createMon(hint.species, {level: run.wave + 5, ivMin: 20, shinyChance: (1 + (run.perks?.luck ?? 0)) / 256});
   return {mon, rarity: 'legendary', boss: true, hinted: true, intro: ['A dica do viajante era verdade...']};
 }
@@ -60,7 +60,8 @@ export function rollBiome(run: RunState, region = run.region): string {
   const hidden = hiddenBiomeOf(region);
   if (hidden) {
     const hinted = (run.diary ?? []).some(id => getHint(id)?.biome === hidden.id);
-    if (chance(hinted ? HIDDEN_WITH_HINT : HIDDEN_BASE)) return hidden.id;
+    const lv = run.perks?.hidden ?? 0;
+    if (chance(hinted ? HIDDEN_WITH_HINT + 0.15 * lv : HIDDEN_BASE * (1 + lv))) return hidden.id;
   }
   return pick(BIOMES).id;
 }

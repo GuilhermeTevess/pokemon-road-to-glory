@@ -11,7 +11,7 @@ import {PARTY_SIZE, useGame} from '../../game/store';
 import type {Screen} from '../../game/store';
 import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
-import {REGIONS, getRegion} from '../../data/regions';
+import {REGIONS, getRegion, regionStay} from '../../data/regions';
 import {ACHIEVEMENTS} from '../../game/achievements';
 import type {Region} from '../../data/regions';
 import {FX} from '../fx';
@@ -476,7 +476,7 @@ export function RegionCard({region, onClick, label}: {region: Region; onClick: (
 export function RegionSelect() {
   const {run, chooseNextRegion} = useGame();
   const options = useMemo(
-    () => shuffle(REGIONS.filter(r => r.id !== run?.region)).slice(0, 3),
+    () => shuffle(REGIONS.filter(r => r.id !== run?.region)).slice(0, 3 + (run?.perks?.regions ?? 0)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [run?.wave],
   );
@@ -485,7 +485,7 @@ export function RegionSelect() {
   return (
     <div className="screen biome-screen">
       <h2>Mapa de Região: para onde vamos?</h2>
-      <p className="hint">Na região nova você fica 20 rondas. Os Pokémon de lá aparecem mais.</p>
+      <p className="hint">Na região nova você fica {regionStay(run)} rondas. Os Pokémon de lá aparecem mais.</p>
       <div className="biomes">
         {options.map(r => (
           <RegionCard key={r.id} region={r} onClick={() => chooseNextRegion(r.id)} />

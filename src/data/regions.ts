@@ -32,6 +32,11 @@ export const REGIONS: Region[] = [
 export const REGION_STAY = 20;
 export const BIOME_STAY = 10;
 
+/** Rondas em cada região, com a melhoria Estadia longa. */
+export function regionStay(run: {perks?: {stay?: number}}): number {
+  return REGION_STAY + 5 * (run.perks?.stay ?? 0);
+}
+
 export function getRegion(id: string | undefined): Region {
   return REGIONS.find(r => r.id === id) ?? REGIONS[0];
 }
