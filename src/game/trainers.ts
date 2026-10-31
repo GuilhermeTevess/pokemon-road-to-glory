@@ -8,6 +8,19 @@ export interface Trainer {
   /** Sprite de treinador do Showdown (ex.: "dawn") ou visual próprio ("custom:..."). */
   avatar: string;
   createdAt: number;
+  /** Treinador de uma carreira online (não conta no limite de 3). */
+  career?: TrainerCareer;
+}
+
+export interface TrainerCareer {
+  code: string;
+  /** Treinador cuja coleção é usada (quando o host libera a coleção). */
+  colFrom?: string;
+  /** Temporada atual, pontos das temporadas terminadas e colocações nos torneios. */
+  season: number;
+  banked: number;
+  results: {season: number; kind: string; placement: number}[];
+  done?: boolean;
 }
 
 interface TrainerStore {

@@ -1,3 +1,4 @@
+import {roundOf} from '../../game/career';
 // Ginásios: entrada com conversa do líder, cenário do ginásio, cerimônia da insígnia e as cadernetas.
 import {useEffect, useState} from 'react';
 import {TYPE_PT, species} from '../../data/dex';
@@ -235,7 +236,7 @@ function BadgeBook({region}: {region: string}) {
                   Ingresso ₽ {price}
                 </button>
               )}
-              {st === 'booked' && <span className="gym-when">Luta na ronda {booked?.wave}</span>}
+              {st === 'booked' && <span className="gym-when">Luta na ronda {booked && run ? roundOf({...run, wave: booked.wave}) : ''}</span>}
             </div>
           );
         })}
@@ -254,7 +255,7 @@ function BadgeBook({region}: {region: string}) {
           <div className="row center wrap">
             {waves.slice(0, 12).map(w => (
               <button key={w} className={`btn small ${w === wave ? 'primary' : ''}`} onClick={() => setWave(w)}>
-                {w}
+                {roundOf({...run, wave: w})}
               </button>
             ))}
           </div>
@@ -264,7 +265,7 @@ function BadgeBook({region}: {region: string}) {
               Cancelar
             </button>
             <button className="btn primary" onClick={() => (playCoins(), scheduleGym(picking.id, wave), setPicking(null))}>
-              Pagar ₽ {price} e marcar ronda {wave}
+              Pagar ₽ {price} e marcar ronda {roundOf({...run, wave})}
             </button>
           </div>
         </div>

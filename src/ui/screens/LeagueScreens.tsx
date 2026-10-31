@@ -1,3 +1,4 @@
+import {roundOf, roundsOf} from '../../game/career';
 // Ranking (temporada e geral) e Conquistas.
 import {useState} from 'react';
 import {getRegion} from '../../data/regions';
@@ -153,7 +154,7 @@ export function RankingScreen() {
       </div>
       {tab === 'season' && active && run && (
         <>
-          <p className="muted">Ronda {run.wave}/120. Os rivais também vão somando pontos ao longo da temporada.</p>
+          <p className="muted">Ronda {roundOf(run)}/{roundsOf(run)}. Os rivais também vão somando pontos ao longo da temporada.</p>
           <RankTable rows={seasonRanking(col, run, me)} log={run.pointLog ?? []} />
           <h3>Seus pontos nesta temporada</h3>
           <Breakdown points={run.points ?? {}} log={run.pointLog ?? []} />

@@ -1,3 +1,4 @@
+import {roundOf} from '../../game/career';
 // Torneios: explicação, sorteio animado, chaveamento e histórico.
 import {useEffect, useState} from 'react';
 import {useGame} from '../../game/store';
@@ -16,7 +17,7 @@ import {species} from '../../data/dex';
 
 /** Formato comum para a chave ao vivo e para o histórico. */
 interface BracketData {
-  entrants: {name: string; avatar?: string; player?: boolean; team: string[]}[];
+  entrants: {name: string; avatar?: string; player?: boolean; friend?: boolean; team: string[]}[];
   rounds: MatchRec[][];
 }
 
@@ -98,7 +99,7 @@ function MatchDetail({data, match, onClose, wave}: {data: BracketData; match: Ma
             <TrainerAvatar avatar={e.avatar ?? ''} name={e.name} size={56} />
             <b>{e.name}</b>
             {match.winner === (i === 0 ? match.a : match.b) && <span className="win-tag">Venceu</span>}
-            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} team={e.team} />}
+            {teams ? <TeamRow team={teams[i]} size={48} /> : e.player || e.friend ? <TeamRow team={e.team} size={48} /> : <ScoutPanel name={e.name} wave={wave} team={e.team} />}
           </div>
         ))}
       </div>
@@ -248,7 +249,7 @@ export function TournamentScreen() {
       <header className="bar">
         <TourBadge kind={t.kind} />
         <h2>{tourName(t)}</h2>
-        <span className="muted">Ronda {t.wave}</span>
+        <span className="muted">Ronda {run ? roundOf({...run, wave: t.wave}) : t.wave}</span>
       </header>
       {t.stage === 'intro' && (
         <div className="panel tour-intro">
