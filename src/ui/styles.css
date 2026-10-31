@@ -972,3 +972,5 @@ table.move-info td { padding: 3px 0; }
 @media (prefers-reduced-motion: reduce) { .ceremony-stage.step0::before, .ceremony-badge.step0, .ceremony-trainer.cheer { animation: none; } }
 .book-cell .btn.small { font-size: 10px; padding: 4px 6px; line-height: 1.2; }
 .book-cell .gym-when { color: var(--butter); }
+.travel-slot { position: relative; display: flex; }
+.travel-slot .biome-card { width: 190px; }

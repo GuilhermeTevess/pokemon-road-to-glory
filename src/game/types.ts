@@ -155,8 +155,8 @@ export interface RunState {
   /** Resultado da temporada (tela final). */
   season?: SeasonRec;
   /** Viagem sorteada para mostrar na roleta (fase 'travel'). */
-  /** Troca de região/bioma: as opções sorteadas (a atual entre elas) e o resultado. */
-  travel?: {region?: string; biome: string; fromRegion?: string; fromBiome: string; regionOptions?: string[]; biomeOptions?: string[]};
+  /** Fim da estadia: opções sorteadas para escolher (região, depois bioma). `region` = região já escolhida. */
+  travel?: {region?: string; fromRegion?: string; fromBiome: string; regionOptions?: string[]; biomeOptions?: string[]};
   /** Encontro com a lenda antes da luta: ela te acha ou você a acha. */
   legendMeet?: {id: string; kind: 'approach' | 'found'};
   /** Insígnia que acabou de ganhar (para a animação). */

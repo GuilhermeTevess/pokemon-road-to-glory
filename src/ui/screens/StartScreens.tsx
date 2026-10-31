@@ -635,7 +635,7 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
     return (
       <div className="screen biome-screen">
         <h2>Escolha sua primeira região</h2>
-        <p className="hint">Você fica 20 rondas em cada região. Depois, uma roleta sorteia a próxima entre algumas opções, e a atual pode cair de novo.</p>
+        <p className="hint">Você fica 20 rondas em cada região. Depois, saem 4 regiões no sorteio e você escolhe (a atual só aparece se der sorte).</p>
         <div className="biomes">
           {REGIONS.map(r => (
             <RegionCard key={r.id} region={r} onClick={() => setRegion(r.id)} />

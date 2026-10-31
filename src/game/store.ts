@@ -152,6 +152,8 @@ interface Store {
   chooseNextRegion(id: string | null): void;
   /** Depois da roleta de viagem, segue para a próxima ronda. */
   continueTravel(): void;
+  /** Fim da estadia: escolhe a região (e depois o bioma) entre as opções sorteadas. */
+  travelPick(id: string): void;
   /** Encontro com a lenda: aceitar (vai para a arena) ou deixar para outra hora. */
   answerLegend(accept: boolean): void;
   /** Fecha a conversa de depois da luta com a lenda. */
@@ -203,7 +205,7 @@ function emptyRun(): RunState {
 }
 
 /** Chance de dois selvagens aparecerem juntos (batalha em dupla). */
-/** Quantas opções aparecem na roleta de viagem (a atual é uma delas). */
+/** Quantas opções sorteadas aparecem no fim da estadia (a atual pode ou não estar entre elas). */
 const TRAVEL_OPTIONS = 4;
 const DOUBLE_CHANCE = 0.05;
 
@@ -338,43 +340,29 @@ export const useGame = create<Store>((set, get) => {
       for (const m of run.party) m.hp = maxHp(m);
       run.log.push('Centro Pokémon: seu time foi curado!');
     }
-    // Fim da estadia: a roleta mostra algumas opções com a atual no meio delas.
-    // Quem der sorte pode cair de novo onde já está.
+    // Fim da estadia: sorteia 4 opções entre todas (a atual pode ou não aparecer) e o jogador escolhe.
     const fromRegion = run.region;
     const fromBiome = run.biome;
     if ((run.regionLeft ?? 1) <= 0) {
-      const regionOptions = shuffle([fromRegion!, ...shuffle(REGIONS.map(r => r.id).filter(id => id !== fromRegion)).slice(0, TRAVEL_OPTIONS - 1)]);
-      run.region = pick(regionOptions);
-      run.regionLeft = regionStay(run);
-      run.regionPass = false;
-      const [biomeOptions, biome] = travelBiomes(run, fromBiome);
-      setBiome(run, biome);
-      run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome, regionOptions, biomeOptions};
+      const regionOptions = shuffle(REGIONS.map(r => r.id)).slice(0, TRAVEL_OPTIONS + (run.perks?.regions ?? 0));
+      run.travel = {fromRegion, fromBiome, regionOptions};
       run.phase = 'travel';
       return;
     }
     if ((run.biomeLeft ?? 1) <= 0) {
-      const [biomeOptions, biome] = travelBiomes(run, fromBiome);
-      setBiome(run, biome);
-      run.travel = {biome: run.biome, fromBiome, biomeOptions};
+      run.travel = {fromBiome, biomeOptions: travelBiomes(run)};
       run.phase = 'travel';
       return;
     }
     nextStop(run);
   };
 
-  /** Roleta de biomas: o atual e outros comuns, e o sorteado. O bioma oculto entra no lugar de um deles. */
-  const travelBiomes = (run: RunState, current: string): [string[], string] => {
-    // Bioma oculto de outra região não vem junto na viagem.
-    const keep = !getBiome(current).region || getBiome(current).region === run.region;
-    const others = shuffle(BIOMES.map(b => b.id).filter(id => id !== current)).slice(0, TRAVEL_OPTIONS - (keep ? 1 : 0));
+  /** Opções de bioma da viagem: 4 sorteados entre todos; o oculto da região às vezes entra no lugar de um. */
+  const travelBiomes = (run: RunState): string[] => {
+    const options = shuffle(BIOMES.map(b => b.id)).slice(0, TRAVEL_OPTIONS + (run.perks?.biomes ?? 0));
     const special = rollBiome(run);
-    const options = shuffle(keep ? [current, ...others] : others);
-    if (getBiome(special).region && special !== current) {
-      options[Math.floor(Math.random() * options.length)] = special;
-      return [options, special];
-    }
-    return [options, pick(options)];
+    if (getBiome(special).region && !options.includes(special)) options[Math.floor(Math.random() * options.length)] = special;
+    return options;
   };
 
   /** Troca o bioma e reinicia a estadia nele. */
@@ -1253,6 +1241,24 @@ export const useGame = create<Store>((set, get) => {
     continueTravel() {
       mutate(run => {
         if (run.phase === 'travel') nextStop(run);
+      });
+    },
+    travelPick(id) {
+      mutate(run => {
+        const t = run.travel;
+        if (run.phase !== 'travel' || !t) return;
+        if (t.regionOptions && !t.region) {
+          if (!t.regionOptions.includes(id)) return;
+          run.region = id;
+          run.regionLeft = regionStay(run);
+          run.regionPass = false;
+          t.region = id;
+          t.biomeOptions = travelBiomes(run);
+          return;
+        }
+        if (!t.biomeOptions?.includes(id)) return;
+        setBiome(run, id);
+        nextStop(run);
       });
     },
     answerLegend(accept) {
