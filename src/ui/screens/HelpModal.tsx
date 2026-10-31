@@ -8,7 +8,7 @@ const GROUPS: {title: string; kinds: ItemKind[]; text: string}[] = [
   {title: 'Treino', kinds: ['candy', 'evolution', 'tm'], text: 'Use entre batalhas em "Time e mochila", escolhendo o Pokémon.'},
   {title: 'EVs', kinds: ['vitamin'], text: 'Vitaminas dão EVs na hora, no Pokémon e na ficha da linha. Os itens Power (de segurar) dão EVs a cada vitória. Distribua o banco de EVs na ficha da coleção.'},
   {title: 'Itens de segurar', kinds: ['held'], text: 'Equipe num Pokémon em "Time e mochila". Eles funcionam sozinhos na batalha, como no Showdown.'},
-  {title: 'Viagem', kinds: ['map', 'incense'], text: 'Use entre batalhas. O Mapa libera troca de bioma; o Incenso deixa os raros mais comuns.'},
+  {title: 'Viagem', kinds: ['map', 'incense'], text: 'Use entre batalhas. Você fica 10 rondas em cada bioma e 20 em cada região; depois o próximo é sorteado. Os Mapas deixam você escolher, os Passes dobram a estadia, e o Incenso deixa os raros mais comuns.'},
 ];
 
 export function HelpModal({onClose}: {onClose: () => void}) {
@@ -19,7 +19,7 @@ export function HelpModal({onClose}: {onClose: () => void}) {
         <li>Monte seu time inicial e escolha um bioma. Cada ronda é uma batalha contra um Pokémon selvagem.</li>
         <li>Vença para ganhar XP e dinheiro, ou capture com Pokébolas (até 6 no time; o resto vai para o PC).</li>
         <li>Depois de cada ronda, escolha 1 de 3 itens. Dá para sortear de novo ou comprar na Loja.</li>
-        <li>A cada 5 rondas você pode trocar de bioma. A cada 10, o time é curado. Chefes nas rondas 10 e 20, lendário na 30.</li>
+        <li>Você fica 20 rondas em cada região e 10 em cada bioma; depois o próximo é sorteado. A cada 10 rondas o time é curado e aparece um chefe da região. Torneios nas rondas 30, 60, 90 e 120.</li>
         <li>Toque no cartão do selvagem para ver as fraquezas. Cada golpe mostra se é super efetivo e o que faz.</li>
         <li>O painel ao lado mostra seu time, a Mochila, o PC e as fraquezas do time. Toque num Pokémon para ver detalhes.</li>
         <li>Cada treinador tem sua coleção. Monte o time inicial com 6 pontos: cada Pokémon tem um custo (o número no canto). Tudo que você capturar vira opção.</li>

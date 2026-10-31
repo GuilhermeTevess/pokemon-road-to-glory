@@ -6,7 +6,8 @@ import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
 import {isBossWave, isMilestoneWave, SEASON_LENGTH} from '../../game/encounters';
 import {getBattle, useGame} from '../../game/store';
-import {ROUND_NAMES, tourInfo} from '../../game/tournament';
+import {ROUND_NAMES, tourName} from '../../game/tournament';
+import {getRegion} from '../../data/regions';
 import {
   CategoryIcon,
   HpBar,
@@ -223,13 +224,13 @@ export function BattleScreen() {
 
   const tour = run.tournament;
   const header = enc.tournament && tour
-    ? `${tourInfo(tour.kind).name} · ${ROUND_NAMES[tour.rounds.length - 1]} · contra ${enc.trainer}`
+    ? `${tourName(tour)} · ${ROUND_NAMES[tour.rounds.length - 1]} · contra ${enc.trainer}`
     : enc.trainer
     ? `Desafio do rival ${enc.trainer}`
     : isMilestoneWave(run.wave)
     ? `Ronda ${run.wave} · Desafio final da etapa`
     : isBossWave(run.wave)
-      ? `Ronda ${run.wave} · Chefe`
+      ? `Ronda ${run.wave} · Chefe de ${getRegion(run.region).name}`
       : `Ronda ${run.wave}/${SEASON_LENGTH}`;
 
   return (
@@ -252,6 +253,7 @@ export function BattleScreen() {
         <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         <div className="fx-layer" ref={fxRef} />
         <div className="arena-biome" style={{['--bc' as string]: biome.color}}>
+          {run.region ? `${getRegion(run.region).name} · ` : ''}
           {biome.name}
         </div>
         {wild && (

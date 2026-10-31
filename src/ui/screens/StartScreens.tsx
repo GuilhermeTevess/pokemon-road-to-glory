@@ -10,6 +10,8 @@ import {PARTY_SIZE, useGame} from '../../game/store';
 import type {Screen} from '../../game/store';
 import {teamBudget} from '../../game/glory';
 import {shuffle} from '../../game/rng';
+import {REGIONS, getRegion} from '../../data/regions';
+import type {Region} from '../../data/regions';
 import {FX} from '../fx';
 import {MatchupPanel, PixelIcon, RarityBadge, Sprite, TypeBadge, TypeFilter} from '../components';
 import {playCry} from '../audio';
@@ -451,8 +453,47 @@ export function BiomeCard({biome, onClick, label}: {biome: Biome; onClick: () =>
   );
 }
 
+export function RegionCard({region, onClick, label}: {region: Region; onClick: () => void; label?: string}) {
+  return (
+    <button className="biome-card region-card" onClick={onClick} style={{['--bc' as string]: region.color}}>
+      <span className="region-top">
+        {region.icons.map(n => (
+          <Sprite key={n} name={n} size={48} />
+        ))}
+      </span>
+      <span className="biome-name">{label ?? region.name}</span>
+      <span className="muted region-blurb">{region.blurb}</span>
+    </button>
+  );
+}
+
+/** Escolha da região: no começo (todas) ou com o Mapa de Região (3 sorteadas + ficar). */
+export function RegionSelect() {
+  const {run, chooseNextRegion} = useGame();
+  const options = useMemo(
+    () => shuffle(REGIONS.filter(r => r.id !== run?.region)).slice(0, 3),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [run?.wave],
+  );
+  if (!run) return null;
+  const current = getRegion(run.region);
+  return (
+    <div className="screen biome-screen">
+      <h2>Mapa de Região: para onde vamos?</h2>
+      <p className="hint">Na região nova você fica 20 rondas. Os Pokémon de lá aparecem mais.</p>
+      <div className="biomes">
+        {options.map(r => (
+          <RegionCard key={r.id} region={r} onClick={() => chooseNextRegion(r.id)} />
+        ))}
+        <RegionCard region={current} label={`Ficar: ${current.name}`} onClick={() => chooseNextRegion(null)} />
+      </div>
+    </div>
+  );
+}
+
 export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
   const {run, chooseStartBiome, chooseNextBiome} = useGame();
+  const [region, setRegion] = useState<string | null>(null);
   const options = useMemo(() => {
     if (mode === 'start') return BIOMES;
     const n = 3 + (run?.perks?.biomes ?? 0);
@@ -461,14 +502,37 @@ export function BiomeSelect({mode}: {mode: 'start' | 'next'}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, run?.wave]);
   if (!run) return null;
+  if (mode === 'start' && !region) {
+    return (
+      <div className="screen biome-screen">
+        <h2>Escolha sua primeira região</h2>
+        <p className="hint">Você fica 20 rondas em cada região. Depois, a próxima é sorteada (pode até repetir).</p>
+        <div className="biomes">
+          {REGIONS.map(r => (
+            <RegionCard key={r.id} region={r} onClick={() => setRegion(r.id)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const current = getBiome(run.biome);
   return (
     <div className="screen biome-screen">
-      <h2>{mode === 'start' ? 'Escolha seu primeiro bioma' : 'Hora de viajar! Para onde vamos?'}</h2>
-      <p className="hint">Cada bioma tem Pokémon dos tipos mostrados no cartão.</p>
+      <h2>{mode === 'start' ? `${getRegion(region!).name}: escolha o primeiro bioma` : 'Mapa de Bioma: para onde vamos?'}</h2>
+      <p className="hint">
+        Cada bioma tem Pokémon dos tipos mostrados no cartão. Você fica 10 rondas nele.
+        {mode === 'start' && (
+          <>
+            {' '}
+            <button className="link" onClick={() => setRegion(null)}>
+              Trocar região
+            </button>
+          </>
+        )}
+      </p>
       <div className="biomes">
         {options.map(b => (
-          <BiomeCard key={b.id} biome={b} onClick={() => (mode === 'start' ? chooseStartBiome(b.id) : chooseNextBiome(b.id))} />
+          <BiomeCard key={b.id} biome={b} onClick={() => (mode === 'start' ? chooseStartBiome(b.id, region!) : chooseNextBiome(b.id))} />
         ))}
         {mode === 'next' && <BiomeCard biome={current} label={`Ficar: ${current.name}`} onClick={() => chooseNextBiome(null)} />}
       </div>

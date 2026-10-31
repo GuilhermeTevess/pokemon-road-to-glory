@@ -4,7 +4,8 @@ import {BIOMES} from '../data/biomes';
 import {dex, species, teachableMoves} from '../data/dex';
 import {POWER_EVS, VITAMIN_EVS, getItem, megaStonesFor} from '../data/items';
 import {BattleController} from './battle';
-import {BIOME_CHANGE_EVERY, HEAL_EVERY, SEASON_LENGTH, generateEncounter} from './encounters';
+import {HEAL_EVERY, SEASON_LENGTH, generateEncounter} from './encounters';
+import {BIOME_STAY, REGIONS, REGION_STAY, getRegion} from '../data/regions';
 import {
   CANDY, COST_CUT_PRICE, EV_MAX_STAT, EV_MAX_TOTAL, EV_MULT, EV_PRESETS, EV_RESET_PRICE,
   HEART_STEPS, MEGA_STONE_PRICE, addStatEvs, lineMegaStones, allocateEvs, bankEvs, evTotal, evYield, resetEvs, tutorRoll, HEART_PTS, MAX_COST_CUT, SHINY_PRICE,
@@ -14,13 +15,14 @@ import {
 import type {Collection, TutorPlan} from './meta';
 import {cleanNickname, createMon, displayName, evolve, expYield, gainExp, itemEvolutions, levelUp, maxHp} from './mon';
 import {pick, shuffle, uid} from './rng';
-import {moneyReward, moneyValue, rerollCost, rollRewards} from './rewards';
+import {moneyReward, moneyValue, rerollCost, rollRewards, shopPrice, travelBlocked} from './rewards';
 import {cheapestHeal, rivalEncounter, rollEvent, shouldRollEvent} from './events';
-import {START_LEVELS, applyPerks, buyUpgrade, discounted, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
+import {START_LEVELS, applyPerks, buyUpgrade, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {
   applyToCareer, createTournament, currentRound, highlightsFromLog, placementLabel, playerIndex, playerMatch,
   prizeIndex, recordPlayerResult, tourAt, tourInfo,
+  tourName,
 } from './tournament';
 import type {Tournament} from './tournament';
 import {introLines} from './narration';
@@ -126,7 +128,7 @@ interface Store {
   resetLineEvs(line: string): void;
   presetEvs(line: string, preset: number): void;
   abandonRun(): void;
-  chooseStartBiome(id: string): void;
+  chooseStartBiome(id: string, region?: string): void;
   finishBattle(outcome: 'won' | 'caught' | 'fled' | 'lost'): void;
   resolvePending(choice: string | number | null): void;
   /** Pega a recompensa; com `target`, já usa/equipa o item nesse Pokémon. */
@@ -135,6 +137,10 @@ interface Store {
   buy(itemId: string): void;
   skipReward(): void;
   chooseNextBiome(id: string | null): void;
+  /** Mapa de Região: escolhe a próxima região (null = ficar). */
+  chooseNextRegion(id: string | null): void;
+  /** Depois da roleta de viagem, segue para a próxima ronda. */
+  continueTravel(): void;
   useItem(itemId: string, monUid: string): void;
   takeItem(monUid: string): void;
   setLead(monUid: string): void;
@@ -158,6 +164,9 @@ function emptyRun(): RunState {
     startedAt: Date.now(),
     wave: 0,
     biome: BIOMES[0].id,
+    region: REGIONS[0].id,
+    regionLeft: REGION_STAY,
+    biomeLeft: BIOME_STAY,
     phase: 'starter',
     party: [],
     box: [],
@@ -208,11 +217,15 @@ export const useGame = create<Store>((set, get) => {
   const startWave = (run: RunState) => {
     run.wave++;
     run.event = undefined;
+    // Runs antigas, de antes das regiões, começam em Kanto.
+    if (!run.region) Object.assign(run, {region: REGIONS[0].id, regionLeft: REGION_STAY, biomeLeft: BIOME_STAY});
+    run.regionLeft = (run.regionLeft ?? REGION_STAY) - 1;
+    run.biomeLeft = (run.biomeLeft ?? BIOME_STAY) - 1;
     const info = tourAt(run.wave);
     if (info) {
       const t = get().trainer;
       const c = careerOf(get().collection);
-      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame});
+      run.tournament = createTournament(info, {name: t?.name ?? 'Você', avatar: t?.avatar, titles: c.titles, runnerUps: c.runnerUps, fame: c.fame}, run.region);
       run.encounter = undefined;
       run.upcoming = undefined;
       run.phase = 'tournament';
@@ -223,7 +236,7 @@ export const useGame = create<Store>((set, get) => {
     if (!run.encounter) {
       // Evita repetir a mesma espécie das últimas rondas (biomas pareciam sempre iguais).
       for (let i = 0; i < 4; i++) {
-        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck);
+        run.encounter = generateEncounter(run.wave, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region);
         if (!run.recent?.includes(run.encounter.mon.species)) break;
       }
     }
@@ -250,7 +263,41 @@ export const useGame = create<Store>((set, get) => {
       for (const m of run.party) m.hp = maxHp(m);
       run.log.push('Centro Pokémon: seu time foi curado!');
     }
-    if (run.wave % BIOME_CHANGE_EVERY === 0 || run.mapReady) run.phase = 'biomeChoice';
+    // Fim da estadia: sorteia nova região (a cada 20 rondas) ou novo bioma (a cada 10). Pode repetir.
+    const fromRegion = run.region;
+    const fromBiome = run.biome;
+    if ((run.regionLeft ?? 1) <= 0) {
+      run.region = pick(REGIONS).id;
+      run.regionLeft = REGION_STAY;
+      run.regionPass = false;
+      setBiome(run, pick(BIOMES).id);
+      run.travel = {region: run.region, biome: run.biome, fromRegion, fromBiome};
+      run.phase = 'travel';
+      return;
+    }
+    if ((run.biomeLeft ?? 1) <= 0) {
+      setBiome(run, pick(BIOMES).id);
+      run.travel = {biome: run.biome, fromBiome};
+      run.phase = 'travel';
+      return;
+    }
+    nextStop(run);
+  };
+
+  /** Troca o bioma e reinicia a estadia nele. */
+  const setBiome = (run: RunState, id: string) => {
+    if (id !== run.biome) run.visited = [run.biome, ...(run.visited ?? [])].slice(0, 4);
+    run.biome = id;
+    run.biomeLeft = BIOME_STAY;
+    run.biomePass = false;
+    run.upcoming = undefined;
+  };
+
+  /** Mapas abertos primeiro, depois um evento ou a próxima ronda. */
+  const nextStop = (run: RunState) => {
+    run.travel = undefined;
+    if (run.regionMapReady) run.phase = 'regionChoice';
+    else if (run.mapReady) run.phase = 'biomeChoice';
     else if (shouldRollEvent(run)) {
       run.event = rollEvent(run);
       run.lastEventWave = run.wave;
@@ -306,9 +353,27 @@ export const useGame = create<Store>((set, get) => {
     let used = false;
     let message = '';
     if (item.kind === 'map') {
-      run.mapReady = true;
+      if (travelBlocked(run, {...item, id: '_'})) return '';
       used = true;
-      message = 'Você poderá trocar de bioma depois da próxima vitória.';
+      switch (item.travel) {
+        case 'region':
+          run.regionMapReady = true;
+          message = 'Você vai escolher a próxima região depois da próxima vitória.';
+          break;
+        case 'biomeStay':
+          run.biomePass = true;
+          run.biomeLeft = (run.biomeLeft ?? 0) + BIOME_STAY;
+          message = `Estadia dobrada: mais ${BIOME_STAY} rondas neste bioma.`;
+          break;
+        case 'regionStay':
+          run.regionPass = true;
+          run.regionLeft = (run.regionLeft ?? 0) + REGION_STAY;
+          message = `Estadia dobrada: mais ${REGION_STAY} rondas em ${getRegion(run.region).name}.`;
+          break;
+        default:
+          run.mapReady = true;
+          message = 'Você vai escolher o bioma depois da próxima vitória.';
+      }
     } else if (item.kind === 'incense') {
       run.incenseWaves += 5;
       used = true;
@@ -693,9 +758,10 @@ export const useGame = create<Store>((set, get) => {
       set({run: null, screen: 'title'});
     },
 
-    chooseStartBiome(id) {
+    chooseStartBiome(id, region) {
       mutate(run => {
         run.biome = id;
+        if (region) run.region = region;
         startWave(run);
       });
     },
@@ -862,7 +928,7 @@ export const useGame = create<Store>((set, get) => {
         run.money += info.money[i];
         statsOf(col).moneyEarned += info.money[i];
         if (t.placement === 1) for (const m of run.party) addHeartPts(col, m.species, HEART_PTS.stageClear * (m.partner ? 2 : 1));
-        get().toast(`${info.name}: ${placementLabel(t.placement ?? 5)}! +₽ ${info.money[i]} · +${info.glory[i]} Glória${info.cp[i] ? ` · +${info.cp[i]} CP` : ''}`);
+        get().toast(`${tourName(t)}: ${placementLabel(t.placement ?? 5)}! +₽ ${info.money[i]} · +${info.glory[i]} Glória${info.cp[i] ? ` · +${info.cp[i]} CP` : ''}`);
         run.tournament = undefined;
         run.encounter = undefined;
         healAll(run);
@@ -937,8 +1003,8 @@ export const useGame = create<Store>((set, get) => {
     buy(itemId) {
       mutate((run, col) => {
         const item = getItem(itemId);
-        const price = discounted(run, item.price);
-        if (!item.price || run.money < price) return;
+        const price = shopPrice(run, item);
+        if (!item.price || run.money < price || travelBlocked(run, item)) return;
         run.money -= price;
         if (item.kind === 'breed') col.items = {...col.items, [itemId]: (col.items?.[itemId] ?? 0) + 1};
         else run.bag[itemId] = (run.bag[itemId] ?? 0) + 1;
@@ -972,13 +1038,26 @@ export const useGame = create<Store>((set, get) => {
 
     chooseNextBiome(id) {
       mutate(run => {
-        if (id && id !== run.biome) {
-          run.visited = [run.biome, ...(run.visited ?? [])].slice(0, 4);
-          run.biome = id;
+        if (id && id !== run.biome) setBiome(run, id);
+        run.mapReady = false;
+        nextStop(run);
+      });
+    },
+    chooseNextRegion(id) {
+      mutate(run => {
+        if (id && id !== run.region) {
+          run.region = id;
+          run.regionLeft = REGION_STAY;
+          run.regionPass = false;
           run.upcoming = undefined;
         }
-        run.mapReady = false;
-        startWave(run);
+        run.regionMapReady = false;
+        nextStop(run);
+      });
+    },
+    continueTravel() {
+      mutate(run => {
+        if (run.phase === 'travel') nextStop(run);
       });
     },
 

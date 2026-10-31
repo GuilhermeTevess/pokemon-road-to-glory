@@ -4,6 +4,7 @@ import {useGame} from '../../game/store';
 import {careerOf} from '../../game/meta';
 import {
   FAME_TIERS, ROUND_NAMES, TOURS, fameLabel, placementLabel, playerIndex, playerMatch, prizeIndex, tourInfo,
+  tourName,
 } from '../../game/tournament';
 import type {MatchRec, TourKind} from '../../game/tournament';
 import {Modal, PixelIcon, Sprite} from '../components';
@@ -176,7 +177,7 @@ export function TournamentScreen() {
     <div className="screen tour-screen">
       <header className="bar">
         <TourBadge kind={t.kind} />
-        <h2>{info.name}</h2>
+        <h2>{tourName(t)}</h2>
         <span className="muted">Ronda {t.wave}</span>
       </header>
       {t.stage === 'intro' && (

@@ -12,10 +12,10 @@ export const BERRIES = ['sitrusberry', 'lumberry', 'oranberry'];
 /** Um selvagem "tranquilo" (sem super raros nem lendários) para a casa e o machucado. */
 function calmMon(run: RunState): Encounter['mon'] {
   for (let i = 0; i < 20; i++) {
-    const enc = generateEncounter(Math.max(1, run.wave), run.biome, false);
+    const enc = generateEncounter(Math.max(1, run.wave), run.biome, false, 0, run.region);
     if (enc.rarity === 'common' || enc.rarity === 'uncommon' || enc.rarity === 'rare') return enc.mon;
   }
-  return generateEncounter(1, run.biome, false).mon;
+  return generateEncounter(1, run.biome, false, 0, run.region).mon;
 }
 
 export function shouldRollEvent(run: RunState): boolean {
@@ -56,13 +56,13 @@ export function rollEvent(run: RunState): RunEvent {
 /** Gera os próximos selvagens antes (a Vidente mostra os tipos deles). */
 export function upcomingEncounters(run: RunState, n: number): Encounter[] {
   const out: Encounter[] = [];
-  for (let w = run.wave + 1; w <= run.wave + n && w <= SEASON_LENGTH && !isMilestoneWave(w); w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck));
+  for (let w = run.wave + 1; w <= run.wave + n && w <= SEASON_LENGTH && !isMilestoneWave(w); w++) out.push(generateEncounter(w, run.biome, run.incenseWaves > 0, run.perks?.luck, run.region));
   return out;
 }
 
 /** Pokémon do rival: um pouco mais forte que o selvagem da ronda. */
 export function rivalEncounter(run: RunState, name: string): Encounter {
-  const enc = generateEncounter(run.wave + 1, run.biome, false);
+  const enc = generateEncounter(run.wave + 1, run.biome, false, 0, run.region);
   enc.mon.level += 3;
   return {...enc, boss: false, trainer: name};
 }
