@@ -80,7 +80,7 @@ export function ProfileModal({profile: p, onClose}: {profile: Profile; onClose: 
                   {e.label}
                   {e.wave ? <small className="muted"> · ronda {round(e.wave)}</small> : null}
                 </span>
-                <b>+{e.pts}</b>
+                <b>{e.pts < 0 ? e.pts : `+${e.pts}`}</b>
               </div>
             ))}
             {!p.log.length && <p className="hint">Ainda sem pontos nesta temporada.</p>}

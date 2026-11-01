@@ -101,7 +101,9 @@ export type RunEvent =
   | {kind: 'fan'; avatar: string; heard?: string}
   | {kind: 'place'; theme: string; mon?: OwnedMon; item?: string}
   | {kind: 'life'; theme: 'mom' | 'center' | 'birthday'; uid?: string; chat?: string}
-  | {kind: 'traveler'; name: string; avatar: string; ask: 'money' | 'heal' | 'item'; cost?: number; item?: string; hint: string};
+  | {kind: 'traveler'; name: string; avatar: string; ask: 'money' | 'heal' | 'item'; cost?: number; item?: string; hint: string}
+  /** Carreira online: o time caiu, mas você fugiu e segue (com o que perdeu na fuga). */
+  | {kind: 'wipe'; foe: string; levels: number; items: {id: string; n: number}[]; money: number; points: number};
 
 /** Algo que precisa da decisão do jogador depois da batalha (golpe novo, evolução). */
 export type PendingEvent =

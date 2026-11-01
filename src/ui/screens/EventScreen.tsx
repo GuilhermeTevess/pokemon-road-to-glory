@@ -39,6 +39,39 @@ export function EventScreen() {
   );
 
   switch (ev.kind) {
+    case 'wipe': {
+      const partner = run.party.find(m => m.partner) ?? run.party[0];
+      return (
+        <Scene
+          title="Fuga pela trilha"
+          art={partner ? <Sprite name={partner.species} shiny={partner.shiny} className="hurt" /> : null}
+          text={
+            <>
+              <p>
+                <b>{ev.foe}</b> derrubou o seu time inteiro! Você pegou todo mundo e correu até o Centro Pokémon mais perto.
+                A temporada continua, mas a fuga custou caro:
+              </p>
+              <ul className="wipe-losses">
+                {ev.levels > 0 && <li>O time ficou abalado e perdeu até {ev.levels} {ev.levels === 1 ? 'nível' : 'níveis'}.</li>}
+                {ev.items.map(it => (
+                  <li key={it.id}>
+                    <ItemIcon id={it.id} /> Enquanto você fugia, deixou cair {it.n > 1 ? `${it.n}x ` : ''}
+                    {getItem(it.id).name}.
+                  </li>
+                ))}
+                {ev.money > 0 && <li>Na correria, ₽ {ev.money} caíram do bolso.</li>}
+                {ev.points > 0 && <li>O jornal noticiou a derrota: −{ev.points} pontos no ranking.</li>}
+              </ul>
+              <p className="hint">O time foi curado no Centro Pokémon. Bola pra frente!</p>
+            </>
+          }
+        >
+          <button className="btn primary" onClick={() => resolveEvent(null)}>
+            Levantar e seguir
+          </button>
+        </Scene>
+      );
+    }
     case 'house': {
       const name = species(ev.mon.species).name;
       return (

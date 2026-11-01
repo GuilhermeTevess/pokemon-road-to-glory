@@ -69,7 +69,7 @@ export function PointLog({log}: {log: PointEntry[]}) {
     <div className="point-log">
       {[...log].reverse().map((e, i) => (
         <div key={i} className="point-row">
-          <b>+{e.pts}</b>
+          <b>{e.pts < 0 ? e.pts : `+${e.pts}`}</b>
           <span>{e.label}</span>
           <small className="muted">ronda {e.wave}</small>
         </div>

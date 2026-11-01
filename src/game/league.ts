@@ -6,7 +6,7 @@ import {randInt, shuffle} from './rng';
 import {RIVALS} from '../data/rivals';
 import type {RunState} from './types';
 
-export type PointSource = 'tournaments' | 'legends' | 'gyms' | 'books' | 'travelers' | 'legendaries';
+export type PointSource = 'tournaments' | 'legends' | 'gyms' | 'books' | 'travelers' | 'legendaries' | 'penalties';
 
 export const POINTS = {legend: 150, badge: 30, book: 300, traveler: 10, legendary: 50};
 
@@ -17,6 +17,7 @@ export const SOURCE_LABEL: Record<PointSource, string> = {
   books: 'Cadernetas completas',
   travelers: 'Viajantes ajudados',
   legendaries: 'Lendários das dicas',
+  penalties: 'Derrotas na trilha',
 };
 
 export interface Npc {
@@ -101,6 +102,16 @@ export function addPoints(run: RunState, col: Collection | null, source: PointSo
   run.points = {...run.points, [source]: (run.points?.[source] ?? 0) + n};
   run.pointLog = [...(run.pointLog ?? []), {source, label: label ?? SOURCE_LABEL[source], pts: n, wave: run.wave}];
   if (col && fame) careerOf(col).fame += n;
+}
+
+/** Tira pontos da temporada (nunca abaixo de zero) e um pouco da fama. Devolve quanto tirou. */
+export function losePoints(run: RunState, col: Collection | null, n: number, label: string): number {
+  const lost = Math.min(Math.round(n), seasonPoints(run));
+  if (lost <= 0) return 0;
+  run.points = {...run.points, penalties: (run.points?.penalties ?? 0) - lost};
+  run.pointLog = [...(run.pointLog ?? []), {source: 'penalties', label, pts: -lost, wave: run.wave}];
+  if (col) careerOf(col).fame = Math.max(0, careerOf(col).fame - lost);
+  return lost;
 }
 
 /** Lendas vencidas nesta temporada (pelo extrato de pontos). */
