@@ -5,6 +5,7 @@ import {TYPE_PT, species} from '../../data/dex';
 import {GYMS, bookName, getGym, gymsOf} from '../../data/gyms';
 import type {Gym} from '../../data/gyms';
 import {REGIONS, getRegion} from '../../data/regions';
+import {isBossWave} from '../../game/encounters';
 import {GYM_PRIZE, badgesIn, gymDifficulty, gymLines, gymStatus, gymWaves, leaderAvatar, leaderWinLine, ticketPrice} from '../../game/gym';
 import {useGame} from '../../game/store';
 import {playCoins, playJingle, playSticker} from '../audio';
@@ -254,11 +255,14 @@ function BadgeBook({region}: {region: string}) {
           </p>
           <div className="row center wrap">
             {waves.slice(0, 12).map(w => (
-              <button key={w} className={`btn small ${w === wave ? 'primary' : ''}`} onClick={() => setWave(w)}>
+              <button key={w} className={`btn small ${w === wave ? 'primary' : ''}`} onClick={() => setWave(w)} title={isBossWave(w) ? 'Ronda de chefe' : undefined}>
                 {roundOf({...run, wave: w})}
+                {isBossWave(w) && ' 👑'}
               </button>
             ))}
           </div>
+          {isBossWave(wave) && <p className="hint">👑 Ronda de chefe: o ginásio toma o lugar do chefe. Você não ganha a EXP dele nem a chance de capturar um Pokémon forte.</p>}
+          <p className="muted">Ginásio não dá XP nem dinheiro: vale a insígnia e os pontos no ranking.</p>
           <p className="muted">Time previsto: {gymDifficulty(picking, run).size} Pokémon, nível ~{gymDifficulty(picking, run).level}.</p>
           <div className="row center">
             <button className="btn" onClick={() => setPicking(null)}>

@@ -6,6 +6,7 @@ import {bookName, getGym, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
 import {ACHIEVEMENTS, checkAchievements} from './achievements';
 import {POINTS, addPoints, finishSeason, leagueOf, legendsBeaten, rollRivalPoints} from './league';
+import {applyWipe} from './wipe';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
@@ -1041,6 +1042,11 @@ export const useGame = create<Store>((set, get) => {
           message = `${species(mon.species).name} entrou no seu time! (+${reg.candies} doces)`;
         };
         switch (ev.kind) {
+          case 'wipe':
+            // A ronda já contou: segue para a próxima parada (viagem, cura, evento...).
+            run.event = undefined;
+            afterReward(run);
+            return;
           case 'house':
             if (choice === 'care') {
               addTrail(run, TRAIL.event);
@@ -1311,6 +1317,14 @@ export const useGame = create<Store>((set, get) => {
           get().toast(`${enc.trainer} venceu desta vez. Seu time foi curado: a jornada continua!`);
           afterReward(run);
           return;
+        } else if (outcome === 'lost' && run.career) {
+          // Carreira online: a temporada não acaba. Você foge, perde um pouco e continua com os amigos.
+          const foe = enc.trainer ?? `${species(enc.mon.species).name}${enc.boss ? ' chefe' : ' selvagem'}`;
+          run.event = {kind: 'wipe', ...applyWipe(run, col, foe)};
+          run.cleared = run.wave;
+          run.lastEventWave = run.wave;
+          run.phase = 'event';
+          return;
         } else if (outcome === 'lost') {
           run.phase = 'gameOver';
           endRun(run, col, 'lost');
@@ -1357,6 +1371,8 @@ export const useGame = create<Store>((set, get) => {
               if (add > 0) m.evs[power] += add;
               addStatEvs(col, m.species, power, POWER_EVS);
             }
+            // Ginásio não dá EXP: você está ali se provando, não treinando.
+            if (enc.gym) continue;
             const share = (fought ? 1 : run.bag.expall ? 0.8 : 0.5) * (run.bag.luckyegg ? 1.5 : 1);
             const bonus = expBonus(heartsOf(col.entries[lineRoot(m.species)]));
             const r = gainExp(m, Math.floor(exp * share * bonus * careerBoost(run)));
@@ -1385,7 +1401,8 @@ export const useGame = create<Store>((set, get) => {
             get().toast(`Time cheio: ${mon.species} foi para a caixa.`);
           }
         }
-        const money = enc.tournament ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1) * careerBoost(run));
+        // Torneio e ginásio não pagam dinheiro por batalha (ginásio vale insígnia e pontos).
+        const money = enc.tournament || enc.gym ? 0 : Math.round(moneyReward(run.wave, enc.boss || !!enc.trainer) * (enc.trainer ? 2 : 1) * (run.bag.amuletcoin ? 1.5 : 1) * careerBoost(run));
         run.money += money;
         // Chefe vencido ou capturado deixa a lenda da região de olho em você.
         if ((outcome === 'won' || outcome === 'caught') && enc.boss && !enc.trainer && !enc.hinted) {

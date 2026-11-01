@@ -16,9 +16,14 @@ describe('ginásios', () => {
     }
   });
 
-  it('rondas livres: dentro da estadia, sem torneio, chefe ou outro ginásio', () => {
+  it('rondas livres: dentro da estadia, sem torneio nem outro ginásio', () => {
     const run = {wave: 22, regionLeft: 10, gyms: [{id: 'kanto-1', wave: 25}]} as RunState;
     expect(gymWaves(run)).toEqual([23, 24, 26, 27, 28, 29, 31, 32]);
+  });
+
+  it('ronda de chefe (40) pode virar ginásio; ronda de torneio (60) não', () => {
+    expect(gymWaves({wave: 37, regionLeft: 5} as RunState)).toEqual([38, 39, 40, 41, 42]);
+    expect(gymWaves({wave: 57, regionLeft: 5} as RunState)).toEqual([58, 59, 61, 62]);
   });
 
   it('começa fácil e cresce com insígnias, nível e tamanho do time', () => {

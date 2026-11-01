@@ -1,8 +1,10 @@
 // Ginásios: compre o ingresso na loja e marque a ronda da luta (dentro do tempo na região,
-// fora das rondas de torneio e de chefe). Cada insígnia vale uma vez por temporada.
+// fora das rondas de torneio). Numa ronda de chefe (10, 20...) o ginásio toma o lugar do chefe,
+// e você abre mão da EXP e do Pokémon forte dele. Ginásio não dá EXP nem dinheiro: vale a
+// insígnia e os pontos. Cada insígnia vale uma vez por temporada.
 import {GYM_BIOME, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
-import {isBossWave, isMilestoneWave, SEASON_LENGTH} from './encounters';
+import {isMilestoneWave, SEASON_LENGTH} from './encounters';
 import {waveStep} from './career';
 import {discounted} from './glory';
 import {createMon} from './mon';
@@ -24,13 +26,13 @@ export function badgesIn(run: RunState, region = run.region): number {
   return (run.badges ?? []).filter(id => ids.has(id)).length;
 }
 
-/** Rondas livres para marcar um ginásio: dentro da estadia na região, sem torneio, chefe ou outro ginásio. */
+/** Rondas livres para marcar um ginásio: dentro da estadia na região, sem torneio nem outro ginásio (chefe pode). */
 export function gymWaves(run: RunState): number[] {
   const out: number[] = [];
   const taken = new Set((run.gyms ?? []).map(g => g.wave));
   const step = waveStep(run);
   const last = Math.min(SEASON_LENGTH, run.wave + (run.regionLeft ?? 0));
-  for (let w = run.wave + step; w <= last; w += step) if (!isMilestoneWave(w) && !isBossWave(w) && !taken.has(w)) out.push(w);
+  for (let w = run.wave + step; w <= last; w += step) if (!isMilestoneWave(w) && !taken.has(w)) out.push(w);
   return out;
 }
 
