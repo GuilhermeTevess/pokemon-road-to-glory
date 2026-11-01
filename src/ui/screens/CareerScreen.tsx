@@ -363,7 +363,7 @@ function PointsModal({p, onClose}: {p: PlayerDoc; onClose: () => void}) {
         {log.map(e => (
           <div key={e.label} className="points-row">
             <span>{e.label}</span>
-            <b>+{e.pts}</b>
+            <b>{e.pts < 0 ? e.pts : `+${e.pts}`}</b>
           </div>
         ))}
         {!log.length && !p.banked && <p className="hint">Ainda sem pontos nesta temporada.</p>}

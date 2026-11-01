@@ -1449,3 +1449,17 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .guide-notes { text-align: left; margin-top: 12px; padding-left: 18px; }
 @media (max-width: 560px) { .guide-wave input { width: 110px; } .guide-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); } }
 .guide-mon img { width: 40px; height: 40px; object-fit: contain; }
+
+/* Fuga depois de perder o time na carreira online: o que caiu pelo caminho. */
+.wipe-losses {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  text-align: left;
+}
+.wipe-losses li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
