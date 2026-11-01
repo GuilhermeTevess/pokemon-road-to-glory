@@ -27,6 +27,8 @@ export const WIPE = {
 export interface WipeLoss {
   /** Quem venceu (para a cena). */
   foe: string;
+  /** Derrota no ginásio: o time volta com 1 HP (sem perder pontos, dinheiro nem itens). */
+  gym?: boolean;
   levels: number;
   items: {id: string; n: number}[];
   money: number;
@@ -65,4 +67,14 @@ export function applyWipe(run: RunState, col: Collection | null, foe: string): W
   run.money -= money;
   const points = losePoints(run, col, wipePoints(run), `Fuga depois de perder para ${foe}`);
   return {foe, levels, items, money, points};
+}
+
+/**
+ * Perdeu no ginásio: o ingresso já pagou a cura ANTES da luta, então depois não tem cura de graça.
+ * Quem caiu volta machucado, com 1 HP (dá para usar Poções, Revivers ou esperar o Centro Pokémon).
+ * Não mexe em pontos, dinheiro nem mochila.
+ */
+export function applyGymLoss(run: RunState, foe: string): WipeLoss {
+  for (const m of run.party) if (m.hp <= 0) m.hp = 1;
+  return {foe, gym: true, levels: 0, items: [], money: 0, points: 0};
 }

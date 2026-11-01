@@ -244,7 +244,7 @@ function BadgeBook({region}: {region: string}) {
       </div>
       {here && (
         <p className="book-note">
-          ✓ = ganha nesta temporada. Compre o ingresso e escolha a ronda (enquanto estiver aqui). Perder não acaba a run.
+          ✓ = ganha nesta temporada. Compre o ingresso e escolha a ronda (enquanto estiver aqui). O ingresso cura o time antes da luta. Perder não acaba a run, mas quem caiu sai com 1 HP.
           {!waves.length && ' Não sobra ronda livre nesta região para marcar ginásio.'}
         </p>
       )}
@@ -262,7 +262,7 @@ function BadgeBook({region}: {region: string}) {
             ))}
           </div>
           {isBossWave(wave) && <p className="hint">👑 Ronda de chefe: o ginásio toma o lugar do chefe. Você não ganha a EXP dele nem a chance de capturar um Pokémon forte.</p>}
-          <p className="muted">Ginásio não dá XP nem dinheiro: vale a insígnia e os pontos no ranking.</p>
+          <p className="muted">Ginásio não dá XP nem dinheiro: vale a insígnia e os pontos no ranking. O ingresso inclui a cura do time antes da luta; se perder, quem caiu sai com 1 HP.</p>
           <p className="muted">Time previsto: {gymDifficulty(picking, run).size} Pokémon, nível ~{gymDifficulty(picking, run).level}.</p>
           <div className="row center">
             <button className="btn" onClick={() => setPicking(null)}>
