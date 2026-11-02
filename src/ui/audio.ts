@@ -610,3 +610,21 @@ export function playAchievement(): void {
   [784, 988, 1175, 1568].forEach((f, i) => tone(a, {wave: 'square', from: f, to: f, dur: 0.12, gain: 0.06, at: i * 0.08}));
   tone(a, {wave: 'triangle', from: 2093, to: 2093, dur: 0.5, gain: 0.1, at: 0.34});
 }
+
+/** Megaevolução: brilho que sobe girando enquanto junta energia e um estouro cristalino no fim. */
+export function playMega(phase: 'charge' | 'burst'): void {
+  const a = audio();
+  if (!a) return;
+  if (phase === 'charge') {
+    sample(a, 'twirl', {gain: 0.5, rate: 1.2, dur: 0.8});
+    noise(a, {filter: 'bandpass', from: 600, to: 6000, dur: 0.8, gain: 0.16, q: 4, attack: 0.6});
+    for (let i = 0; i < 10; i++) {
+      const f = 392 * Math.pow(2, i / 6);
+      tone(a, {wave: 'triangle', from: f, to: f * 1.04, dur: 0.12, gain: 0.05, at: i * 0.075});
+    }
+    return;
+  }
+  noise(a, {filter: 'highpass', from: 3000, to: 9000, dur: 0.5, gain: 0.22});
+  [523, 784, 1047, 1319, 1568].forEach((f, i) => tone(a, {wave: i % 2 ? 'triangle' : 'square', from: f, to: f, dur: 0.7 - i * 0.08, gain: 0.05, at: i * 0.04}));
+  tone(a, {wave: 'sine', from: 2093, to: 2093, dur: 0.9, gain: 0.04, at: 0.12, vibrato: 7});
+}
