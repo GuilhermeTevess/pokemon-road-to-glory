@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
+import {drawPairs, duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import {arenaFor} from '../../game/arenas';
@@ -11,7 +11,7 @@ import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
 import {cardOf, loadHistory, recordMatch, rememberFoe, snapOf, withWin} from '../../game/history';
-import type {HistCard} from '../../game/history';
+import type {HistCard, MatchExtra} from '../../game/history';
 import {flipKo, koFromLog, saneKo} from '../../game/recap';
 import type {Ko} from '../../game/recap';
 import {useGame} from '../../game/store';
@@ -36,9 +36,10 @@ function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe
 }
 
 /** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
-function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu aparelho', ko?: Ko[]) {
+function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu aparelho', extra: MatchExtra = {}, ko?: Ko[]) {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
+    ...extra,
     mode: `online-rush:${s.mode}`,
     online: true,
     won: winner === me,
@@ -128,7 +129,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   const foeLeft = () => {
     const s = sharedRef.current;
     if (!playing(s.step) || ctl.current?.ended) return false;
-    logRush(s, 0, 0, FOE_QUIT);
+    logRush(s, 0, 0, FOE_QUIT, {quit: 'foe'});
     setFoeQuit(true);
     sharedRef.current = {...s, step: 'end', winner: 0};
     setShared(sharedRef.current);
@@ -137,7 +138,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   };
   useMatchGuard(playing(shared.step) && !error, () => {
     if (ctl.current?.ended) return;
-    logRush(sharedRef.current, 0, 1, QUIT);
+    logRush(sharedRef.current, 0, 1, QUIT, {quit: 'me'});
     send({t: 'forfeit'});
   });
   const leave = () => requestLeave(onExit);
@@ -181,8 +182,9 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     if (c.ended) {
       const winner = c.won ? 0 : 1;
       const ko = koFromLog(c.battle.log, 'p1');
-      send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name), ko});
-      logRush(sharedRef.current, 0, winner, undefined, ko);
+      const score = duelScore(c.battle);
+      send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name), ko, score});
+      logRush(sharedRef.current, 0, winner, undefined, {score: scoreFor(score, 'p1')}, ko);
       send({t: 'snap', snap: mySnap(sharedRef.current.players[0])});
       setTimeout(() => {
         playFanfare(1);
@@ -317,7 +319,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
     const s = sharedRef.current;
     if (over.current || !s || !playing(s.step)) return false;
     over.current = true;
-    logRush(s, 1, 1, FOE_QUIT);
+    logRush(s, 1, 1, FOE_QUIT, {quit: 'foe'});
     setReq(null);
     setFoeQuit(true);
     setEnded(1);
@@ -326,7 +328,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   };
   useMatchGuard(connected && playing(shared?.step) && ended === null && !error, () => {
     over.current = true;
-    if (sharedRef.current) logRush(sharedRef.current, 1, 0, QUIT);
+    if (sharedRef.current) logRush(sharedRef.current, 1, 0, QUIT, {quit: 'me'});
     send({t: 'forfeit'});
   });
   const leave = () => requestLeave(onExit);
@@ -346,7 +348,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         else if (msg.t === 'end') {
           over.current = true;
           setReq(null);
-          if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number, undefined, flipKo(saneKo(msg.ko)));
+          if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number, undefined, {score: guestScore(msg.score)}, flipKo(saneKo(msg.ko)));
           setHostHist((msg.hist as HistCard | undefined) ?? null);
           const sh = sharedRef.current;
           if (sh) send({t: 'snap', snap: mySnap(sh.players[1])});

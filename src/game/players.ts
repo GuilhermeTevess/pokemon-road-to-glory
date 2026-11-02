@@ -6,6 +6,7 @@ import {cloudId, cloudRaw, cloudReady} from './cloud';
 import {isOnlineMode, loadHistory, onOnlineHistory, type History, type MatchLog, type ModeTotals} from './history';
 import {loadTrainers} from './trainers';
 import {saneKo} from './recap';
+import {RAISE_GAP, RANK_KEYS, emptyScore, nextCloudScore, type CloudScore} from './ranking';
 
 /** Resumo de um jogador na nuvem (só a parte online do histórico). */
 export interface PlayerCard {
@@ -20,6 +21,8 @@ export interface PlayerCard {
   totals: Record<string, ModeTotals>;
   /** Treinador apagado: some da lista. */
   gone?: boolean;
+  /** Pontos do ranking que o banco aceitou (conferidos pelas regras, não pelo aparelho dele). */
+  score?: CloudScore;
 }
 
 export const PLAYERS_PATH = 'careers/PLAYERS/players';
@@ -55,9 +58,33 @@ export function onlinePart(h: History): {list: MatchLog[]; totals: Record<string
 export const hasOnline = (h: History) => h.list.some(m => m.online) || Object.keys(h.totals).some(isOnlineMode);
 
 /** Histórico para abrir o perfil. */
-export const historyOfCard = (p: PlayerCard): History => ({version: 1, list: p.list, totals: p.totals});
+export const historyOfCard = (p: PlayerCard): History => ({version: 1, list: p.list, totals: p.totals, points: p.score?.pts});
 
 // ------------------------------------------------------------------ Gravar o seu
+
+const sentKey = (tid: string) => `rtg-score-${tid}`;
+
+/** Últimos pontos que o banco aceitou deste treinador. */
+function loadSent(tid: string): CloudScore {
+  try {
+    const s = saneScore(JSON.parse(localStorage.getItem(sentKey(tid)) ?? 'null'));
+    if (s) return s;
+  } catch {
+    /* sem storage */
+  }
+  return emptyScore();
+}
+
+function saveSent(tid: string, s: CloudScore): void {
+  try {
+    localStorage.setItem(sentKey(tid), JSON.stringify(s));
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Gravações seguidas recusadas (para não insistir para sempre). */
+const fails = new Map<string, number>();
 
 async function push(tid: string, gone = false): Promise<void> {
   const me = await cloudId();
@@ -65,29 +92,64 @@ async function push(tid: string, gone = false): Promise<void> {
   const t = loadTrainers().list.find(x => x.id === tid);
   if (!t && !gone) return;
   const key = `${me}_${tid}`;
+  const h = loadHistory(tid);
   const card: PlayerCard = gone
     ? {key, tid, name: '', avatar: '', at: Date.now(), list: [], totals: {}, gone: true}
-    : {key, tid, name: t!.name, avatar: t!.avatar, at: Date.now(), ...onlinePart(loadHistory(tid))};
-  await cloudRaw.put(`${PLAYERS_PATH}/${encodeURIComponent(key)}`, card);
+    : {key, tid, name: t!.name, avatar: t!.avatar, at: Date.now(), ...onlinePart(h)};
+  const path = `${PLAYERS_PATH}/${encodeURIComponent(key)}`;
+  const sent = loadSent(tid);
+  // Treinador apagado: os pontos ficam como estão (o documento some da lista mesmo assim).
+  const next = gone ? {score: sent, more: false, raises: false} : nextCloudScore(h.points ?? {}, sent, Date.now());
+  try {
+    await cloudRaw.put(path, card, {score: next.score as unknown as Record<string, number>});
+  } catch (e) {
+    if (!/403/.test(String(e))) throw e; // sem internet: vai na próxima partida
+    // Recusado: talvez o banco tenha outros pontos guardados (outro navegador, aparelho resetado).
+    // Lê o que está lá e tenta de novo daqui a pouco.
+    const there = await cloudRaw.getField(path, 'score').then(
+      v => ({ok: true, v}),
+      () => ({ok: false, v: undefined}),
+    );
+    if (!there.ok) throw e;
+    if (there.v === undefined) {
+      // Banco sem pontos (regras antigas, de antes do ranking): grava o resto sem eles.
+      await cloudRaw.put(path, card);
+      markPushed(tid);
+      cache = null;
+      return;
+    }
+    const n = (fails.get(tid) ?? 0) + 1;
+    fails.set(tid, n);
+    saveSent(tid, saneScore(there.v) ?? emptyScore());
+    if (n <= 3) later(tid, RAISE_GAP + 5000);
+    throw e;
+  }
+  fails.delete(tid);
+  saveSent(tid, next.score);
+  // Ganhou duas seguidas muito rápido: o resto dos pontos vai na próxima gravação.
+  if (next.more) later(tid, RAISE_GAP + 5000);
   markPushed(tid);
   cache = null;
 }
 
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-
-/** Manda o resumo daqui a pouco (várias mudanças seguidas, como partida + título, viram uma gravação só). */
-export function queuePush(tid: string): void {
+function later(tid: string, ms: number): void {
   if (!cloudReady()) return;
   clearTimeout(timers.get(tid));
   timers.set(
     tid,
     setTimeout(() => {
       timers.delete(tid);
-      void push(tid).catch(() => {
-        /* sem internet: vai na próxima partida */
-      });
-    }, 1500),
+      void push(tid).catch(() => {});
+    }, ms),
   );
+}
+
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Manda o resumo daqui a pouco (várias mudanças seguidas, como partida + título, viram uma gravação só). */
+export function queuePush(tid: string): void {
+  fails.delete(tid);
+  later(tid, 1500);
 }
 
 /** Mudou nome ou avatar: atualiza só se ele já está na lista (quem só joga offline não grava). */
@@ -141,7 +203,17 @@ function saneMatch(x: unknown): MatchLog | null {
     theirs: strs(m.theirs),
     note: str(m.note, 80) || undefined,
     ko: saneKo(m.ko),
+    pts: typeof m.pts === 'number' && Number.isFinite(m.pts) && Math.abs(m.pts) <= 50 ? Math.round(m.pts) : undefined,
   };
+}
+
+/** Pontos lidos do banco (ou do aparelho): só inteiros, sem negativos, só os modos do ranking. */
+export function saneScore(x: unknown): CloudScore | null {
+  const s = x as CloudScore | null;
+  if (!s || typeof s !== 'object' || !s.pts || typeof s.pts !== 'object') return null;
+  const pts = emptyScore().pts;
+  for (const k of RANK_KEYS) pts[k] = num(s.pts[k]);
+  return {pts, n: num(s.n), t: typeof s.t === 'number' && Number.isFinite(s.t) && s.t >= 0 ? Math.floor(s.t) : 0};
 }
 
 /** Limpa o que veio do banco (um amigo esperto poderia gravar qualquer coisa). */
@@ -172,9 +244,13 @@ let cache: {at: number; list: PlayerCard[]} | null = null;
 /** Todos os jogadores (quem jogou por último primeiro). Guarda por 30 s para não ler o banco à toa. */
 export async function listPlayers(force = false): Promise<PlayerCard[]> {
   if (!force && cache && Date.now() - cache.at < 30_000) return cache.list;
-  const raw = await cloudRaw.list<unknown>(PLAYERS_PATH);
+  const raw = await cloudRaw.listWith<unknown>(PLAYERS_PATH, 'score');
   const list = raw
-    .map(sanePlayerCard)
+    .map(({value, extra}) => {
+      const p = sanePlayerCard(value);
+      const score = saneScore(extra);
+      return p && score ? {...p, score} : p;
+    })
     .filter((p): p is PlayerCard => !!p && !p.gone)
     .sort((a, b) => b.at - a.at);
   cache = {at: Date.now(), list};

@@ -247,6 +247,7 @@ function QuickTourGuard() {
       mine: run.party.map(m => m.species),
       theirs: (foe.team ?? []).map(m => m.species),
       note: 'Saiu no meio do campeonato',
+      quit: 'me',
     });
   });
   return null;

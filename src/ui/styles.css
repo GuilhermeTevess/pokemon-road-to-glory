@@ -1833,3 +1833,39 @@ button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: v
 .arena-name { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 4; font-family: 'Press Start 2P', monospace; font-size: 11px; padding: 5px 14px 7px; background: var(--panel); color: var(--ink); border: var(--px) solid var(--line); border-top: none; white-space: nowrap; pointer-events: none; animation: arena-name 3.5s forwards; }
 @keyframes arena-name { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .arena-stage .flame, .arena-stage .twinkle, .arena-stage .led, .arena-stage .wave, .arena-stage .palm, .snowfall { animation: none; } }
+/* ---------- Ranking e elos */
+.elo-badge { image-rendering: pixelated; flex-shrink: 0; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .25)); }
+.elo-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.elo-card { display: flex; align-items: center; gap: 8px; padding: 6px 10px; min-width: 150px; flex: 1 1 150px; }
+.elo-card.general { flex-basis: 100%; }
+.elo-card-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.elo-card-info small { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.elo-name { font-family: 'Press Start 2P', monospace; font-size: 11px; font-weight: normal; color: var(--elo); }
+.elo-card.general .elo-name { font-size: 14px; }
+.elo-bar { display: block; height: 6px; background: var(--panel-2); border: 1px solid var(--line); margin-top: 2px; }
+.elo-bar > span { display: block; height: 100%; }
+.hist-pts { font-weight: 700; }
+.hist-mid .hist-pts.v, .hist-pts.v { color: #2f8a4c; }
+.hist-mid .hist-pts.d, .hist-pts.d { color: #b5473f; }
+.ranking { display: flex; flex-direction: column; gap: 8px; }
+.ranking-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.ranking-tabs .chip { display: inline-flex; align-items: center; gap: 4px; }
+.ranking-help { padding: 6px 12px; font-size: 14px; }
+.ranking-help summary { cursor: pointer; font-weight: 600; }
+.ranking-help ul { margin: 6px 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.ranking-help .v { color: #2f8a4c; }
+.ranking-help .d { color: #b5473f; }
+.elo-ladder { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 4px 0; }
+.elo-ladder > span { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 70px; }
+.elo-ladder b { font-size: 12px; }
+.elo-ladder small { font-size: 11px; }
+.ranking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow: auto; }
+.ranking-row { width: 100%; display: grid; grid-template-columns: 36px auto auto 1fr auto; align-items: center; gap: 8px; padding: 6px 10px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.ranking-row:hover { background: var(--panel-2); }
+.ranking-row.top1 { background: linear-gradient(90deg, rgba(230, 180, 34, .25), transparent 70%); }
+.ranking-row.top2 { background: linear-gradient(90deg, rgba(174, 184, 196, .3), transparent 70%); }
+.ranking-row.top3 { background: linear-gradient(90deg, rgba(192, 122, 62, .25), transparent 70%); }
+.ranking-pos { font-family: 'Press Start 2P', monospace; font-size: 11px; text-align: center; }
+.ranking-pts { font-family: 'Press Start 2P', monospace; font-size: 13px; white-space: nowrap; }
+.ranking-pts small { font-size: 8px; }
+@media (max-width: 560px) { .ranking-row { grid-template-columns: 28px auto 1fr auto; } .ranking-row > :nth-child(3) { display: none; } }

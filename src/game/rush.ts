@@ -7,6 +7,7 @@ import {ITEMS, megaStonesFor} from '../data/items';
 import {calcStats, createMon} from './mon';
 import {applySet} from './sets';
 import type {OwnedMon} from './types';
+import {isScore, sideScore, type MatchScore, type SideScore} from './ranking';
 
 export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky';
 
@@ -233,6 +234,22 @@ export function duelRequest(b: Battle, side: Side): DuelReq {
 /** Quem ainda está de pé em cada lado (as bolinhas do placar). */
 export function duelBalls(b: Battle): {p1: boolean[]; p2: boolean[]} {
   return {p1: b.p1.pokemon.map(p => !p.fainted), p2: b.p2.pokemon.map(p => !p.fainted)};
+}
+
+/** Como cada lado terminou (Pokémon de pé e vida que sobrou), para os pontos de ranking. */
+export function duelScore(b: Battle): {p1: SideScore; p2: SideScore} {
+  return {p1: sideScore(b.p1.pokemon), p2: sideScore(b.p2.pokemon)};
+}
+
+/** Placar visto por um lado (p1 = quem roda a batalha). */
+export const scoreFor = (s: {p1: SideScore; p2: SideScore} | null | undefined, side: 'p1' | 'p2'): MatchScore | null =>
+  s ? (side === 'p1' ? {mine: s.p1, theirs: s.p2} : {mine: s.p2, theirs: s.p1}) : null;
+
+/** Placar que o dono da partida mandou, visto por quem entrou (p2). Inválido = sem placar. */
+export function guestScore(x: unknown): MatchScore | null {
+  const s = x as {p1: SideScore; p2: SideScore} | null;
+  const out = s && typeof s === 'object' ? scoreFor(s, 'p2') : null;
+  return out && isScore(out) ? out : null;
 }
 
 /** Aplica a escolha ("move 2", "switch 3") de um lado e devolve o que aconteceu. */
