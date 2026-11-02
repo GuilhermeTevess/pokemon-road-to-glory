@@ -6,7 +6,7 @@ import {bookName, getGym, gymsOf} from '../data/gyms';
 import type {Gym} from '../data/gyms';
 import {ACHIEVEMENTS, checkAchievements} from './achievements';
 import {POINTS, addPoints, finishSeason, leagueOf, legendsBeaten, rollRivalPoints} from './league';
-import {applyWipe} from './wipe';
+import {applyGymLoss, applyWipe} from './wipe';
 import {GYM_PRIZE, badgesIn, gymEncounter, gymStatus, gymWaves, ticketPrice} from './gym';
 import {hintHere, rollBiome, rollHintLegendary} from './travelers';
 import {dex, species, teachableMoves} from '../data/dex';
@@ -1299,16 +1299,23 @@ export const useGame = create<Store>((set, get) => {
             return;
           }
         } else if (outcome === 'lost' && enc.gym) {
-          healAll(run);
           run.gymTries = {...run.gymTries, [enc.gym]: (run.gymTries?.[enc.gym] ?? 0) + 1};
           // Muito raro, como no anime: o líder dá a insígnia por mérito mesmo com a derrota
           // (só se você derrubou pelo menos metade do time dele).
           const gymLost = getGym(enc.gym);
           const downed = ctl ? ctl.battle.p2.pokemon.filter(p => p.fainted).length : 0;
           if (gymLost && !run.badges?.includes(gymLost.id) && downed * 2 >= (enc.team?.length ?? 1) && Math.random() < MERIT_CHANCE) {
+            // Insígnia por mérito: o líder ainda cura o time de graça.
+            healAll(run);
             awardBadge(run, col, gymLost, enc, ctl?.battle.turn ?? 0, true);
-          } else get().toast(`${enc.trainer} venceu. Seu time foi curado; dá para tentar de novo com outro ingresso.`);
-          afterReward(run);
+            afterReward(run);
+            return;
+          }
+          // Sem cura depois: o ingresso já curou o time antes da luta. Quem caiu volta com 1 HP.
+          run.event = {kind: 'wipe', ...applyGymLoss(run, enc.trainer ?? 'o líder')};
+          run.cleared = run.wave;
+          run.lastEventWave = run.wave;
+          run.phase = 'event';
           return;
         } else if (outcome === 'lost' && enc.legend) {
           // Perder para uma lenda não acaba a run: o time é curado e a jornada segue.
@@ -1796,6 +1803,8 @@ export const useGame = create<Store>((set, get) => {
     startGymBattle() {
       mutate(run => {
         if (run.phase !== 'gymIntro') return;
+        // O ingresso inclui a cura: o time entra no ginásio inteiro (depois de perder, não tem cura grátis).
+        healAll(run);
         run.phase = 'battle';
         run.rerolls = 0;
         battle = null;

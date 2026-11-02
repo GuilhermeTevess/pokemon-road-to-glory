@@ -7,7 +7,7 @@ import type {Gym} from '../data/gyms';
 import {isMilestoneWave, SEASON_LENGTH} from './encounters';
 import {waveStep} from './career';
 import {discounted} from './glory';
-import {createMon} from './mon';
+import {createMon, stageAt} from './mon';
 import {LEADER_TALK} from '../data/gymTalk';
 import {TYPE_PT, dex, isLegendary, isPlayable, playableEvos, species} from '../data/dex';
 import type {Fame, Line} from './legend';
@@ -111,7 +111,7 @@ export function gymEncounter(gym: Gym, run: RunState, me: Fame): Encounter {
   const base = gym.team.slice(0, -1);
   const ace = gym.team[gym.team.length - 1];
   // Os primeiros do time, depois Pokémon extras do tipo; o ás sempre fecha.
-  const others = [...base, ...extraOfType(gym, 6)].slice(0, d.size - 1);
+  const others = [...base, ...extraOfType(gym, 6).map(n => stageAt(n, d.level))].slice(0, d.size - 1);
   const team = [...others.map(n => createMon(grownUp(n, d.level), {level: d.level, ivMin: d.ivMin, shinyChance: 0, hiddenAbilityChance: 0})), createMon(grownUp(ace, d.ace), {level: d.ace, ivMin: Math.min(31, d.ivMin + 6), shinyChance: 0, hiddenAbilityChance: 0})];
   const intro = me.fame >= 400 ? [`🎙️ O ginásio de ${gym.leader} está lotado! ${me.name} quer a ${gym.badge}!`] : [`${gym.leader}: "${LEADER_TALK[gym.leader]?.[0] ?? 'Vamos batalhar!'}"`];
   return {mon: team[0], team, rarity: 'rare', boss: true, trainer: gym.leader, gym: gym.id, arena: GYM_BIOME[gym.type], intro};

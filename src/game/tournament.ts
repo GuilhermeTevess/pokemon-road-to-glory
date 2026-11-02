@@ -5,7 +5,7 @@ import {BIOMES} from '../data/biomes';
 import {getRegion} from '../data/regions';
 import {aiMoveChoice, aiSwitchChoice} from './battle';
 import {generateEncounter} from './encounters';
-import {createMon, toSet} from './mon';
+import {createMon, stageAt, toSet} from './mon';
 import {RIVALS, rivalsOf} from '../data/rivals';
 import type {Rival} from '../data/rivals';
 import type {NarratorCtx} from './narration';
@@ -187,7 +187,8 @@ export function rivalTeam(rival: Rival, wave: number, size: number, skill: numbe
   // Quem abre a luta também varia (mas costuma ser um dos carros-chefes).
   if (Math.random() < 0.35) picked.unshift(...picked.splice(randInt(0, picked.length - 1), 1));
   return picked.map(name => {
-    const mon = createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
+    // No nível de agora: no começo da temporada o Charizard dele ainda é Charmeleon.
+    const mon = createMon(stageAt(name, level), {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
     mon.item = rivalItem(rival.name, name);
     return mon;
   });
@@ -245,7 +246,7 @@ export function worldTeam(b: WorldBot, wave: number, size: number): OwnedMon[] {
   // Quem abre a luta varia um pouco.
   if (Math.random() < 0.35 && team.length > 1) team.unshift(...team.splice(randInt(0, Math.min(size, team.length) - 1), 1));
   return team.slice(0, size).map(name => {
-    const mon = createMon(name, {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
+    const mon = createMon(stageAt(name, level), {level, ivMin: 10, shinyChance: 0, hiddenAbilityChance: 0.1});
     mon.item = rivalItem(b.name, name);
     return mon;
   });
