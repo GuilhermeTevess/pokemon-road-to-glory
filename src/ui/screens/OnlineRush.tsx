@@ -12,6 +12,8 @@ import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
 import {cardOf, loadHistory, recordMatch, rememberFoe, snapOf, withWin} from '../../game/history';
 import type {HistCard} from '../../game/history';
+import {flipKo, koFromLog, saneKo} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import {useGame} from '../../game/store';
 import {playCrowd, playCry, playFanfare} from '../audio';
 import {fast} from '../settings';
@@ -34,7 +36,7 @@ function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe
 }
 
 /** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
-function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu aparelho') {
+function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu aparelho', ko?: Ko[]) {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
     mode: `online-rush:${s.mode}`,
@@ -46,6 +48,7 @@ function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu ap
     mine: s.teams[me],
     theirs: s.teams[1 - me],
     note,
+    ko,
   });
 }
 
@@ -177,8 +180,9 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     send({t: 'events', events, balls: duelBalls(c.battle)});
     if (c.ended) {
       const winner = c.won ? 0 : 1;
-      send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name)});
-      logRush(sharedRef.current, 0, winner);
+      const ko = koFromLog(c.battle.log, 'p1');
+      send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name), ko});
+      logRush(sharedRef.current, 0, winner, undefined, ko);
       send({t: 'snap', snap: mySnap(sharedRef.current.players[0])});
       setTimeout(() => {
         playFanfare(1);
@@ -342,7 +346,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         else if (msg.t === 'end') {
           over.current = true;
           setReq(null);
-          if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number);
+          if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number, undefined, flipKo(saneKo(msg.ko)));
           setHostHist((msg.hist as HistCard | undefined) ?? null);
           const sh = sharedRef.current;
           if (sh) send({t: 'snap', snap: mySnap(sh.players[1])});

@@ -5,6 +5,7 @@
 import {cloudId, cloudRaw, cloudReady} from './cloud';
 import {isOnlineMode, loadHistory, onOnlineHistory, type History, type MatchLog, type ModeTotals} from './history';
 import {loadTrainers} from './trainers';
+import {saneKo} from './recap';
 
 /** Resumo de um jogador na nuvem (só a parte online do histórico). */
 export interface PlayerCard {
@@ -139,6 +140,7 @@ function saneMatch(x: unknown): MatchLog | null {
     mine: strs(m.mine),
     theirs: strs(m.theirs),
     note: str(m.note, 80) || undefined,
+    ko: saneKo(m.ko),
   };
 }
 
