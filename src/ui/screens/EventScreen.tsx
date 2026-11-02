@@ -41,10 +41,31 @@ export function EventScreen() {
   switch (ev.kind) {
     case 'wipe': {
       const partner = run.party.find(m => m.partner) ?? run.party[0];
+      const art = partner ? <Sprite name={partner.species} shiny={partner.shiny} className="hurt" /> : null;
+      if (ev.gym)
+        return (
+          <Scene
+            title="Derrota no ginásio"
+            art={art}
+            text={
+              <>
+                <p>
+                  <b>{ev.foe}</b> venceu desta vez. O ingresso já tinha pago a cura antes da luta, então agora não tem enfermaria de graça:
+                  quem caiu sai do ginásio machucado, com 1 HP.
+                </p>
+                <p className="hint">Use Poções e Revivers da mochila ou da Loja, ou aguente até o Centro Pokémon (a cada 10 rondas). Perder no ginásio não tira pontos.</p>
+              </>
+            }
+          >
+            <button className="btn primary" onClick={() => resolveEvent(null)}>
+              Seguir viagem
+            </button>
+          </Scene>
+        );
       return (
         <Scene
           title="Fuga pela trilha"
-          art={partner ? <Sprite name={partner.species} shiny={partner.shiny} className="hurt" /> : null}
+          art={art}
           text={
             <>
               <p>

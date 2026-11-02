@@ -78,7 +78,7 @@ export const BASE_STAGE: Species[] = PLAYABLE.filter(isBaseStage);
 
 // ---------------------------------------------------------------- Golpes
 
-function learnsetFor(s: Species): Record<string, string[]> {
+export function learnsetFor(s: Species): Record<string, string[]> {
   const tries = [s.id, toID(s.changesFrom ?? ''), toID(s.baseSpecies)];
   for (const id of tries) {
     if (!id) continue;

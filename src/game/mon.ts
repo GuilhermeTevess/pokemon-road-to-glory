@@ -1,5 +1,5 @@
 import type {PokemonSet, Species} from '@pkmn/sim';
-import {dex, movesAtLevel, movesLearnedAt, playableEvos, species} from '../data/dex';
+import {dex, isPlayable, learnsetFor, movesAtLevel, movesLearnedAt, playableEvos, species} from '../data/dex';
 import {getItem} from '../data/items';
 import {STAT_IDS} from './types';
 import type {OwnedMon, PendingEvent, StatTable} from './types';
@@ -179,4 +179,30 @@ export function levelUp(mon: OwnedMon, events: PendingEvent[]): number {
 export function expYield(defeated: OwnedMon, boss: boolean): number {
   const s = species(defeated.species);
   return Math.floor(((s.bst * defeated.level) / 4) * (boss ? 1.5 : 1));
+}
+
+/**
+ * Estágio de evolução que faz sentido para o nível: um Charizard de rival no nível 28 vira Charmeleon,
+ * um Gengar no 29 vira Haunter. Evolução por troca ou pedra conta como nível 30 (40 no 3º estágio).
+ * Evolução por amizade (Pikachu, Lucario) não volta: o parceiro do Ash continua Pikachu.
+ */
+export function stageAt(name: string, level: number): string {
+  let s = species(name);
+  for (let i = 0; i < 3 && s.prevo; i++) {
+    const prev = species(s.prevo);
+    if (!isPlayable(prev) || s.evoType === 'levelFriendship') break;
+    const need = s.evoLevel ?? (prev.prevo ? 40 : 30);
+    if (level >= need) break;
+    s = prev;
+  }
+  return s.name;
+}
+
+/** Golpes de assinatura que a forma anterior consegue aprender; o resto vem dos golpes do nível. */
+export function movesFor(name: string, wanted: string[], level: number): string[] {
+  const s = species(name);
+  const learn = learnsetFor(s);
+  const keep = wanted.filter(m => learn[dex.moves.get(m).id]);
+  const fill = movesAtLevel(s, level).filter(m => !keep.some(k => dex.moves.get(k).id === dex.moves.get(m).id));
+  return [...keep, ...fill].slice(0, 4);
 }
