@@ -94,6 +94,7 @@ export function deleteTrainerData(id: string): void {
   try {
     localStorage.removeItem(collectionKey(id));
     localStorage.removeItem(runKey(id));
+    localStorage.removeItem(`rtg-history-${id}`);
   } catch {
     /* ignora */
   }
