@@ -9,11 +9,29 @@ import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
+import {recordMatch} from '../../game/history';
+import {useGame} from '../../game/store';
 import {playCrowd, playCry, playFanfare} from '../audio';
 import {BattleView, DraftView, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 
 type Msg = Record<string, unknown>;
+
+/** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
+function logRush(s: Shared, me: 0 | 1, winner: number) {
+  const foe = s.players[1 - me];
+  recordMatch(useGame.getState().trainer?.id, {
+    mode: `online-rush:${s.mode}`,
+    online: true,
+    won: winner === me,
+    vs: foe.name,
+    vsAvatar: foe.avatar,
+    vsKind: 'player',
+    mine: s.teams[me],
+    theirs: s.teams[1 - me],
+    note: 'Cada um no seu aparelho',
+  });
+}
 
 interface Shared {
   step: 'lobby' | 'draft' | 'prep' | 'battle' | 'end';
@@ -104,6 +122,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     if (c.ended) {
       const winner = c.won ? 0 : 1;
       send({t: 'end', winner});
+      logRush(sharedRef.current, 0, winner);
       setTimeout(() => {
         playFanfare(1);
         playCrowd(1, 3);
@@ -215,6 +234,8 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   const [balls, setBalls] = useState<{p1: boolean[]; p2: boolean[]}>({p1: [], p2: []});
   const [req, setReq] = useState<DuelReq | null>(null);
   const [ended, setEnded] = useState<number | null>(null);
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
 
   const send = (msg: Msg) => link.current?.send(msg);
 
@@ -231,6 +252,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
         else if (msg.t === 'end') {
           setReq(null);
+          if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number);
           setTimeout(() => {
             playFanfare(1);
             playCrowd(1, 3);

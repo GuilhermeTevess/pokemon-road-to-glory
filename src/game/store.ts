@@ -31,12 +31,15 @@ import {cheapestHeal, getPlace, rivalEncounter, rollEvent, shouldRollEvent, tuto
 import {START_LEVELS, applyPerks, buyUpgrade, rerollPrice, gloryFor, perksOf, teamBudget} from './glory';
 import {DAYCARE_ITEMS, EGG_PRICE, MAX_EGGS, hatch, makeEgg} from './daycare';
 import {
-  adoptShared, applyToCareer, botPending, createSharedTournament, simulateBotMatch, createTournament, currentRound, highlightsFromLog, matchKey, myPending, placementLabel, playerIndex, playerMatch,
+  ROUND_NAMES, adoptShared, applyToCareer, botPending, createSharedTournament, simulateBotMatch, createTournament, currentRound, highlightsFromLog, matchKey, myPending, placementLabel, playerIndex, playerMatch,
   prizeIndex, recordPlayerResult, sharedAdvance, tourAt, tourInfo,
   tourName,
 } from './tournament';
 import type {MatchResult, TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
+import {bumpTotals, recordMatch} from './history';
+import type {FoeKind} from './history';
+import {getRival} from '../data/rivals';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
 import type {TrainerCareer} from './trainers';
 import {careerBoost, deviceId, enforceRules, fromSnap, groupLog, playerId, roundBlockers, seasonBlockers, snapMon, waveStep} from './career';
@@ -630,6 +633,20 @@ export const useGame = create<Store>((set, get) => {
       const {left: _left, ...egg} = run.egg;
       col.eggs = [...(col.eggs ?? []), egg];
     }
+    if (!run.career && !run.quick) {
+      // Histórico do perfil: a run inteira vira uma "partida" (vitória = temporada completa).
+      recordMatch(t?.id, {
+        mode: 'run',
+        online: false,
+        won: result === 'stageClear',
+        vs: `Ronda ${run.wave}`,
+        vsKind: 'run',
+        mine: run.party.map(m => m.species),
+        theirs: [],
+        note: result === 'stageClear' ? 'Temporada completa!' : result === 'abandoned' ? `Desistiu na ronda ${run.wave}` : `Caiu na ronda ${run.wave}`,
+      });
+      bumpTotals(t?.id, 'run', x => (x.best = Math.max(x.best ?? 0, run.wave)));
+    }
     col.runs.unshift({
       endedAt: Date.now(),
       wave: run.wave,
@@ -638,6 +655,31 @@ export const useGame = create<Store>((set, get) => {
       party: run.party.map(m => m.species),
     });
     col.runs = col.runs.slice(0, 30);
+  };
+
+  /** Histórico do perfil: luta contra treinador (ginásio, lenda, torneio, rival) numa run ou campeonato rápido. */
+  const logFight = (run: RunState, enc: Encounter, ctl: BattleController, won: boolean) => {
+    const name = enc.trainer!;
+    const t = run.tournament;
+    const gym = enc.gym ? getGym(enc.gym) : undefined;
+    const legend = enc.legend ? getLegend(enc.legend) : undefined;
+    const entrant = enc.tournament ? t?.entrants.find(e => e.name === name && !e.player) : undefined;
+    const sub: 'tour' | 'gym' | 'legend' | 'rival' = enc.tournament ? 'tour' : enc.gym ? 'gym' : enc.legend ? 'legend' : 'rival';
+    const mode = run.quick ? (run.quickRoom ? 'qtour-online' : 'qtour') : run.career ? 'career' : sub;
+    const used = run.party.filter(m => ctl.participants.has(m.uid)).map(m => m.species);
+    const shown = ctl.battle.p2.pokemon.filter(p => p.previouslySwitchedIn > 0 || p.isActive || p.fainted).map(p => p.set.species || p.species.name);
+    const where = sub === 'tour' && t ? `${tourName(t)} · ${ROUND_NAMES[t.rounds.length - 1] ?? ''}` : sub === 'gym' ? (gym?.badge ?? 'Ginásio') : sub === 'legend' ? 'Desafio de lenda' : 'Rival no caminho';
+    recordMatch(tid(), {
+      mode,
+      online: !!(run.quickRoom || run.career),
+      won,
+      vs: name,
+      vsAvatar: entrant?.avatar ?? legend?.avatar ?? getRival(name)?.avatar ?? (gym ? gym.leader.toLowerCase().replace(/[^a-z0-9]/g, '') : undefined),
+      vsKind: (sub === 'tour' ? 'bot' : sub) as FoeKind,
+      mine: used.length ? used : run.party.map(m => m.species),
+      theirs: shown,
+      note: run.career ? `${{tour: 'Torneio', gym: 'Ginásio', legend: 'Lenda', rival: 'Rival'}[sub]} · ${where}` : where,
+    });
   };
 
   const flushPending = (run: RunState) => {
@@ -1285,6 +1327,7 @@ export const useGame = create<Store>((set, get) => {
             run.faced = {...run.faced, [enc.trainer]: [...new Set([...prev, ...shown])]};
           }
         }
+        if (ctl && enc.trainer && outcome !== 'fled') logFight(run, enc, ctl, outcome === 'won' || outcome === 'caught');
         if (enc.tournament && run.tournament && ctl) {
           // Partida de torneio: perder não acaba a run, só tira você do torneio.
           const t = run.tournament;
@@ -1597,9 +1640,22 @@ export const useGame = create<Store>((set, get) => {
         const mine = t?.shared ? myPending(t) : null;
         const sc = sharedCode(run);
         if (!t || !mine || !sc) return;
+        const round = ROUND_NAMES[t.rounds.length - 1] ?? '';
         recordPlayerResult(t, won, myTeam, highlights, left);
         const m = t.rounds[mine.round][mine.index];
         const me = playerIndex(t);
+        const foe = t.entrants[m.a === me ? m.b : m.a];
+        recordMatch(tid(), {
+          mode: run.career ? 'career-pvp' : 'qtour-online',
+          online: true,
+          won,
+          vs: foe?.name ?? '?',
+          vsAvatar: foe?.avatar,
+          vsKind: 'player',
+          mine: myTeam,
+          theirs: foeTeam,
+          note: `${tourName(t)} · ${round}`,
+        });
         m.teams = m.a === me ? [myTeam, foeTeam] : [foeTeam, myTeam];
         if (host) void cloud.putMatch(sc, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights, left}).catch(() => undefined);
         healAll(run);
@@ -1619,6 +1675,7 @@ export const useGame = create<Store>((set, get) => {
       if (quick?.quick) {
         const t = quick.tournament;
         if (t) get().toast(`${tourName(t)}: ${placementLabel(t.placement ?? 5)}! Fim do campeonato rápido.`);
+        if (t?.placement === 1) bumpTotals(tid(), quick.quickRoom ? 'qtour-online' : 'qtour', x => (x.titles = (x.titles ?? 0) + 1));
         // Volta para a run de verdade (que ficou guardada).
         set({run: loadRun(tid()), screen: 'quickplay'});
         battle = null;
@@ -1630,6 +1687,7 @@ export const useGame = create<Store>((set, get) => {
         const info = tourInfo(t.kind);
         const i = prizeIndex(t.placement ?? 5);
         applyToCareer(careerOf(col), t);
+        if (t.placement === 1) bumpTotals(tid(), run.career ? 'career' : 'tour', x => (x.titles = (x.titles ?? 0) + 1));
         if (run.world) worldTournament(run.world, t, tourName(t), info.fame);
         const tc = get().trainer?.career;
         if (run.career && tc) patchCareer({results: [...tc.results, {season: run.career.season, kind: t.kind, placement: t.placement ?? 5}]});
