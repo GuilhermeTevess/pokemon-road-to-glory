@@ -37,7 +37,7 @@ import {
 } from './tournament';
 import type {MatchResult, TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
-import {bumpTotals, recordMatch} from './history';
+import {bumpTotals, loadHistory, recordMatch, snapOf} from './history';
 import type {FoeKind} from './history';
 import {getRival} from '../data/rivals';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
@@ -317,6 +317,7 @@ export const useGame = create<Store>((set, get) => {
       badges: live ? (live.badges ?? []).map(id => ({gym: id, ...(live.badgeInfo?.[id] ?? {wave: 0, team: [], tries: 1})})) : [],
       legends: live ? legendsBeaten(live) : [],
       partner: (live ?? run)?.party.find(m => m.partner)?.species,
+      hist: snapOf(loadHistory(t.id), t.name, t.avatar),
       updatedAt: Date.now(),
     };
   };

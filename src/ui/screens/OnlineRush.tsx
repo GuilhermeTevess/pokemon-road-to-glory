@@ -9,7 +9,7 @@ import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
-import {cardOf, loadHistory, recordMatch, withWin} from '../../game/history';
+import {cardOf, loadHistory, recordMatch, rememberFoe, snapOf, withWin} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {useGame} from '../../game/store';
 import {playCrowd, playCry, playFanfare} from '../audio';
@@ -21,6 +21,9 @@ type Msg = Record<string, unknown>;
 
 /** Resuminho do seu histórico agora (vai para o outro aparelho mostrar se você vencer). */
 const myCard = (name: string): HistCard => cardOf(loadHistory(useGame.getState().trainer?.id), name);
+/** Seu perfil para o amigo poder abrir depois (tocando no seu nome no histórico dele). */
+const mySnap = (p: Player) => snapOf(loadHistory(useGame.getState().trainer?.id), p.name, p.avatar);
+const keepFoe = (snap: unknown) => rememberFoe(useGame.getState().trainer?.id, snap);
 
 /** Histórico de quem venceu: o seu (já com esta partida) ou o do amigo (o que ele mandou + esta vitória). */
 function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe: HistCard | null): HistCard | null {
@@ -146,6 +149,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
       const winner = c.won ? 0 : 1;
       send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name)});
       logRush(sharedRef.current, 0, winner);
+      send({t: 'snap', snap: mySnap(sharedRef.current.players[0])});
       setTimeout(() => {
         playFanfare(1);
         playCrowd(1, 3);
@@ -168,7 +172,10 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     const s = sharedRef.current;
     if (msg.t === 'hello' && s.step === 'lobby') {
       foeHist.current = (msg.hist as HistCard | undefined) ?? null;
+      keepFoe(msg.snap);
       publish({...s, players: [s.players[0], msg.player as Player], step: 'draft', pairs: drawPairs(mode)});
+    } else if (msg.t === 'snap') {
+      keepFoe(msg.snap);
     } else if (msg.t === 'pick' && s.step === 'draft' && s.round % 2 === 1) {
       pick(msg.k as 0 | 1);
     } else if (msg.t === 'prepDone' && s.step === 'prep') {
@@ -282,6 +289,10 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
           setReq(null);
           if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number);
           setHostHist((msg.hist as HistCard | undefined) ?? null);
+          const sh = sharedRef.current;
+          if (sh) send({t: 'snap', snap: mySnap(sh.players[1])});
+        } else if (msg.t === 'snap') {
+          keepFoe(msg.snap);
           setTimeout(() => {
             playFanfare(1);
             playCrowd(1, 3);
@@ -291,7 +302,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
       },
       () => {
         setConnected(true);
-        send({t: 'hello', player: me, hist: myCard(me.name)});
+        send({t: 'hello', player: me, hist: myCard(me.name), snap: mySnap(me)});
       },
       () => alive && setError('A conexão com a sala caiu.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),

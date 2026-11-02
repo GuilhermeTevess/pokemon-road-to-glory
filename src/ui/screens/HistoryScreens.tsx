@@ -2,9 +2,10 @@
 // vitória por modo) e a lista das últimas partidas (você na esquerda, o adversário na direita).
 import {useMemo, useState} from 'react';
 import {species} from '../../data/dex';
-import {loadHistory, mvpOf, nemesisOf, sumRows, streakOf, tableOf, winRate, modeLabel} from '../../game/history';
+import {historyOfSnap, isSnap, loadHistory, mirrorHistory, mvpOf, nemesisOf, sumRows, streakOf, tableOf, winRate, modeLabel} from '../../game/history';
 import type {HistCard, History, MatchLog, TableRow} from '../../game/history';
 import {Modal, Sprite} from '../components';
+import {useGame} from '../../game/store';
 import {TrainerAvatar} from './StartScreens';
 
 const name = (s: string) => {
@@ -152,7 +153,7 @@ function Team({list}: {list: string[]}) {
   );
 }
 
-function MatchCard({m, me}: {m: MatchLog; me: {name: string; avatar: string}}) {
+function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: string}; onFoe?: (m: MatchLog) => void}) {
   const [open, setOpen] = useState(false);
   const run = m.vsKind === 'run';
   return (
@@ -183,7 +184,20 @@ function MatchCard({m, me}: {m: MatchLog; me: {name: string; avatar: string}}) {
           <>
             <div>
               <span className={`hist-tag ${m.won ? 'l' : 'w'}`}>{m.won ? 'LOSE' : 'WIN'}</span>
-              <b>{m.vs}</b>
+              {onFoe ? (
+                <button
+                  className="hist-foe-link"
+                  title={`Ver o perfil de ${m.vs}`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onFoe(m);
+                  }}
+                >
+                  {m.vs}
+                </button>
+              ) : (
+                <b>{m.vs}</b>
+              )}
             </div>
             <TrainerAvatar avatar={m.vsAvatar ?? ''} name={m.vs} size={40} />
           </>
@@ -225,7 +239,7 @@ const FILTERS: {id: Filter; label: string}[] = [
   {id: 'l', label: 'Derrotas'},
 ];
 
-function RecentList({h, me}: {h: History; me: {name: string; avatar: string}}) {
+function RecentList({h, me, onFoe}: {h: History; me: {name: string; avatar: string}; onFoe?: (m: MatchLog) => void}) {
   const [f, setF] = useState<Filter>('all');
   const list = h.list.filter(m => (f === 'off' ? !m.online : f === 'on' ? m.online : f === 'w' ? m.won : f === 'l' ? !m.won : true));
   return (
@@ -241,7 +255,7 @@ function RecentList({h, me}: {h: History; me: {name: string; avatar: string}}) {
       {!list.length && <p className="muted">Nenhuma partida aqui ainda.</p>}
       <div className="hist-list">
         {list.map((m, i) => (
-          <MatchCard key={`${m.at}-${i}`} m={m} me={me} />
+          <MatchCard key={`${m.at}-${i}`} m={m} me={me} onFoe={onFoe} />
         ))}
       </div>
     </section>
@@ -249,8 +263,44 @@ function RecentList({h, me}: {h: History; me: {name: string; avatar: string}}) {
 }
 
 /** Perfil do treinador (o seu ou de outro treinador deste aparelho). */
-export function FighterProfile({trainer, onClose}: {trainer: {id: string; name: string; avatar: string}; onClose: () => void}) {
-  const h = useMemo(() => loadHistory(trainer.id), [trainer.id]);
+/** Perfil de quem você enfrentou: outro treinador deste aparelho, o resumo que o aparelho dele mandou, ou (computador e amigo no mesmo PC) as partidas contra você. */
+interface FoeView {
+  trainer: {id?: string; name: string; avatar: string};
+  history: History;
+  note?: string;
+}
+
+function useFoeView(me: {id?: string; name: string; avatar: string}, h: History): (m: MatchLog) => FoeView {
+  const trainers = useGame(s => s.trainers);
+  const peers = useGame(s => s.careerPeers);
+  return (m: MatchLog) => {
+    const avatar = m.vsAvatar ?? '';
+    const local = trainers.find(t => t.name === m.vs && t.id !== me.id);
+    if (local) return {trainer: local, history: loadHistory(local.id)};
+    const peer = peers.find(p => p.name === m.vs);
+    if (peer && isSnap(peer.hist)) return {trainer: {name: peer.name, avatar: peer.avatar}, history: historyOfSnap(peer.hist), note: 'Perfil da carreira online (atualiza quando ele joga).'};
+    const snap = h.foes?.[m.vs];
+    if (snap) return {trainer: {name: snap.name, avatar: snap.avatar || avatar}, history: historyOfSnap(snap), note: `Como estava em ${when(snap.at)}, na última partida de vocês.`};
+    const kind = m.vsKind === 'cpu' ? 'O computador' : m.vsKind === 'friend' ? 'Este amigo' : m.online ? 'Este jogador' : 'Este treinador';
+    return {
+      trainer: {name: m.vs, avatar},
+      history: mirrorHistory(h, m.vs, me),
+      note: `${kind} não tem perfil neste aparelho: aqui estão só as partidas dele contra você.${m.online ? ' Na próxima partida online, o perfil completo dele chega junto.' : ''}`,
+    };
+  };
+}
+
+/** Perfil do treinador (o seu, de outro treinador deste aparelho ou de um adversário). */
+export function FighterProfile({trainer, history, note, onClose}: {
+  trainer: {id?: string; name: string; avatar: string};
+  /** Histórico pronto (adversário); sem ele, lê o do treinador pelo id. */
+  history?: History;
+  note?: string;
+  onClose: () => void;
+}) {
+  const h = useMemo(() => history ?? loadHistory(trainer.id), [history, trainer.id]);
+  const foeView = useFoeView(trainer, h);
+  const [foe, setFoe] = useState<FoeView | null>(null);
   const [tab, setTab] = useState<'stats' | 'recent'>('stats');
   const off = tableOf(h, false);
   const on = tableOf(h, true);
@@ -265,7 +315,7 @@ export function FighterProfile({trainer, onClose}: {trainer: {id: string; name: 
         <header className="profile-head">
           <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={88} />
           <div>
-            <span className="event-tag">Perfil do treinador</span>
+            <span className="event-tag">{history ? 'Perfil do adversário' : 'Perfil do treinador'}</span>
             <h2>{trainer.name}</h2>
             <span>
               {all.w + all.l} partidas · <b className="v">{all.w} vitórias</b> · <b className="d">{all.l} derrotas</b>
@@ -274,6 +324,7 @@ export function FighterProfile({trainer, onClose}: {trainer: {id: string; name: 
             <HistoryDots list={h.list} n={10} />
           </div>
         </header>
+        {note && <p className="hist-note">{note}</p>}
         {!!h.list.length && (
           <div className="hist-facts">
             {streak && streak.n >= 2 && (
@@ -311,9 +362,10 @@ export function FighterProfile({trainer, onClose}: {trainer: {id: string; name: 
             </p>
           </div>
         ) : (
-          <RecentList h={h} me={trainer} />
+          <RecentList h={h} me={trainer} onFoe={history ? undefined : m => setFoe(foeView(m))} />
         )}
       </div>
+      {foe && <FighterProfile trainer={foe.trainer} history={foe.history} note={foe.note} onClose={() => setFoe(null)} />}
     </Modal>
   );
 }
