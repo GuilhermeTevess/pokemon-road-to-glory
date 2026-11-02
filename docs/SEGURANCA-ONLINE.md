@@ -44,7 +44,7 @@ O jogo roda inteiro no navegador de cada um. Então quem programa sempre consegu
 - **Os próprios pontos e resultados** no ranking da carreira, dentro de valores possíveis.
 - **Lutas ao vivo**: cada aparelho calcula a batalha e manda as escolhas; um navegador modificado pode mandar dados falsos para o próprio lado.
 
-O que **não** dá mais: mexer no jogador, no time, nas salas ou nas mensagens **dos outros**, apagar coisas dos outros, mudar a chave do torneio depois de criada, ou encher o banco de lixo.
+O que **não** dá mais: mexer no jogador, no time, nas salas ou nas mensagens **dos outros**, apagar coisas dos outros, mudar a chave do torneio depois de criada, ou gravar documentos gigantes. (Criar muitos documentos pequenos ainda dá: regras não contam quantos pedidos cada um faz.)
 
 Deixar 100% à prova de trapaça precisaria de um servidor calculando todas as batalhas (como o Showdown tem). Dá para fazer no futuro (Firebase Functions, plano pago), mas é um projeto grande. Para um grupo de amigos, a regra de ouro é: se alguém aparecer com algo absurdo, dá para ver no perfil dele (histórico, times usados).
 
