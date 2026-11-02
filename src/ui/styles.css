@@ -1466,6 +1466,23 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .qt-players { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 10px 0; }
 .qt-player { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; }
 
+/* "Quer trocar o Pokémon?" antes da luta da run */
+.lead-prompt .lead-foe { padding: 14px; text-align: center; border-top: 6px solid var(--bc, var(--line)); }
+.lead-prompt h2 { margin: 0 0 8px; font-size: 20px; }
+.lead-foes { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.lead-foe-card { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 220px; max-width: 320px; }
+.lead-foe-card .row { justify-content: center; }
+.lead-foe-name { font-weight: 700; font-size: 17px; }
+.lead-ask { margin-top: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.lead-current { display: flex; gap: 10px; align-items: center; text-align: left; }
+.lead-current .row { margin-top: 4px; gap: 4px; }
+.lead-tip { margin-top: 4px; font-size: 14px; color: var(--ink-soft); }
+.lead-q { margin: 4px 0 0; font-weight: 700; font-size: 18px; text-align: center; }
+.lead-buttons { justify-content: center; gap: 8px; flex-wrap: wrap; }
+.lead-best { font-size: 13px; color: #3b8b4a; font-weight: 700; }
+.lead-always { font-size: 13px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: center; cursor: pointer; margin-top: 6px; }
+.switch-info .row.wrap { gap: 4px; }
+
 /* O fundo da arena (plateia, arquibancada, holofotes) fica numa camada própria, sempre
    atrás dos Pokémon: as fileiras da plateia têm z-index próprio e passavam na frente. */
 .arena > .arena-bg { z-index: 0; }
