@@ -5,10 +5,13 @@ import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
 import {teamToOwned} from '../../game/builder';
 import type {BuiltTeam} from '../../game/builder';
-import {recordMatch} from '../../game/history';
+import {recordMatch, type MatchExtra} from '../../game/history';
+import {flipKo, koFromLog, saneKo} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
+import {arenaFor} from '../../game/arenas';
 import type {Link} from '../../game/net';
-import {duelBalls, duelChoose, duelNeeds, duelRequest} from '../../game/rush';
+import {duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest} from '../../game/rush';
 import type {DuelReq} from '../../game/rush';
 import {useGame} from '../../game/store';
 import type {OwnedMon} from '../../game/types';
@@ -36,9 +39,10 @@ const ERRORS: Record<string, string> = {
   network: 'Sem conexão com a internet agora. Confira o Wi-Fi ou os dados móveis.',
 };
 
-function log(s: Shared, me: 0 | 1, winner: number, note?: string) {
+function log(s: Shared, me: 0 | 1, winner: number, note?: string, extra: MatchExtra = {}, ko?: Ko[]) {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
+    ...extra,
     mode: 'online-built',
     online: true,
     won: winner === me,
@@ -48,6 +52,7 @@ function log(s: Shared, me: 0 | 1, winner: number, note?: string) {
     mine: s.teams[me],
     theirs: s.teams[1 - me],
     note: note ?? `${s.names[me]} contra ${s.names[1 - me]}`,
+    ko,
   });
 }
 
@@ -100,7 +105,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
   const foeLeft = () => {
     const s = sharedRef.current;
     if (!playing(s.step) || ctl.current?.ended) return false;
-    log(s, 0, 0, FOE_QUIT);
+    log(s, 0, 0, FOE_QUIT, {quit: 'foe'});
     setFoeQuit(true);
     sharedRef.current = {...s, step: 'end', winner: 0};
     setShared(sharedRef.current);
@@ -109,7 +114,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
   };
   useMatchGuard(playing(shared.step) && !error, () => {
     if (ctl.current?.ended) return;
-    log(sharedRef.current, 0, 1, QUIT);
+    log(sharedRef.current, 0, 1, QUIT, {quit: 'me'});
     send({t: 'forfeit'});
   });
   const leave = () => requestLeave(onExit);
@@ -127,8 +132,10 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     send({t: 'events', events, balls: duelBalls(c.battle)});
     if (c.ended) {
       const winner = c.won ? 0 : 1;
-      send({t: 'end', winner});
-      log(sharedRef.current, 0, winner);
+      const ko = koFromLog(c.battle.log, 'p1');
+      const score = duelScore(c.battle);
+      send({t: 'end', winner, ko, score});
+      log(sharedRef.current, 0, winner, undefined, {score: scoreFor(score, 'p1')}, ko);
       setTimeout(() => {
         playFanfare(1);
         playCrowd(1, 3);
@@ -212,6 +219,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     const mine = idle && duelNeeds(c.battle, 'p1') ? duelRequest(c.battle, 'p1') : null;
     return (
       <BattleView
+        arena={arenaFor(code)}
         players={s.players}
         teams={s.teams}
         bottom="p1"
@@ -251,7 +259,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
     const s = sharedRef.current;
     if (over.current || !s || !playing(s.step)) return false;
     over.current = true;
-    log(s, 1, 1, FOE_QUIT);
+    log(s, 1, 1, FOE_QUIT, {quit: 'foe'});
     setReq(null);
     setFoeQuit(true);
     setEnded(1);
@@ -260,7 +268,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
   };
   useMatchGuard(connected && playing(shared?.step) && ended === null && !error, () => {
     over.current = true;
-    if (sharedRef.current) log(sharedRef.current, 1, 0, QUIT);
+    if (sharedRef.current) log(sharedRef.current, 1, 0, QUIT, {quit: 'me'});
     send({t: 'forfeit'});
   });
   const leave = () => requestLeave(onExit);
@@ -279,7 +287,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
         else if (msg.t === 'end') {
           over.current = true;
           setReq(null);
-          if (sharedRef.current) log(sharedRef.current, 1, msg.winner as number);
+          if (sharedRef.current) log(sharedRef.current, 1, msg.winner as number, undefined, {score: guestScore(msg.score)}, flipKo(saneKo(msg.ko)));
           setTimeout(() => {
             playFanfare(1);
             playCrowd(1, 3);
@@ -328,6 +336,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
   }
   return (
     <BattleView
+      arena={arenaFor(code)}
       players={s.players}
       teams={s.teams}
       bottom="p2"

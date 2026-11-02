@@ -4,9 +4,14 @@ import {useMemo, useState} from 'react';
 import {species} from '../../data/dex';
 import {historyOfSnap, isSnap, loadHistory, mirrorHistory, mvpOf, nemesisOf, sumRows, streakOf, tableOf, winRate, modeLabel} from '../../game/history';
 import type {HistCard, History, MatchLog, TableRow} from '../../game/history';
-import {Modal, PixelIcon, Sprite} from '../components';
+import {Modal, MoveInfo, PixelIcon, Sprite} from '../components';
+import {TYPE_COLORS, dex} from '../../data/dex';
+import {faintedMask} from '../../game/recap';
+import type {Ko} from '../../game/recap';
+import {MonInfo} from './BiomeGuide';
 import {useGame} from '../../game/store';
 import {TrainerAvatar} from './StartScreens';
+import {EloStrip} from './RankingScreens';
 
 const name = (s: string) => {
   try {
@@ -56,6 +61,19 @@ export function HistorySummary({card}: {card: HistCard}) {
         <small className="muted">
           {card.w}V · {card.l}D · {rate}% de vitórias
         </small>
+      )}
+      {!!card.last?.length && (
+        <ul className="hist-last">
+          {card.last.map((m, i) => (
+            <li key={i}>
+              <span className="hist-last-who">{card.who}</span>
+              <span className={m.won ? 'v' : 'd'}>{m.won ? 'vitória' : 'derrota'}</span>
+              <span className="muted">x</span>
+              <span className={m.won ? 'd' : 'v'}>{m.won ? 'derrota' : 'vitória'}</span>
+              <span className="hist-last-who">{m.vs}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -156,20 +174,137 @@ export const when = (at: number) => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} - ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-function Team({list}: {list: string[]}) {
+/** Não deixa um toque dentro das janelinhas (ficha, resumo) abrir/fechar a partida de trás. */
+const keep = (e: {stopPropagation: () => void}) => e.stopPropagation();
+
+/** Time de uma partida. Quem desmaiou fica em preto e branco com um X vermelho; tocar abre a ficha. */
+function Team({list, down, onMon}: {list: string[]; down?: boolean[]; onMon?: (s: string) => void}) {
   if (!list.length) return null;
   return (
     <span className="hist-team">
       {list.slice(0, 6).map((s, i) => (
-        <Sprite key={i} name={s} size={36} still />
+        <button
+          key={i}
+          className={`hist-mon ${down?.[i] ? 'down' : ''}`}
+          title={`${name(s)}${down?.[i] ? ' (desmaiou)' : ''} · ver ficha`}
+          onClick={e => {
+            keep(e);
+            onMon?.(s);
+          }}
+        >
+          <Sprite name={s} size={36} still />
+        </button>
       ))}
+    </span>
+  );
+}
+
+/** "2 caíram" (só quando a partida tem o resumo). */
+const downLabel = (mask: boolean[] | undefined) => {
+  if (!mask) return '';
+  const n = mask.filter(Boolean).length;
+  return n === 0 ? ' · ninguém caiu' : ` · ${n} caí${n > 1 ? 'ram' : 'u'}`;
+};
+
+function MoveChip({move, onMove}: {move: string; onMove: (m: string) => void}) {
+  const m = dex.moves.get(move);
+  return (
+    <button className="recap-move" style={{['--mc' as string]: TYPE_COLORS[m.type] ?? '#777'}} title="Ver o que o golpe faz" onClick={() => onMove(m.exists ? m.name : move)}>
+      {m.exists ? m.name : move}
+    </button>
+  );
+}
+
+/** Resumo da partida: rodada por rodada, quem nocauteou quem e com o quê. */
+function Recap({m, me, onClose}: {m: MatchLog; me: string; onClose: () => void}) {
+  const [mon, setMon] = useState<string | null>(null);
+  const [move, setMove] = useState<string | null>(null);
+  const ko = m.ko ?? [];
+  const owner = (side: 0 | 1) => (side === 0 ? me : m.vs);
+  const Mon = ({s, side}: {s: string; side: 0 | 1}) => (
+    <button className={`recap-mon ${side === 0 ? 'me' : 'foe'}`} onClick={() => setMon(s)} title="Ver ficha">
+      <Sprite name={s} size={28} still />
+      <b>{name(s)}</b>
+    </button>
+  );
+  const line = (k: Ko) => {
+    const victim = (
+      <>
+        <Mon s={k.mon} side={k.side} /> <small className="muted">de {owner(k.side)}</small>
+      </>
+    );
+    if (k.by && k.move)
+      return (
+        <>
+          <Mon s={k.by} side={(1 - k.side) as 0 | 1} /> nocauteou {victim} com <MoveChip move={k.move} onMove={setMove} />
+        </>
+      );
+    if (k.move)
+      return (
+        <>
+          {victim} caiu usando <MoveChip move={k.move} onMove={setMove} />
+        </>
+      );
+    return (
+      <>
+        {victim} desmaiou{k.why ? ` por ${k.why}` : ''}
+      </>
+    );
+  };
+  const rounds = [...new Set(ko.map(k => k.r))];
+  const mine = ko.filter(k => k.side === 1).length;
+  const theirs = ko.filter(k => k.side === 0).length;
+  return (
+    <span className="portal-anchor" onClick={keep}>
+      <Modal onClose={onClose}>
+        <div className="recap">
+          <h3>Resumo da partida</h3>
+          <p className="muted small">
+            {modeLabel(m.mode)} · {when(m.at)}
+          </p>
+          <div className="recap-score">
+            <span className={m.won ? 'v' : 'd'}>
+              {me} derrubou <b>{mine}</b>
+            </span>
+            <span className={m.won ? 'd' : 'v'}>
+              {m.vs} derrubou <b>{theirs}</b>
+            </span>
+          </div>
+          {!ko.length && <p className="muted">Ninguém desmaiou nessa partida.</p>}
+          <ol className="recap-list">
+            {rounds.map(r => (
+              <li key={r}>
+                <span className="recap-round">Rodada {r}</span>
+                {ko
+                  .filter(k => k.r === r)
+                  .map((k, i) => (
+                    <p key={i} className={`recap-line ${k.side === 0 ? 'lost' : 'won'}`}>
+                      {line(k)}
+                    </p>
+                  ))}
+              </li>
+            ))}
+          </ol>
+          <p className={`recap-end ${m.won ? 'v' : 'd'}`}>
+            <PixelIcon name="trophy" /> Vitória de {m.won ? me : m.vs}
+            {m.note ? ` · ${m.note}` : ''}
+          </p>
+          <p className="hint small">Toque num Pokémon para ver a ficha, ou num golpe para ver o tipo e o que ele faz.</p>
+        </div>
+      </Modal>
+      {mon && <MonInfo name={mon} onClose={() => setMon(null)} />}
+      {move && <MoveInfo move={move} onClose={() => setMove(null)} />}
     </span>
   );
 }
 
 function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: string}; onFoe?: (m: MatchLog) => void}) {
   const [open, setOpen] = useState(false);
+  const [mon, setMon] = useState<string | null>(null);
+  const [recap, setRecap] = useState(false);
   const run = m.vsKind === 'run';
+  const downMine = m.ko ? faintedMask(m.mine, m.ko, 0) : undefined;
+  const downTheirs = m.ko ? faintedMask(m.theirs, m.ko, 1) : undefined;
   return (
     <div className={`hist-match ${m.won ? 'won' : 'lost'}`} onClick={() => setOpen(!open)}>
       <div className="hist-side">
@@ -183,6 +318,12 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
         <span className={`hist-badge ${m.online ? 'on' : ''}`}><PixelIcon name={m.online ? 'globe' : 'phone'} size={12} /> {m.online ? 'Online' : 'Offline'}</span>
         <b>{modeLabel(m.mode)}</b>
         {m.note && <small>{m.note}</small>}
+        {typeof m.pts === 'number' && (
+          <small className={`hist-pts ${m.pts > 0 ? 'v' : m.pts < 0 ? 'd' : 'muted'}`}>
+            {m.pts > 0 ? '+' : ''}
+            {m.pts} pts no ranking
+          </small>
+        )}
         <small className="muted">{when(m.at)}</small>
       </div>
       <div className="hist-side foe">
@@ -222,14 +363,19 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
       {open && (
         <div className="hist-teams">
           <div>
-            <small className="muted">{run ? 'Time no fim da run' : 'Seu time'}</small>
-            <Team list={m.mine} />
+            <small className="muted">
+              {run ? 'Time no fim da run' : 'Seu time'}
+              {downLabel(downMine)}
+            </small>
+            <Team list={m.mine} down={downMine} onMon={setMon} />
             <small className="muted">{m.mine.map(name).join(', ')}</small>
           </div>
           {!run && (
             <div>
-              <small className="muted">Time de {m.vs} (o que você viu)</small>
-              <Team list={m.theirs} />
+              <small className="muted">
+                Time de {m.vs} (o que você viu){downLabel(downTheirs)}
+              </small>
+              <Team list={m.theirs} down={downTheirs} onMon={setMon} />
               <small className="muted">{m.theirs.map(name).join(', ') || '?'}</small>
             </div>
           )}
@@ -237,11 +383,30 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
       )}
       {!open && (
         <div className="hist-teams mini">
-          <Team list={m.mine} />
+          <Team list={m.mine} down={downMine} onMon={setMon} />
           {!run && <span className="muted">vs</span>}
-          {!run && <Team list={m.theirs} />}
+          {!run && <Team list={m.theirs} down={downTheirs} onMon={setMon} />}
         </div>
       )}
+      {m.ko && !run && (
+        <div className="hist-recap-row">
+          <button
+            className="btn small hist-recap-btn"
+            onClick={e => {
+              keep(e);
+              setRecap(true);
+            }}
+          >
+            <PixelIcon name="book" size={12} /> Resumo
+          </button>
+        </div>
+      )}
+      {mon && (
+        <span className="portal-anchor" onClick={keep}>
+          <MonInfo name={mon} onClose={() => setMon(null)} />
+        </span>
+      )}
+      {recap && <Recap m={m} me={me.name} onClose={() => setRecap(false)} />}
     </div>
   );
 }
@@ -274,7 +439,7 @@ function RecentList({h, me, onFoe, canOpen, onlineOnly}: {
           </button>
         ))}
       </div>
-      <p className="hint small">Toque numa partida para ver os dois times inteiros.</p>
+      <p className="hint small">Toque numa partida para ver os dois times inteiros, num Pokémon para ver a ficha, e em Resumo para ver quem nocauteou quem.</p>
       {!list.length && <p className="muted">Nenhuma partida aqui ainda.</p>}
       <div className="hist-list">
         {list.map((m, i) => (
@@ -378,6 +543,7 @@ export function FighterProfile({trainer, history, note, onClose, tag, onlineOnly
             )}
           </div>
         )}
+        {(onlineOnly || on.length > 0) && <EloStrip points={h.points} />}
         <div className="row wrap">
           <button className={`tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
             Estatísticas

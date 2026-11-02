@@ -5,6 +5,8 @@ import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
+import {koFromLog} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import {LUCKY_LEVEL, RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
@@ -16,15 +18,17 @@ import type {TourKind} from '../../game/tournament';
 import type {OwnedMon} from '../../game/types';
 import {CalcButton, CategoryIcon, HpBar, MatchupPanel, Modal, Narrated, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
 import {ArenaBackdrop} from '../scene';
+import {ArenaStage} from '../arenas';
+import {randomArena} from '../../game/arenas';
 import {TrainerAvatar} from './StartScreens';
-import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
+import {playClick, playCrowd, playCry, playFanfare, playHit, playMega, playMove} from '../audio';
 import {fast} from '../settings';
 import {OnlineRush} from './OnlineRush';
 import {HistorySummary} from './HistoryScreens';
 import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
-import {FX, playMoveFx} from '../fx';
+import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
 import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
 import {useMatchGuard} from '../leaveGuard';
@@ -442,7 +446,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         teams={teams}
         curtain={curtain && !vsCpu}
         cpu={vsCpu}
-        onEnd={w => {
+        onEnd={(w, ko) => {
           // Histórico do perfil: você é sempre o jogador 1 (esquerda).
           recordMatch(useGame.getState().trainer?.id, {
             mode: `rush:${mode}`,
@@ -454,6 +458,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
             mine: teams[0].map(m => m.species),
             theirs: teams[1].map(m => m.species),
             note: vsCpu ? 'Contra o computador' : 'Amigo no mesmo aparelho',
+            ko,
           });
           setWinner(w);
           setStep('end');
@@ -480,7 +485,8 @@ function localCard(players: [Player, Player], winner: number, vsCpu: boolean): H
   const h = loadHistory(id);
   if (winner === 0) return cardOf(h, players[0].name);
   const foe = players[1];
-  return vsCpu ? mirrorCard(h, foe.name, m => m.vsKind === 'cpu' && m.vs === foe.name) : mirrorCard(h, foe.name, m => m.vsKind === 'friend' && m.vs === foe.name);
+  const kind = vsCpu ? 'cpu' : 'friend';
+  return mirrorCard(h, foe.name, m => m.vsKind === kind && m.vs === foe.name, players[0].name);
 }
 
 /** Sorteio do Rush (o mesmo desenho no mesmo PC e no online). */
@@ -813,8 +819,10 @@ interface View {
  * Tela da batalha do Rush. Só mostra: quem decide o que acontece é o "driver"
  * (o mesmo PC revezando, ou a rede no online). `batches` cresce a cada turno resolvido.
  */
-export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, onChoose, onIdle}: {
+export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, arena, onChoose, onIdle}: {
   players: [Player, Player];
+  /** Arena com plateia dos modos rápidos (sem ela, a arena de madeira de sempre). */
+  arena?: number;
   /** Os times (nomes) de cada jogador, para o botão "Times". */
   teams?: [string[], string[]];
   /** Lado que aparece embaixo (o seu). */
@@ -868,9 +876,23 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         }
         if (ev.forme) {
           const f = ev.forme;
-          setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
-          playCry(f.species);
-          await wait(700);
+          const el = arenaRef.current?.querySelector<HTMLElement>(f.side === bottom ? '.player-slot' : '.wild-slot');
+          if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
+            // Megaevolução animada: junta energia, clarão e a forma nova aparece.
+            playMega('charge');
+            await Promise.race([
+              playMegaFx(fxRef.current, el, () => {
+                playMega('burst');
+                setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: undefined} : null}));
+                playCry(f.species);
+              }),
+              wait(3000),
+            ]);
+          } else {
+            setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
+            playCry(f.species);
+            await wait(700);
+          }
         }
         if (ev.move) {
           const mv = ev.move;
@@ -1005,7 +1027,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         ))}
       </div>
       <div className="arena" ref={arenaRef}>
-        <ArenaBackdrop tier={1} color="#7aa860" />
+        {arena != null ? <ArenaStage arena={arena} /> : <ArenaBackdrop tier={1} color="#7aa860" />}
         <div className="fx-layer" ref={fxRef} />
         {box(top, false)}
         {box(bottom, true)}
@@ -1130,7 +1152,9 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
 }
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
-export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
+export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number, ko: Ko[]) => void}) {
+  // Cada luta sorteia uma das arenas com plateia.
+  const [arena] = useState(randomArena);
   // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
   const ctl = useMemo(
     () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name}),
@@ -1144,12 +1168,13 @@ export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Play
     if (idle && ctl.ended) {
       playFanfare(1);
       playCrowd(1, 3);
-      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1), 1200);
+      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1, koFromLog(ctl.battle.log, 'p1')), 1200);
       return () => clearTimeout(t);
     }
   }, [idle, ctl, onEnd]);
   return (
     <BattleView
+      arena={arena}
       players={players}
       teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]}
       bottom="p1"

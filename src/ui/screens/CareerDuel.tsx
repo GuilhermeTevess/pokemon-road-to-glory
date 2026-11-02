@@ -3,11 +3,14 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {duelBalls, duelChoose, duelNeeds, duelRequest} from '../../game/rush';
+import {duelBalls, duelChoose, duelNeeds, duelRequest, duelScore, guestScore, scoreFor} from '../../game/rush';
+import type {MatchScore} from '../../game/ranking';
 import type {DuelReq} from '../../game/rush';
 import {hostRoom, joinRoom} from '../../game/net';
 import type {Link} from '../../game/net';
 import {highlightsFromLog} from '../../game/tournament';
+import {flipKo, koFromLog, saneKo} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import type {OwnedMon} from '../../game/types';
 import {playCrowd, playFanfare} from '../audio';
 import {BattleView} from './QuickplayScreen';
@@ -23,6 +26,11 @@ export interface DuelOutcome {
   left: number;
   myTeam: string[];
   foeTeam: string[];
+  /** Quem desmaiou (do ponto de vista de quem está neste aparelho). */
+  ko?: Ko[];
+  /** Como a batalha terminou (pontos de ranking). */
+  score?: MatchScore | null;
+  quit?: 'foe';
 }
 
 function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: string; onLeave: () => void}) {
@@ -50,7 +58,7 @@ function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: strin
   );
 }
 
-export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLeave}: {
+export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDone, onLeave}: {
   /** Código da sala (o mesmo nos dois PCs). */
   room: string;
   host: boolean;
@@ -60,6 +68,8 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
   team: OwnedMon[];
   /** Campeonato rápido: sair no meio da luta dá a vitória para o outro (na carreira, não). */
   forfeitable?: boolean;
+  /** Arena com plateia (campeonato rápido); na carreira fica a arena de sempre. */
+  arena?: number;
   /** `host` volta true quando o outro saiu: aí é você quem grava o resultado na chave. */
   onDone: (r: DuelOutcome, wonByQuit?: boolean) => void;
   onLeave: () => void;
@@ -93,7 +103,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
   const foeQuit = () => {
     if (!forfeitable || !startedRef.current || finished.current) return false;
     setStatus(`${foe.name} saiu da partida.`);
-    finish({won: true, highlights: [`${foe.name} saiu da partida. Vitória de ${me.name}!`], left: team.length, myTeam: team.map(m => m.species), foeTeam: foeTeam.current}, true);
+    finish({won: true, highlights: [`${foe.name} saiu da partida. Vitória de ${me.name}!`], left: team.length, myTeam: team.map(m => m.species), foeTeam: foeTeam.current, quit: 'foe'}, true);
     return true;
   };
   // A derrota em si o campeonato grava; aqui só avisamos o outro aparelho.
@@ -116,8 +126,10 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
       const left = side.pokemon.filter(p => !p.fainted).length;
       const highlights = highlightsFromLog(c.battle.log, me.name, foe.name, hostWon ? me.name : foe.name, left);
       const mine = team.map(m => m.species);
-      send({t: 'end', hostWon, highlights, left, hostTeam: mine});
-      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current});
+      const ko = koFromLog(c.battle.log, 'p1');
+      const score = duelScore(c.battle);
+      send({t: 'end', hostWon, highlights, left, hostTeam: mine, ko, score});
+      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current, ko, score: scoreFor(score, 'p1')});
       return;
     }
     send({t: 'req', req: duelNeeds(c.battle, 'p2') ? duelRequest(c.battle, 'p2') : null});
@@ -148,7 +160,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
     } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
     else if (msg.t === 'end') {
       const hostWon = !!msg.hostWon;
-      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[]});
+      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[], ko: flipKo(saneKo(msg.ko)), score: guestScore(msg.score)});
     }
   };
 
@@ -202,6 +214,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
   const mine = host ? (c && idle && duelNeeds(c.battle, 'p1') ? duelRequest(c.battle, 'p1') : null) : req;
   return (
     <BattleView
+      arena={arena}
       players={players}
       bottom={host ? 'p1' : 'p2'}
       batches={batches}

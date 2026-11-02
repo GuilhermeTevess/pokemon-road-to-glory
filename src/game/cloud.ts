@@ -21,7 +21,26 @@ export function cloudReady(): boolean {
 const BASE = () => `https://firestore.googleapis.com/v1/projects/${FIREBASE.projectId}/databases/(default)/documents`;
 const KEY = () => `key=${encodeURIComponent(FIREBASE.apiKey)}`;
 
-type Doc = {name?: string; fields?: {json?: {stringValue?: string}; owner?: {stringValue?: string}}};
+type FsValue = {stringValue?: string; integerValue?: string; doubleValue?: number; booleanValue?: boolean; mapValue?: {fields?: Record<string, FsValue>}};
+type Doc = {name?: string; fields?: {json?: {stringValue?: string}; owner?: {stringValue?: string}} & Record<string, FsValue>};
+
+/** Campos extras (fora do `json`) para as regras do banco conseguirem conferir: só números inteiros e mapas. */
+export type Extra = {[k: string]: number | Extra};
+
+function toFs(v: number | Extra): FsValue {
+  if (typeof v === 'number') return {integerValue: String(Math.floor(v))};
+  return {mapValue: {fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toFs(x)]))}};
+}
+
+function fromFs(v: FsValue | undefined): unknown {
+  if (!v) return undefined;
+  if (v.integerValue !== undefined) return Number(v.integerValue);
+  if (v.doubleValue !== undefined) return v.doubleValue;
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.booleanValue !== undefined) return v.booleanValue;
+  if (v.mapValue) return Object.fromEntries(Object.entries(v.mapValue.fields ?? {}).map(([k, x]) => [k, fromFs(x)]));
+  return undefined;
+}
 
 // ---------- Login anônimo ----------
 // Ninguém digita nada: na primeira vez o navegador ganha uma identidade secreta do Firebase
@@ -126,9 +145,13 @@ async function call(url: string, init: RequestInit = {}, json = false): Promise<
   return fetch(url, {...init, headers: await headers(json)});
 }
 
-async function body(value: unknown): Promise<string> {
+function extraFields(extra?: Record<string, Extra>): Record<string, FsValue> {
+  return extra ? Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, toFs(v)])) : {};
+}
+
+async function body(value: unknown, extra?: Record<string, Extra>): Promise<string> {
   const a = await auth();
-  const doc: Doc = {fields: {json: {stringValue: JSON.stringify(value)}, ...(a ? {owner: {stringValue: a.uid}} : {})}};
+  const doc: Doc = {fields: {json: {stringValue: JSON.stringify(value)}, ...(a ? {owner: {stringValue: a.uid}} : {}), ...extraFields(extra)}};
   return JSON.stringify(doc);
 }
 
@@ -150,12 +173,12 @@ async function getDoc<T>(path: string): Promise<T | null> {
   return parse<T>(await res.json());
 }
 
-async function putDoc(path: string, value: unknown): Promise<void> {
+async function putDoc(path: string, value: unknown, extra?: Record<string, Extra>): Promise<void> {
   if (localMode()) {
-    localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify({fields: {json: {stringValue: JSON.stringify(value)}}}));
+    localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify({fields: {json: {stringValue: JSON.stringify(value)}, ...extraFields(extra)}}));
     return;
   }
-  const data = await body(value);
+  const data = await body(value, extra);
   // keepalive: mensagens pequenas ainda saem se a pessoa fechar a aba (ex.: avisar que saiu da partida).
   // O navegador só aceita keepalive até 64 KB, então as grandes (turnos da batalha) vão sem.
   const res = await call(`${BASE()}/${path}?${KEY()}`, {method: 'PATCH', body: data, keepalive: data.length < 30000}, true);
@@ -193,30 +216,50 @@ async function delDoc(path: string): Promise<void> {
 }
 
 /** Acesso direto a documentos (as salas do Rush e do campeonato rápido online usam). */
-export const cloudRaw = {get: getDoc, put: putDoc, del: delDoc, createOnce, list: listDocs};
+export const cloudRaw = {get: getDoc, put: putDoc, del: delDoc, createOnce, list: listDocs, listWith, getField};
+
+/** Lê um campo extra de um documento (ex.: os pontos do ranking que o banco aceitou). */
+async function getField(path: string, field: string): Promise<unknown> {
+  const d = localMode() ? (JSON.parse(localStorage.getItem(`rtg-fakecloud/${path}`) ?? 'null') as Doc | null) : await (async () => {
+    const res = await call(`${BASE()}/${path}?${KEY()}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Firestore ${res.status}`);
+    return (await res.json()) as Doc;
+  })();
+  return fromFs(d?.fields?.[field]);
+}
+
+/** Lista com um campo extra junto de cada documento. */
+async function listWith<T>(path: string, field: string): Promise<{value: T; extra: unknown}[]> {
+  return (await listRaw(path)).flatMap(d => {
+    const value = parse<T>(d);
+    return value ? [{value, extra: fromFs(d.fields?.[field])}] : [];
+  });
+}
 
 async function listDocs<T>(path: string): Promise<T[]> {
+  return (await listRaw(path)).map(d => parse<T>(d)).filter((v): v is T => v !== null);
+}
+
+async function listRaw(path: string): Promise<Doc[]> {
   if (localMode()) {
-    const out: T[] = [];
+    const out: Doc[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i)!;
       if (!k.startsWith(`rtg-fakecloud/${path}/`)) continue;
-      const v = parse<T>(JSON.parse(localStorage.getItem(k) ?? 'null'));
-      if (v) out.push(v);
+      const d = JSON.parse(localStorage.getItem(k) ?? 'null') as Doc | null;
+      if (d) out.push(d);
     }
     return out;
   }
   // Lê todas as páginas (uma carreira longa passa de 100 partidas).
-  const out: T[] = [];
+  const out: Doc[] = [];
   let token = '';
   for (let page = 0; page < 50; page++) {
     const res = await call(`${BASE()}/${path}?pageSize=300${token ? `&pageToken=${encodeURIComponent(token)}` : ''}&${KEY()}`);
     if (!res.ok) throw new Error(`Firestore ${res.status}`);
     const data = (await res.json()) as {documents?: Doc[]; nextPageToken?: string};
-    for (const d of data.documents ?? []) {
-      const v = parse<T>(d);
-      if (v) out.push(v);
-    }
+    out.push(...(data.documents ?? []));
     if (!data.nextPageToken) break;
     token = data.nextPageToken;
   }

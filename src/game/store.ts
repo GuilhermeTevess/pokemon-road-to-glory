@@ -38,6 +38,7 @@ import {
 import type {MatchResult, TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
 import {bumpTotals, loadHistory, recordMatch, snapOf} from './history';
+import type {MatchScore} from './ranking';
 import {profileChanged, trainerRemoved} from './players';
 import type {FoeKind} from './history';
 import {getRival} from '../data/rivals';
@@ -51,6 +52,8 @@ import {seasonPoints} from './league';
 import type {Trainer} from './trainers';
 import {STAT_LABEL} from './types';
 import type {Encounter, OwnedMon, PendingEvent, RunPerks, RunState, StatId, StatTable} from './types';
+import {koFromLog} from './recap';
+import type {Ko} from './recap';
 
 export const PARTY_SIZE = 6;
 export const STARTER_LEVEL = 5;
@@ -223,7 +226,7 @@ interface Store {
   /** Torneio da carreira: pega (ou grava) a chave na nuvem para todo mundo jogar a mesma. */
   tourLoad(): Promise<void>;
   /** Resultado da partida ao vivo contra outro jogador. */
-  tourDuelResult(r: {won: boolean; highlights: string[]; left: number; myTeam: string[]; foeTeam: string[]; host: boolean}): void;
+  tourDuelResult(r: {won: boolean; highlights: string[]; left: number; myTeam: string[]; foeTeam: string[]; host: boolean; ko?: Ko[]; score?: MatchScore | null; quit?: 'foe'}): void;
   /** Carreira online: tenta seguir para a próxima ronda (se todo mundo já terminou a atual). */
   careerContinue(): Promise<void>;
   /** Quickplay: começa um campeonato avulso com o time escolhido. */
@@ -680,6 +683,7 @@ export const useGame = create<Store>((set, get) => {
       vsKind: (sub === 'tour' ? 'bot' : sub) as FoeKind,
       mine: used.length ? used : run.party.map(m => m.species),
       theirs: shown,
+      ko: koFromLog(ctl.battle.log, 'p1'),
       note: run.career ? `${{tour: 'Torneio', gym: 'Ginásio', legend: 'Lenda', rival: 'Rival'}[sub]} · ${where}` : where,
     });
   };
@@ -1638,7 +1642,7 @@ export const useGame = create<Store>((set, get) => {
       });
     },
 
-    tourDuelResult({won, highlights, left, myTeam, foeTeam, host}) {
+    tourDuelResult({won, highlights, left, myTeam, foeTeam, host, ko, score, quit}) {
       mutate(run => {
         const t = run.tournament;
         const mine = t?.shared ? myPending(t) : null;
@@ -1659,6 +1663,9 @@ export const useGame = create<Store>((set, get) => {
           mine: myTeam,
           theirs: foeTeam,
           note: `${tourName(t)} · ${round}`,
+          ko,
+          score,
+          quit,
         });
         m.teams = m.a === me ? [myTeam, foeTeam] : [foeTeam, myTeam];
         if (host) void cloud.putMatch(sc, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights, left}).catch(() => undefined);

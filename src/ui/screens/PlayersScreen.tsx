@@ -9,6 +9,7 @@ import {useGame} from '../../game/store';
 import {Modal, PixelIcon} from '../components';
 import {FighterProfile, HistoryDots, when, type FoeView} from './HistoryScreens';
 import {TrainerAvatar} from './StartScreens';
+import {RankingBoard} from './RankingScreens';
 
 const NOTE = 'Partidas online contra todo mundo. Atualiza no fim de cada partida online deste jogador.';
 
@@ -17,6 +18,7 @@ export function PlayersModal({onClose}: {onClose: () => void}) {
   const [list, setList] = useState<PlayerCard[] | null>(null);
   const [error, setError] = useState(false);
   const [open, setOpen] = useState<PlayerCard | null>(null);
+  const [tab, setTab] = useState<'ranking' | 'players'>('ranking');
   const ready = cloudReady();
 
   const load = useCallback(
@@ -53,7 +55,19 @@ export function PlayersModal({onClose}: {onClose: () => void}) {
             </button>
           )}
         </header>
-        <p className="hint small">Todo mundo que já jogou online. Toque num jogador para ver as partidas dele contra todo mundo, não só contra você.</p>
+        <div className="row wrap">
+          <button className={`tab ${tab === 'ranking' ? 'active' : ''}`} onClick={() => setTab('ranking')}>
+            <PixelIcon name="trophy" size={12} /> Ranking
+          </button>
+          <button className={`tab ${tab === 'players' ? 'active' : ''}`} onClick={() => setTab('players')}>
+            <PixelIcon name="people" size={12} /> Todos os jogadores
+          </button>
+        </div>
+        <p className="hint small">
+          {tab === 'ranking'
+            ? 'Pontos das partidas online contra outras pessoas. Toque num jogador para ver o perfil dele.'
+            : 'Todo mundo que já jogou online. Toque num jogador para ver as partidas dele contra todo mundo, não só contra você.'}
+        </p>
         {!ready ? (
           <p className="muted">O jogo online não está disponível nesta versão.</p>
         ) : error ? (
@@ -62,6 +76,8 @@ export function PlayersModal({onClose}: {onClose: () => void}) {
           <p className="muted">Carregando jogadores...</p>
         ) : !list.length ? (
           <p className="muted">Ninguém jogou online ainda. Jogue uma partida online (Rush, Dream Team, campeonato ou carreira) e você aparece aqui.</p>
+        ) : tab === 'ranking' ? (
+          <RankingBoard list={list} isMine={mine} onOpen={setOpen} />
         ) : (
           <div className="players-list">
             {list.map(p => {

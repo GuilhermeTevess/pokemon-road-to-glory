@@ -3,6 +3,9 @@
 // Fica no aparelho, um por treinador (rtg-history-<id>). A lista guarda só as últimas
 // partidas, mas os totais de vitórias/derrotas de cada modo nunca se perdem.
 import {RUSH_MODES} from './rush';
+import {flipKo, saneKo} from './recap';
+import type {Ko} from './recap';
+import {applyPoints, matchPoints, rankKeyOf, type MatchScore, type Points} from './ranking';
 
 export type FoeKind = 'cpu' | 'friend' | 'player' | 'bot' | 'gym' | 'legend' | 'rival' | 'run';
 
@@ -21,6 +24,10 @@ export interface MatchLog {
   theirs: string[];
   /** Detalhe curto: "Final · Copa da Liga", "Insígnia da Rocha", "Venceu com 2 de pé"... */
   note?: string;
+  /** Quem desmaiou, em que rodada e como (vira o "Resumo" da partida). Partidas antigas não têm. */
+  ko?: Ko[];
+  /** Pontos de ranking que a partida deu ou tirou (só partidas online contra pessoas). */
+  pts?: number;
 }
 
 export interface ModeTotals {
@@ -38,6 +45,8 @@ export interface History {
   totals: Record<string, ModeTotals>;
   /** Perfil de quem você enfrentou online (o que o aparelho dele mandou na última partida). */
   foes?: Record<string, FoeSnap>;
+  /** Pontos de ranking por modo online (contam a partir da versão com elos). */
+  points?: Points;
 }
 
 /** Resumo do histórico de alguém que mora em outro aparelho (mandado pela rede). */
@@ -47,6 +56,7 @@ export interface FoeSnap {
   at: number;
   list: MatchLog[];
   totals: Record<string, ModeTotals>;
+  points?: Points;
 }
 
 const SNAP_KEEP = 20;
@@ -54,7 +64,7 @@ const FOES_KEEP = 30;
 
 /** Seu perfil para mandar ao adversário (só as últimas partidas, para ficar leve). */
 export function snapOf(h: History, name: string, avatar: string): FoeSnap {
-  return {name, avatar, at: Date.now(), list: h.list.slice(0, SNAP_KEEP), totals: h.totals};
+  return {name, avatar, at: Date.now(), list: h.list.slice(0, SNAP_KEEP), totals: h.totals, points: h.points};
 }
 
 export function isSnap(x: unknown): x is FoeSnap {
@@ -66,21 +76,22 @@ export function isSnap(x: unknown): x is FoeSnap {
 export function rememberFoe(trainerId: string | null | undefined, snap: unknown): void {
   if (!trainerId || !isSnap(snap)) return;
   const h = loadHistory(trainerId);
-  const foes = {...h.foes, [snap.name]: {...snap, list: snap.list.slice(0, SNAP_KEEP)}};
+  const list = snap.list.slice(0, SNAP_KEEP).map(m => (m.ko ? {...m, ko: saneKo(m.ko)} : m));
+  const foes = {...h.foes, [snap.name]: {...snap, list}};
   const keep = Object.values(foes).sort((a, b) => b.at - a.at).slice(0, FOES_KEEP);
   save(trainerId, {...h, foes: Object.fromEntries(keep.map(f => [f.name, f]))});
 }
 
 /** Histórico vindo de um resumo (para abrir o perfil). */
 export function historyOfSnap(s: FoeSnap): History {
-  return {version: 1, list: s.list, totals: s.totals};
+  return {version: 1, list: s.list, totals: s.totals, points: s.points};
 }
 
 /** Histórico de alguém sem perfil próprio (computador, amigo no mesmo PC): as suas partidas contra ele, ao contrário. */
 export function mirrorHistory(h: History, vs: string, me: {name: string; avatar: string}): History {
   let out: History = {version: 1, list: [], totals: {}};
   for (const m of [...h.list].reverse().filter(x => x.vs === vs && x.vsKind !== 'run')) {
-    out = addMatch(out, {...m, won: !m.won, mine: m.theirs, theirs: m.mine, vs: me.name, vsAvatar: me.avatar, vsKind: 'player'});
+    out = addMatch(out, {...m, won: !m.won, mine: m.theirs, theirs: m.mine, ko: flipKo(m.ko), vs: me.name, vsAvatar: me.avatar, vsKind: 'player'});
   }
   return out;
 }
@@ -135,10 +146,28 @@ export function isOnlineMode(mode: string): boolean {
   return ONLINE.some(r => (r.key.endsWith(':') ? mode.startsWith(r.key) : mode === r.key));
 }
 
+/** Extras da partida que não ficam guardados: como terminou (para os pontos de ranking). */
+export interface MatchExtra {
+  score?: MatchScore | null;
+  /** Alguém saiu no meio. */
+  quit?: 'me' | 'foe';
+}
+
+/** Soma a partida e, se for online contra pessoas, os pontos de ranking do modo. */
+export function addScoredMatch(h: History, m: MatchLog, x: MatchExtra = {}): History {
+  // Só contra pessoas: no campeonato online também há bots, e esses não contam.
+  const key = m.online && m.vsKind === 'player' ? rankKeyOf(m.mode) : null;
+  if (!key) return addMatch(h, m);
+  const before = h.points?.[key] ?? 0;
+  const after = applyPoints(before, matchPoints(m.won, x.score, x.quit));
+  return {...addMatch(h, {...m, pts: after - before}), points: {...h.points, [key]: after}};
+}
+
 /** Grava uma partida no histórico do treinador. */
-export function recordMatch(trainerId: string | null | undefined, m: Omit<MatchLog, 'at'> & {at?: number}): void {
+export function recordMatch(trainerId: string | null | undefined, m: Omit<MatchLog, 'at'> & {at?: number} & MatchExtra): void {
   if (!trainerId) return;
-  save(trainerId, addMatch(loadHistory(trainerId), {at: Date.now(), ...m}));
+  const {score, quit, ...log} = m;
+  save(trainerId, addScoredMatch(loadHistory(trainerId), {at: Date.now(), ...log}, {score, quit}));
   if (m.online) onlineListener?.(trainerId);
 }
 
@@ -277,22 +306,27 @@ export interface HistCard {
   l: number;
   /** Ex.: "contra você" quando o histórico é o seu, ao contrário. */
   note?: string;
+  /** As mesmas últimas partidas, com o nome do adversário (aparelhos antigos não mandam). */
+  last?: {vs: string; won: boolean}[];
 }
 
 /** O seu histórico (todas as partidas). */
 export function cardOf(h: History, who: string): HistCard {
   const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
-  return {who, dots: h.list.slice(0, 5).map(m => m.won), w: all.w, l: all.l};
+  const last = h.list.slice(0, 5).map(m => ({vs: m.vs, won: m.won}));
+  return {who, dots: last.map(m => m.won), w: all.w, l: all.l, last};
 }
 
 /** Histórico de quem só existe neste aparelho (computador, amigo no mesmo PC): o seu contra ele, ao contrário. */
-export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean): HistCard {
+export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean, me = 'Você'): HistCard {
   const games = h.list.filter(match);
   const w = games.filter(m => !m.won).length;
-  return {who, dots: games.slice(0, 5).map(m => !m.won), w, l: games.length - w, note: 'contra você'};
+  const last = games.slice(0, 5).map(m => ({vs: me, won: !m.won}));
+  return {who, dots: last.map(m => m.won), w, l: games.length - w, note: 'contra você', last};
 }
 
 /** Soma uma vitória que acabou de acontecer num resumo recebido de outro aparelho. */
-export function withWin(c: HistCard): HistCard {
-  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1};
+export function withWin(c: HistCard, vs?: string): HistCard {
+  const last = vs && Array.isArray(c.last) ? [{vs, won: true}, ...c.last].slice(0, 5) : undefined;
+  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1, last};
 }
