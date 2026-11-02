@@ -104,6 +104,12 @@ async function auth(): Promise<Auth | null> {
   return authInFlight;
 }
 
+/** Identidade deste navegador no banco (para o documento do jogador). `null` = sem login. */
+export async function cloudId(): Promise<string | null> {
+  if (localMode()) return 'local';
+  return (await auth())?.uid ?? null;
+}
+
 async function headers(json = false): Promise<Record<string, string>> {
   const h: Record<string, string> = json ? {'Content-Type': 'application/json'} : {};
   const a = await auth();

@@ -38,6 +38,7 @@ import {
 import type {MatchResult, TourKind, Tournament} from './tournament';
 import {introLines} from './narration';
 import {bumpTotals, loadHistory, recordMatch, snapOf} from './history';
+import {profileChanged, trainerRemoved} from './players';
 import type {FoeKind} from './history';
 import {getRival} from '../data/rivals';
 import {MAX_TRAINERS, deleteTrainerData, loadTrainers, newTrainer, runKey, saveTrainers} from './trainers';
@@ -862,8 +863,10 @@ export const useGame = create<Store>((set, get) => {
       );
       saveTrainers(trainers, tid());
       set({trainers, trainer: trainers.find(t => t.id === get().trainer?.id) ?? null});
+      profileChanged(id);
     },
     removeTrainer(id) {
+      trainerRemoved(id);
       deleteTrainerData(id);
       const trainers = get().trainers.filter(t => t.id !== id);
       set({trainers});

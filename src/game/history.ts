@@ -123,10 +123,23 @@ export function addMatch(h: History, m: MatchLog): History {
   return {...h, list: [m, ...h.list].slice(0, HISTORY_KEEP), totals: {...h.totals, [m.mode]: t}};
 }
 
+// Quem quer saber quando o histórico online muda (a lista de jogadores manda o perfil para a nuvem).
+let onlineListener: ((trainerId: string) => void) | null = null;
+
+export function onOnlineHistory(fn: ((trainerId: string) => void) | null): void {
+  onlineListener = fn;
+}
+
+/** O modo é online (contra pessoas ou na carreira online)? */
+export function isOnlineMode(mode: string): boolean {
+  return ONLINE.some(r => (r.key.endsWith(':') ? mode.startsWith(r.key) : mode === r.key));
+}
+
 /** Grava uma partida no histórico do treinador. */
 export function recordMatch(trainerId: string | null | undefined, m: Omit<MatchLog, 'at'> & {at?: number}): void {
   if (!trainerId) return;
   save(trainerId, addMatch(loadHistory(trainerId), {at: Date.now(), ...m}));
+  if (m.online) onlineListener?.(trainerId);
 }
 
 /** Mexe num total sem criar partida (título de campeonato, melhor ronda). */
@@ -136,6 +149,7 @@ export function bumpTotals(trainerId: string | null | undefined, mode: string, f
   const t = {...(h.totals[mode] ?? {w: 0, l: 0})};
   fn(t);
   save(trainerId, {...h, totals: {...h.totals, [mode]: t}});
+  if (isOnlineMode(mode)) onlineListener?.(trainerId);
 }
 
 export function deleteHistory(trainerId: string): void {
