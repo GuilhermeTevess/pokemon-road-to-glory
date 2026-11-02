@@ -62,7 +62,7 @@ export function QuickplayScreen() {
         <h2>{mode === 'tour' ? 'Campeonato rápido offline' : 'Quickplay'}</h2>
       </header>
       {mode === 'menu' && (
-        <div className="qp-cards">
+        <div className="qp-cards" data-tut="qp-menu">
           <button className="qp-card" onClick={() => setMode('rush')}>
             <span className="qp-icon">
               <PixelIcon name="bolt" size={30} />
@@ -169,7 +169,7 @@ export function OnlineOffline({title, online, offline, onPick, onBack}: {title: 
         </button>
         <h2>{title}</h2>
       </header>
-      <div className="qp-cards">
+      <div className="qp-cards" data-tut="online-offline">
         <button className="qp-card" onClick={() => onPick(false)}>
           <span className="qp-icon">
             <PixelIcon name="phone" size={30} />
@@ -193,7 +193,7 @@ function ModePicker({mode, setMode}: {mode: RushMode; setMode: (m: RushMode) => 
   return (
     <>
       <h3>Modo</h3>
-      <div className="rush-modes">
+      <div className="rush-modes" data-tut="rush-modes">
         {RUSH_MODES.map(m => (
           <button key={m.id} className={`rush-mode ${mode === m.id ? 'on' : ''}`} onClick={() => setMode(m.id)}>
             <b>{m.name}</b>
@@ -940,7 +940,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
       <div className="versus-head">
         <span className="versus-teams">
           {teams && (
-            <button className="btn small" onClick={() => setTeamsOpen(true)} title="Ver os dois times, com os tipos">
+            <button className="btn small" data-tut="versus-teams" onClick={() => setTeamsOpen(true)} title="Ver os dois times, com os tipos">
               <PixelIcon name="people" /> Times
             </button>
           )}

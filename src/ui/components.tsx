@@ -458,7 +458,7 @@ export function TypeCalc({initial, onClose}: {initial: string[]; onClose: () => 
     <Modal onClose={onClose} wide>
       <h2>Calculadora de tipos</h2>
       <p className="hint">Escolha 1 ou 2 tipos (o tipo do Pokémon inimigo, por exemplo).</p>
-      <div className="type-filter">
+      <div className="type-filter" data-tut="type-calc">
         {ALL_TYPES.map(t => (
           <button
             key={t}

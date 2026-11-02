@@ -20,6 +20,7 @@ import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
 import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
 import {fast, setFast} from './settings';
+import {Tutorial} from './Tutorial';
 
 export function App() {
   const {screen, run, toasts, achievePops, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
@@ -82,11 +83,12 @@ export function App() {
             <span className="bag-short">Painel</span>
           </button>
         )}
-        <button className="btn small ghost" onClick={() => openTypeCalc([])} title="Calculadora de tipos">
+        <button className="btn small ghost" data-tut="nav-types" onClick={() => openTypeCalc([])} title="Calculadora de tipos">
           <PixelIcon name="dice" /> <span className="nav-label">Tipos</span>
         </button>
         <button
           className={`btn small ghost ${fastOn ? 'on' : ''}`}
+          data-tut="nav-fast"
           onClick={() => {
             setFast(!fastOn);
             setFastOn(!fastOn);
@@ -95,10 +97,10 @@ export function App() {
         >
           <PixelIcon name={fastOn ? 'fast' : 'play'} /> <span className="nav-label">{fastOn ? 'Rápido' : 'Animações'}</span>
         </button>
-        <button className="btn small ghost" onClick={() => setGuideOpen(true)} title="Guia dos biomas: quem aparece em cada lugar e com que chance">
+        <button className="btn small ghost" data-tut="nav-guide" onClick={() => setGuideOpen(true)} title="Guia dos biomas: quem aparece em cada lugar e com que chance">
           <PixelIcon name="book" /> <span className="nav-label">Guia</span>
         </button>
-        <button className="btn small ghost" onClick={() => setHelpOpen(true)} title="Como jogar">
+        <button className="btn small ghost" data-tut="nav-help" onClick={() => setHelpOpen(true)} title="Como jogar">
           <PixelIcon name="help" /> <span className="nav-label">Ajuda</span>
         </button>
         <button
@@ -148,6 +150,7 @@ export function App() {
           </button>
         </Modal>
       )}
+      <Tutorial />
       <div className="achieve-pops">
         {achievePops.map(a => (
           <AchievePop key={a.id} name={a.name} icon={a.icon} desc={a.desc} />

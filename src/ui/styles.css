@@ -1671,6 +1671,75 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .bar .calc-btn { margin-left: auto; }
 .mega-hint { max-width: 520px; text-align: center; background: #efe2ff; border: var(--px) solid #8a3cc8; padding: 6px 10px; }
 
+/* ---------- Tutorial: pergunta da entrada e destaque brilhante passo a passo */
+.btn.tut-yes { background: var(--mint); }
+.btn.tut-yes:hover:not(:disabled) { background: #86d6a1; }
+.btn.tut-no { background: var(--red); }
+.btn.tut-no:hover:not(:disabled) { background: #ea7474; }
+.btn.tut-never { background: #d9d5de; color: #5d5868; }
+.btn.tut-never:hover:not(:disabled) { background: #c9c4cf; }
+
+.tut-ask-backdrop { position: fixed; inset: 0; z-index: 400; background: rgba(59, 51, 85, .55); display: flex; align-items: center; justify-content: center; padding: 16px; animation: fade .2s steps(4); }
+.tut-ask { background: var(--panel); border: var(--px) solid var(--line); box-shadow: 8px 8px 0 rgba(59, 51, 85, .35); padding: 20px 18px 18px; max-width: 440px; width: 100%; text-align: center; position: relative; }
+.tut-ask h2 { margin: 6px 0 8px; }
+.tut-ask-mascot { height: 72px; display: flex; align-items: flex-end; justify-content: center; }
+.tut-ask-mascot img { max-height: 72px; animation: hero-bob 1s steps(2) infinite; }
+.tut-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.tut-ask-buttons .tut-yes, .tut-ask-buttons .tut-no { font-family: 'Press Start 2P', monospace; font-size: 11px; font-weight: normal; padding: 12px 22px; }
+.tut-ask-buttons .tut-yes { animation: tut-pulse 1.2s steps(2) infinite; }
+.tut-ask-buttons .tut-never { flex-basis: 100%; font-size: 15px; padding: 6px 10px; }
+
+.tut-layer { position: fixed; inset: 0; z-index: 300; }
+.tut-blocker { position: absolute; inset: 0; background: transparent; }
+.tut-blocker.dim { background: rgba(30, 24, 48, .62); }
+/* O anel ilumina o botão e escurece o resto da tela (sombra gigante). */
+.tut-ring {
+  position: fixed;
+  pointer-events: none;
+  border: 4px solid #fff3a0;
+  outline: var(--px) solid var(--line);
+  box-shadow: 0 0 0 9999px rgba(30, 24, 48, .62), 0 0 0 7px var(--butter-d), 0 0 22px 8px #fff3a0;
+  transition: left .18s steps(3), top .18s steps(3), width .18s steps(3), height .18s steps(3);
+  animation: tut-glow 1s steps(2) infinite;
+}
+@keyframes tut-glow {
+  50% { border-color: #ffffff; box-shadow: 0 0 0 9999px rgba(30, 24, 48, .62), 0 0 0 7px var(--butter), 0 0 34px 14px #fff8c8; }
+}
+@keyframes tut-pulse { 50% { transform: scale(1.06); filter: brightness(1.08); } }
+/* Brilhinhos em pixel nos cantos do destaque. */
+.tut-spark { position: absolute; width: 8px; height: 8px; background: #fffbd8; box-shadow: 0 0 0 2px var(--butter-d); animation: twinkle 1.1s steps(3) infinite; }
+.tut-spark.a { left: -10px; top: -10px; }
+.tut-spark.b { right: -10px; top: -10px; animation-delay: .3s; }
+.tut-spark.c { right: -10px; bottom: -10px; animation-delay: .55s; }
+.tut-spark.d { left: -10px; bottom: -10px; animation-delay: .8s; }
+
+.tut-card {
+  position: fixed;
+  width: min(380px, calc(100vw - 16px));
+  background: var(--panel);
+  border: var(--px) solid var(--line);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, .35);
+  padding: 12px 14px 12px;
+  animation: fade .15s steps(3);
+}
+.tut-card-head { display: flex; align-items: center; gap: 8px; margin: 2px 110px 4px 0; }
+.tut-card-head h3 { margin: 0; font-size: 11px; }
+.tut-card-icon { flex: none; display: inline-flex; padding: 3px; background: var(--butter); border: 2px solid var(--line); }
+.tut-card p { margin: 6px 0 10px; font-size: 16px; }
+.tut-skip { position: absolute; top: 8px; right: 8px; background: var(--red); font-size: 14px !important; padding: 3px 8px !important; }
+.tut-skip:hover:not(:disabled) { background: #ea7474 !important; }
+.tut-card-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.tut-dots { display: flex; gap: 4px; margin-right: auto; flex-wrap: wrap; }
+.tut-dots i { width: 8px; height: 8px; background: var(--panel-2); border: 2px solid var(--line); }
+.tut-dots i.done { background: var(--mint-d); }
+.tut-dots i.on { background: var(--butter-d); }
+.tut-next { background: var(--mint); animation: tut-pulse 1.2s steps(2) infinite; }
+.tut-next:hover:not(:disabled) { background: #86d6a1; }
+
+.help-tutorial { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .tut-ring, .tut-next, .tut-ask-buttons .tut-yes, .tut-spark, .tut-ask-mascot img { animation: none; }
+}
 /* Guia: busca em todos os biomas e cartão do Pokémon */
 button.guide-mon { font: inherit; color: inherit; text-align: left; border: 2px solid transparent; cursor: pointer; }
 button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: var(--sky); color: var(--ink); }
