@@ -18,7 +18,8 @@
 1. Entre em <https://console.firebase.google.com> e abra o projeto **pokemon-road-to-glory**.
 2. No menu da esquerda: **Criação** (Build) → **Authentication**.
 3. Se aparecer, clique em **Vamos começar** (Get started).
-4. Aba **Método de login** (Sign-in method) → **Anônimo** (Anonymous) → ligue **Ativar** → **Salvar**.
+4. Aba **Método de login** (Sign-in method) → **Anônimo** (Anonymous) → ligue **Ativar**.
+5. **Desmarque "Ativar a limpeza automática"** (ela apaga as identidades com mais de 30 dias, e quem jogasse há mais de um mês perderia o próprio jogador) → **Salvar**.
 
 ### 2. Juntar o PR
 Aprove e junte o PR. Espere uns 2 minutos o site atualizar e abra o jogo uma vez (recarregue a página).
