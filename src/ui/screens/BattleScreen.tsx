@@ -36,6 +36,7 @@ import {FX, isMegaForme, playMegaFx, playMoveFx, throwBallFx} from '../fx';
 import {lineRoot} from '../../game/meta';
 import type {OwnedMon} from '../../game/types';
 import {Hearts} from './CollectionScreen';
+import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
 import {maxHp as maxHpOf} from '../../game/mon';
 import {itemSpriteUrl} from '../../data/dex';
 
@@ -103,6 +104,7 @@ export function BattleScreen() {
   const [megaOn, setMegaOn] = useState(false);
   const arenaRef = useRef<HTMLDivElement>(null);
   const caughtRef = useRef(false);
+  const {tracker, push} = useBattleTracker();
 
   const biome = getBiome(run.encounter?.arena ?? run.biome);
   const enc = run.encounter!;
@@ -120,6 +122,7 @@ export function BattleScreen() {
       const setterOf = (side: 'p1' | 'p2') => (side === 'p1' ? setPlayers : setWilds);
       for (const ev of events) {
         const slot = ev.slot ?? 0;
+        push(ev);
         if (ev.switchIn) {
           const s = ev.switchIn;
           if (s.side === 'p1') {
@@ -193,7 +196,7 @@ export function BattleScreen() {
       setBusy(false);
       force(x => x + 1);
     },
-    [enc, lookupPlayer],
+    [enc, lookupPlayer, push],
   );
   const player = players[ctl?.slot ?? 0] ?? players.find(Boolean) ?? null;
 
@@ -315,7 +318,10 @@ export function BattleScreen() {
             </>
           )}
         </div>
-        <span className="battle-tag money">₽ {run.money}</span>
+        <span className="battle-right">
+          <BattleLog tracker={tracker} mine="p1" owner={side => (side === 'p1' ? 'Você' : enc.trainer ?? (enc.boss ? 'Chefe' : 'Selvagem'))} />
+          <span className="battle-tag money">₽ {run.money}</span>
+        </span>
       </div>
       <div className={`arena ${ctl.doubles ? 'doubles' : ''}`} ref={arenaRef} style={{backgroundColor: biome.color}}>
         {enc?.venue != null ? (
@@ -331,7 +337,8 @@ export function BattleScreen() {
             <div key={`w${i}`} className="slot-group">
               <div className={`info-box wild-box s${i}`}>
                 <div className="info-name">
-                  {species(wild.species).name}{wild.shiny && <ShinyStar />} <span className="lv">Nv. {wild.level}</span>
+                  <SpeciesButton name={wild.species} />
+                  {wild.shiny && <ShinyStar />} <span className="lv">Nv. {wild.level}</span>
                 </div>
                 <div className="row">
                   <Types name={wild.species} />
@@ -347,9 +354,12 @@ export function BattleScreen() {
                   <StatusBadge status={wild.status} />
                 </div>
                 <HpBar hp={wild.hp} maxhp={wild.maxhp} />
-                <button className={`weak-btn ${showInfo === `w${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `w${i}` ? null : `w${i}`)}>
-                  Fraquezas {showInfo === `w${i}` ? '▴' : '▾'}
-                </button>
+                <div className="info-btns">
+                  <button className={`weak-btn ${showInfo === `w${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `w${i}` ? null : `w${i}`)}>
+                    Fraquezas {showInfo === `w${i}` ? '▴' : '▾'}
+                  </button>
+                  <BoostButton boosts={tracker.boostsAt('p2', i)} open={showInfo === `bw${i}`} onToggle={() => setShowInfo(showInfo === `bw${i}` ? null : `bw${i}`)} />
+                </div>
                 {showInfo === `w${i}` && (
                   <div className="weak-pop below">
                     <MatchupPanel types={[...species(wild.species).types]} />
@@ -390,16 +400,22 @@ export function BattleScreen() {
                   </div>
                 )}
                 <div className="info-name">
-                  <MonName mon={pv} /> <span className="lv">Nv. {pv.level}</span>
+                  <SpeciesButton name={pv.species}>
+                    <MonName mon={pv} />
+                  </SpeciesButton>{' '}
+                  <span className="lv">Nv. {pv.level}</span>
                 </div>
                 <div className="row">
                   <Types name={pv.species} />
                   <StatusBadge status={pv.status} />
                 </div>
                 <HpBar hp={pv.hp} maxhp={pv.maxhp} showNumbers />
-                <button className={`weak-btn ${showInfo === `p${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `p${i}` ? null : `p${i}`)}>
-                  Fraquezas {showInfo === `p${i}` ? '▴' : '▾'}
-                </button>
+                <div className="info-btns">
+                  <button className={`weak-btn ${showInfo === `p${i}` ? 'open' : ''}`} onClick={() => setShowInfo(showInfo === `p${i}` ? null : `p${i}`)}>
+                    Fraquezas {showInfo === `p${i}` ? '▴' : '▾'}
+                  </button>
+                  <BoostButton above boosts={tracker.boostsAt('p1', i)} open={showInfo === `bp${i}`} onToggle={() => setShowInfo(showInfo === `bp${i}` ? null : `bp${i}`)} />
+                </div>
               </div>
             </div>
           ) : null,

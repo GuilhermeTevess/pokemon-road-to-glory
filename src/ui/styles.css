@@ -1869,3 +1869,69 @@ button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: v
 .ranking-pts { font-family: 'Press Start 2P', monospace; font-size: 13px; white-space: nowrap; }
 .ranking-pts small { font-size: 8px; }
 @media (max-width: 560px) { .ranking-row { grid-template-columns: 28px auto 1fr auto; } .ranking-row > :nth-child(3) { display: none; } }
+/* Informações extras da batalha: ficha pelo nome, atributos (+2 de Ataque...) e histórico. */
+.name-btn { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; text-align: left; text-decoration: underline dotted 2px; text-underline-offset: 3px; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.name-btn:hover { color: var(--sky-d); }
+.info-btns { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.boost-btn { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.boost-btn.changed { padding: 1px 4px; }
+.boost-chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 4px; border: 2px solid var(--line); line-height: 1.3; white-space: nowrap; }
+.boost-chip.up { background: var(--mint); }
+.boost-chip.down { background: #f28b8b; }
+[data-theme="dark"] .boost-chip.down { background: #8a3238; }
+.boost-pop { width: max(100%, 270px); }
+.boost-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.boost-table td { padding: 2px 4px; }
+.boost-table td:first-child { text-align: left; }
+.boost-table tr.up .boost-n, .boost-table tr.up .boost-x { color: #2f8f5b; font-weight: 700; }
+.boost-table tr.down .boost-n, .boost-table tr.down .boost-x { color: #c43c3c; font-weight: 700; }
+[data-theme="dark"] .boost-table tr.up :is(.boost-n, .boost-x) { color: var(--dk-good); }
+[data-theme="dark"] .boost-table tr.down :is(.boost-n, .boost-x) { color: var(--dk-bad); }
+.boost-n, .boost-x { text-align: right; white-space: nowrap; }
+.boost-pips { white-space: nowrap; }
+.boost-pips i { display: inline-block; width: 6px; height: 8px; margin-right: 1px; background: var(--panel-2); border: 1px solid var(--line); }
+.boost-table tr.up .boost-pips i.on { background: #3ddc84; }
+.boost-table tr.down .boost-pips i.on { background: #eb5757; }
+
+.battle-right { display: flex; align-items: center; gap: 6px; }
+.log-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.log-toggle.on { background: var(--sky); }
+.battle-log {
+  position: fixed; z-index: 40; display: flex; flex-direction: column; background: var(--panel); color: var(--ink);
+  border: var(--px) solid var(--line); box-shadow: 4px 4px 0 rgba(59, 51, 85, .25); text-align: left;
+}
+.battle-log.docked { position: absolute; left: 10px; z-index: 20; max-height: min(78vh, 720px); }
+.battle-log.drawer { right: 8px; top: 8px; bottom: 8px; width: min(330px, calc(100vw - 16px)); animation: fade .15s steps(3); }
+.battle-log-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: var(--px) solid var(--line); background: var(--panel-2); position: relative; min-height: 36px; }
+.battle-log-head b { display: inline-flex; align-items: center; gap: 6px; }
+.battle-log-head .modal-close { top: 2px; }
+.battle-log-list { overflow: auto; padding: 4px 8px; flex: 1; }
+.battle-log-list section { margin-bottom: 6px; }
+.battle-log-list h5 { margin: 6px 0 3px; font-family: 'Press Start 2P', monospace; font-size: 8px; font-weight: normal; color: var(--ink-soft); }
+.battle-log-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.log-row { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; line-height: 1.45; padding: 2px 4px 2px 6px; border-left: 4px solid var(--line); background: var(--panel-2); }
+.log-row.mine { border-left-color: var(--sky-d); }
+.log-row.foe { border-left-color: #eb5757; }
+.log-row .sprite { flex: none; width: 24px; height: 24px; object-fit: contain; }
+.log-row .sprite.gray { filter: grayscale(1); opacity: .7; }
+.log-row > span { min-width: 0; }
+.log-row .name-btn { display: inline; font-weight: 700; }
+.log-owner { color: var(--ink-soft); }
+.log-faint { color: #c43c3c; }
+[data-theme="dark"] .log-faint { color: var(--dk-bad); }
+.log-sub { margin-left: 18px; background: none; font-size: 12px; }
+.log-move { font: inherit; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 rgba(0, 0, 0, .45); background: var(--mc, #777); border: 2px solid var(--line); padding: 0 5px; cursor: pointer; }
+.log-move:hover { filter: brightness(1.1); }
+.log-res { display: inline-block; margin-left: 4px; font-size: 11px; padding: 0 4px; }
+.battle-log-hint { margin: 0; padding: 4px 10px; font-size: 11px; color: var(--ink-soft); border-top: 2px solid var(--line); }
+@media (max-width: 760px) {
+  .info-btns .weak-btn { padding: 0 6px; }
+  .boost-chip { font-size: 10px; padding: 0 3px; }
+}
+/* Celular: os botões (Times, Calculadora, Histórico) descem para uma linha própria e os nomes cabem na tela. */
+@media (max-width: 560px) {
+  .versus-head { flex-wrap: wrap; }
+  .versus-head > .versus-teams { order: 3; flex-basis: 100%; }
+  .versus-name { min-width: 0; flex: 1 1 0; padding: 3px 5px; font-size: 13px; }
+  .versus-name .foe-balls { flex-wrap: wrap; }
+}

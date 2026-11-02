@@ -30,6 +30,7 @@ import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
 import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
+import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
 import {useMatchGuard} from '../leaveGuard';
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
@@ -853,13 +854,20 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
   const fxRef = useRef<HTMLDivElement>(null);
   const arenaRef = useRef<HTMLDivElement>(null);
   const top: Side = bottom === 'p1' ? 'p2' : 'p1';
+  const {tracker, push} = useBattleTracker();
+  const [boostOf, setBoostOf] = useState<Side | null>(null);
+  // Cada lote entra no histórico uma vez só (o modo estrito do React roda o efeito duas vezes).
+  const fed = useRef(new Set<number>());
 
   useEffect(() => {
     if (busy || played >= batches.length) return;
     const events = batches[played];
+    const feed = !fed.current.has(played);
+    fed.current.add(played);
     setBusy(true);
     void (async () => {
       for (const ev of events) {
+        if (feed) push(ev);
         if (ev.switchIn) {
           const sw = ev.switchIn;
           onField.current[sw.side] = teamName(sw.species);
@@ -923,7 +931,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
       setPlayed(n => n + 1);
       setBusy(false);
     })();
-  }, [batches, played, busy, bottom]);
+  }, [batches, played, busy, bottom, push]);
 
   const idle = !busy && played >= batches.length;
   useEffect(() => {
@@ -951,16 +959,33 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
     const info = (
       <div className={`info-box ${isBottom ? 'player-box' : 'wild-box'} s0`}>
         <div className="info-name">
-          {species(v.species).name} <span className="lv">Nv. {v.level}</span>
+          <SpeciesButton name={v.species} /> <span className="lv">Nv. {v.level}</span>
         </div>
         <div className="row">
           <Types name={v.species} info />
           <StatusBadge status={v.status} />
         </div>
         <HpBar hp={v.hp} maxhp={v.maxhp} showNumbers />
-        <button className={`weak-btn ${weakOf === side ? 'open' : ''}`} onClick={() => setWeakOf(weakOf === side ? null : side)}>
-          Fraquezas {weakOf === side ? '▴' : '▾'}
-        </button>
+        <div className="info-btns">
+          <button
+            className={`weak-btn ${weakOf === side ? 'open' : ''}`}
+            onClick={() => {
+              setBoostOf(null);
+              setWeakOf(weakOf === side ? null : side);
+            }}
+          >
+            Fraquezas {weakOf === side ? '▴' : '▾'}
+          </button>
+          <BoostButton
+            above={isBottom}
+            boosts={tracker.boostsAt(side)}
+            open={boostOf === side}
+            onToggle={() => {
+              setWeakOf(null);
+              setBoostOf(boostOf === side ? null : side);
+            }}
+          />
+        </div>
         {weakOf === side && (
           <div className={`weak-pop ${isBottom ? 'above' : 'below'}`}>
             <MatchupPanel types={[...species(v.species).types]} />
@@ -988,6 +1013,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
             </button>
           )}
           <CalcButton types={views[top] ? species(views[top]!.species).types : []} label="Calculadora" />
+          <BattleLog tracker={tracker} mine={bottom} owner={side => players[side === 'p1' ? 0 : 1].name} />
         </span>
         {(['p1', 'p2'] as Side[]).map((side, i) => (
           <span key={side} className={`versus-name ${req && req.side === side ? 'on' : ''}`}>
