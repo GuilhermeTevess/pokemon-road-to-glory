@@ -1225,7 +1225,10 @@ table.move-info td { padding: 3px 0; }
 .versus-name.on { background: #ffe680; }
 .versus-turn { margin: 0 0 6px; }
 .rush-result { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 16px; overflow: hidden; }
-.rush-result .hist-summary { margin-top: 26px; min-width: min(320px, 100%); }
+.rush-result .hist-summary { margin-top: 26px; min-width: min(320px, 100%); max-width: 100%; }
+/* Confete no fundo: tudo da tela fica na frente dele. */
+.rush-result > .confetti { z-index: 0; }
+.rush-result > :not(.confetti) { position: relative; z-index: 1; }
 .leave-ask { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .rush-result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 @media (max-width: 640px) { .rush-pair, .rush-pair.three { grid-template-columns: 1fr; } .rush-prep-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1517,6 +1520,12 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .hist-dot.l { background: #c9473f; }
 .hist-summary { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 18px; }
 .hist-summary b { font-family: 'Press Start 2P', monospace; font-size: 11px; font-weight: normal; }
+.hist-last { list-style: none; margin: 4px 0 0; padding: 6px 0 0; border-top: 2px dashed var(--panel-2); width: 100%; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.hist-last li { display: grid; grid-template-columns: 1fr auto auto auto 1fr; gap: 6px; align-items: center; }
+.hist-last li > :first-child { text-align: right; }
+.hist-last-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.hist-summary .v { color: #2f8a4c; }
+.hist-summary .d { color: #b5473f; }
 .hist-profile .v, .hist-table .v, .players .v { color: #2f8a4c; }
 .hist-profile .d, .hist-table .d, .players .d { color: #b5473f; }
 .hist-facts { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -479,7 +479,8 @@ function localCard(players: [Player, Player], winner: number, vsCpu: boolean): H
   const h = loadHistory(id);
   if (winner === 0) return cardOf(h, players[0].name);
   const foe = players[1];
-  return vsCpu ? mirrorCard(h, foe.name, m => m.vsKind === 'cpu' && m.vs === foe.name) : mirrorCard(h, foe.name, m => m.vsKind === 'friend' && m.vs === foe.name);
+  const kind = vsCpu ? 'cpu' : 'friend';
+  return mirrorCard(h, foe.name, m => m.vsKind === kind && m.vs === foe.name, players[0].name);
 }
 
 /** Sorteio do Rush (o mesmo desenho no mesmo PC e no online). */

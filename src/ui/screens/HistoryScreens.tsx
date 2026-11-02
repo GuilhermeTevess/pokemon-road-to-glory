@@ -57,6 +57,19 @@ export function HistorySummary({card}: {card: HistCard}) {
           {card.w}V · {card.l}D · {rate}% de vitórias
         </small>
       )}
+      {!!card.last?.length && (
+        <ul className="hist-last">
+          {card.last.map((m, i) => (
+            <li key={i}>
+              <span className="hist-last-who">{card.who}</span>
+              <span className={m.won ? 'v' : 'd'}>{m.won ? 'vitória' : 'derrota'}</span>
+              <span className="muted">x</span>
+              <span className={m.won ? 'd' : 'v'}>{m.won ? 'derrota' : 'vitória'}</span>
+              <span className="hist-last-who">{m.vs}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
