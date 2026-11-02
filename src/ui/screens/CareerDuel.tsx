@@ -50,7 +50,7 @@ function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: strin
   );
 }
 
-export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLeave}: {
+export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDone, onLeave}: {
   /** Código da sala (o mesmo nos dois PCs). */
   room: string;
   host: boolean;
@@ -60,6 +60,8 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
   team: OwnedMon[];
   /** Campeonato rápido: sair no meio da luta dá a vitória para o outro (na carreira, não). */
   forfeitable?: boolean;
+  /** Arena com plateia (campeonato rápido); na carreira fica a arena de sempre. */
+  arena?: number;
   /** `host` volta true quando o outro saiu: aí é você quem grava o resultado na chave. */
   onDone: (r: DuelOutcome, wonByQuit?: boolean) => void;
   onLeave: () => void;
@@ -202,6 +204,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLe
   const mine = host ? (c && idle && duelNeeds(c.battle, 'p1') ? duelRequest(c.battle, 'p1') : null) : req;
   return (
     <BattleView
+      arena={arena}
       players={players}
       bottom={host ? 'p1' : 'p2'}
       batches={batches}

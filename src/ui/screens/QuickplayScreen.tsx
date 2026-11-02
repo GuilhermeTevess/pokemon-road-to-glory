@@ -16,6 +16,8 @@ import type {TourKind} from '../../game/tournament';
 import type {OwnedMon} from '../../game/types';
 import {CalcButton, CategoryIcon, HpBar, MatchupPanel, Modal, Narrated, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
 import {ArenaBackdrop} from '../scene';
+import {ArenaStage} from '../arenas';
+import {randomArena} from '../../game/arenas';
 import {TrainerAvatar} from './StartScreens';
 import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
 import {fast} from '../settings';
@@ -812,8 +814,10 @@ interface View {
  * Tela da batalha do Rush. Só mostra: quem decide o que acontece é o "driver"
  * (o mesmo PC revezando, ou a rede no online). `batches` cresce a cada turno resolvido.
  */
-export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, onChoose, onIdle}: {
+export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, arena, onChoose, onIdle}: {
   players: [Player, Player];
+  /** Arena com plateia dos modos rápidos (sem ela, a arena de madeira de sempre). */
+  arena?: number;
   /** Os times (nomes) de cada jogador, para o botão "Times". */
   teams?: [string[], string[]];
   /** Lado que aparece embaixo (o seu). */
@@ -979,7 +983,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         ))}
       </div>
       <div className="arena" ref={arenaRef}>
-        <ArenaBackdrop tier={1} color="#7aa860" />
+        {arena != null ? <ArenaStage arena={arena} /> : <ArenaBackdrop tier={1} color="#7aa860" />}
         <div className="fx-layer" ref={fxRef} />
         {box(top, false)}
         {box(bottom, true)}
@@ -1105,6 +1109,8 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
 export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
+  // Cada luta sorteia uma das arenas com plateia.
+  const [arena] = useState(randomArena);
   // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
   const ctl = useMemo(
     () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name}),
@@ -1124,6 +1130,7 @@ export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Play
   }, [idle, ctl, onEnd]);
   return (
     <BattleView
+      arena={arena}
       players={players}
       teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]}
       bottom="p1"
