@@ -9,13 +9,12 @@ import {careerOf} from '../../game/meta';
 import {fameLabel} from '../../game/tournament';
 import {useGame} from '../../game/store';
 import type {RunState} from '../../game/types';
-import {Modal, PixelIcon, Sprite} from '../components';
+import {Medal, Modal, PixelIcon, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 import {ProfileModal} from './ProfileModal';
 import {profileOfBot, profileOfRun} from '../../game/profile';
 import type {Profile} from '../../game/profile';
 
-const MEDAL = ['🥇', '🥈', '🥉'];
 
 export function RankTable({rows, limit, log, profileOf}: {rows: RankRow[]; limit?: number; log?: PointEntry[]; profileOf?: (r: RankRow) => Profile | null}) {
   const [open, setOpen] = useState(false);
@@ -28,7 +27,7 @@ export function RankTable({rows, limit, log, profileOf}: {rows: RankRow[]; limit
         const pos = rows.indexOf(r) + 1;
         return (
           <div key={r.name + pos} className={`rank-row ${r.player ? 'me' : ''} ${pos <= 3 ? 'top' : ''}`}>
-            <span className="rank-pos">{MEDAL[pos - 1] ?? `${pos}º`}</span>
+            <span className="rank-pos">{pos <= 3 ? <Medal place={pos} size={18} /> : `${pos}º`}</span>
             <TrainerAvatar avatar={r.avatar ?? 'red'} name={r.name} size={36} />
             <span className="rank-name">
               {profileOf && profileOf(r) ? (
@@ -121,7 +120,9 @@ export function SeasonSummary({run}: {run: RunState}) {
             <TrainerAvatar avatar={r.avatar ?? 'red'} name={r.name} size={48} />
             <b>{r.name}</b>
             <span>{r.points}</span>
-            <span className="podium-medal">{MEDAL[i]}</span>
+            <span className="podium-medal">
+              <Medal place={i + 1} size={28} />
+            </span>
           </div>
         ))}
       </div>

@@ -1592,7 +1592,7 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
    atrás dos Pokémon: as fileiras da plateia têm z-index próprio e passavam na frente. */
 .arena > .arena-bg { z-index: 0; }
 
-/* ------------------------------------------------------------------ Time dos Sonhos */
+/* ------------------------------------------------------------------ Dream Team */
 .builder-btn { background: linear-gradient(135deg, #b9f0c8, #6fd0a0); }
 .builder .bar { flex-wrap: wrap; }
 .builder .bar input.tb-name { font: inherit; font-weight: 700; flex: 1 1 160px; min-width: 120px; padding: 6px 8px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }

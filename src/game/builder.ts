@@ -1,4 +1,4 @@
-// Time dos Sonhos: o jogador monta o próprio time (Pokémon, habilidade, nature, EVs, golpes e item),
+// Dream Team: o jogador monta o próprio time (Pokémon, habilidade, nature, EVs, golpes e item),
 // guarda até 5 times no aparelho e batalha contra o computador ou contra os times dos amigos.
 // Todo mundo luta no nível 50 com IVs perfeitos (como nos campeonatos de verdade).
 import type {Species} from '@pkmn/sim';
@@ -62,7 +62,7 @@ export function saveTeams(trainerId: string, teams: BuiltTeam[]): void {
 
 // ------------------------------------------------------------------ Regras
 
-/** Itens que dá para segurar no Time dos Sonhos (os do Showdown) + a Mega Pedra certa da espécie. */
+/** Itens que dá para segurar no Dream Team (os do Showdown) + a Mega Pedra certa da espécie. */
 export function itemsFor(name: string): ItemDef[] {
   const base = ITEMS.filter(i => i.kind === 'held' && i.showdown && !i.megaFor);
   return [...megaStonesFor(name), ...base];

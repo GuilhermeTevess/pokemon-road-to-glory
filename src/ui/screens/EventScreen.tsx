@@ -11,7 +11,7 @@ import {getItem} from '../../data/items';
 import {cheapestHeal, getPlace} from '../../game/events';
 import {AVATARS} from '../../game/trainers';
 import {useGame} from '../../game/store';
-import {ItemIcon, MonName, Sprite, TypeBadge} from '../components';
+import {ItemIcon, MonName, PixelIcon, Sprite, TypeBadge} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
 function Scene({title, art, text, children}: {title: string; art: ReactNode; text: ReactNode; children: ReactNode}) {
@@ -261,7 +261,7 @@ export function EventScreen() {
           <div className="news-list">
             {ev.items.map((n, i) => (
               <div key={i} className="news-item">
-                <b>📰</b> {n.text}
+                {n.text}
               </div>
             ))}
           </div>
@@ -309,7 +309,7 @@ export function EventScreen() {
         cliff: <>No alto do penhasco, um <b>{mon}</b> está com a asa presa num galho.</>,
       };
       return (
-        <Scene title={t.title} art={ev.mon ? <Sprite name={ev.mon.species} shiny={ev.mon.shiny} /> : <span className="seer-ball">{t.id === 'wreck' ? '⚓' : t.id === 'hotspring' ? '♨️' : '🥋'}</span>} text={<p>{text[t.id]}</p>}>
+        <Scene title={t.title} art={ev.mon ? <Sprite name={ev.mon.species} shiny={ev.mon.shiny} /> : <span className="seer-ball"><PixelIcon name={t.id === 'wreck' ? 'anchor' : t.id === 'hotspring' ? 'spring' : 'fist'} size={64} /></span>} text={<p>{text[t.id]}</p>}>
           <button className="btn primary" onClick={() => resolveEvent('yes')}>
             {t.yes}
           </button>
@@ -331,7 +331,7 @@ export function EventScreen() {
         return (
           <Scene title="Aniversário do parceiro" art={<Sprite name={mon.species} shiny={mon.shiny} />} text={<p>Hoje faz um ano que você e <b>{displayName(mon)}</b> estão juntos! Que tal uma festinha?</p>}>
             <button className="btn primary" onClick={() => resolveEvent('ok')}>
-              Fazer a festa 🎂
+              Fazer a festa
             </button>
           </Scene>
         );
@@ -356,7 +356,9 @@ export function EventScreen() {
       return (
         <Scene
           title="A Vidente"
-          art={<span className="seer-ball">🔮</span>}
+          art={<span className="seer-ball">
+              <PixelIcon name="orb" size={64} color="var(--lilac-d)" />
+            </span>}
           text={<p>"Vejo o seu caminho... Estes são os tipos dos próximos Pokémon que você vai encontrar."</p>}
         >
           <div className="seer-list">

@@ -9,7 +9,7 @@ import {isBossWave} from '../../game/encounters';
 import {GYM_PRIZE, badgesIn, gymDifficulty, gymLines, gymStatus, gymWaves, leaderAvatar, leaderWinLine, ticketPrice} from '../../game/gym';
 import {useGame} from '../../game/store';
 import {playCoins, playJingle, playSticker} from '../audio';
-import {Modal, Sprite, TypeBadge} from '../components';
+import {Modal, PixelIcon, Sprite, TypeBadge} from '../components';
 import {fast} from '../settings';
 import {fameNow} from './LegendScreens';
 import {DialogueBar, GymBackdrop} from '../scene';
@@ -257,11 +257,17 @@ function BadgeBook({region}: {region: string}) {
             {waves.slice(0, 12).map(w => (
               <button key={w} className={`btn small ${w === wave ? 'primary' : ''}`} onClick={() => setWave(w)} title={isBossWave(w) ? 'Ronda de chefe' : undefined}>
                 {roundOf({...run, wave: w})}
-                {isBossWave(w) && ' 👑'}
+                {isBossWave(w) && (
+                  <>
+                    {' '}
+                    <PixelIcon name="crown" size={12} />
+                  </>
+                )}
               </button>
             ))}
           </div>
-          {isBossWave(wave) && <p className="hint">👑 Ronda de chefe: o ginásio toma o lugar do chefe. Você não ganha a EXP dele nem a chance de capturar um Pokémon forte.</p>}
+          {isBossWave(wave) && <p className="hint">
+              <PixelIcon name="crown" size={12} /> Ronda de chefe: o ginásio toma o lugar do chefe. Você não ganha a EXP dele nem a chance de capturar um Pokémon forte.</p>}
           <p className="muted">Ginásio não dá XP nem dinheiro: vale a insígnia e os pontos no ranking. O ingresso inclui a cura do time antes da luta; se perder, quem caiu sai com 1 HP.</p>
           <p className="muted">Time previsto: {gymDifficulty(picking, run).size} Pokémon, nível ~{gymDifficulty(picking, run).level}.</p>
           <div className="row center">

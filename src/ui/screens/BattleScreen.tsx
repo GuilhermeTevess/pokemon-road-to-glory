@@ -26,6 +26,8 @@ import {
   TypeBadge,
   Types,
   effectivenessLabel,
+  isNarration,
+  Narrated,
 } from '../components';
 import {playBall, playCry, playHit, playJingle, playMove, playPlin, playShake} from '../audio';
 import {askLead, fast, setAskLead} from '../settings';
@@ -305,7 +307,7 @@ export function BattleScreen() {
         {enc?.venue != null ? (
           <ArenaBackdrop tier={enc.venue} color={biome.color} bg={biome.bg} filter={biome.filter} />
         ) : enc?.gym && getGym(enc.gym) ? (
-          <GymBackdrop gym={getGym(enc.gym)!} crowd={!!enc.intro?.[0]?.startsWith('🎙️')} />
+          <GymBackdrop gym={getGym(enc.gym)!} crowd={isNarration(enc.intro?.[0] ?? '')} />
         ) : (
           <div className="arena-bg" style={{backgroundImage: `url(${FX(`bg/${biome.bg}.png`)})`, filter: biome.filter}} />
         )}
@@ -391,8 +393,8 @@ export function BattleScreen() {
       </div>
 
       <div className="battle-bottom">
-        <div className={`message ${message.startsWith('🎙️') ? 'narrator' : ''}`} onClick={() => skipText?.()} title="Clique para pular a fala">
-          {message}
+        <div className={`message ${isNarration(message) ? 'narrator' : ''}`} onClick={() => skipText?.()} title="Clique para pular a fala">
+          <Narrated text={message} />
         </div>
         <div className="actions">
           {busy ? null : menu === 'main' && !ctl.ended ? (
@@ -657,7 +659,7 @@ function LeadPrompt({onDone}: {onDone: () => void}) {
                 </div>
                 {bestIsGood && best.uid !== lead.uid && (
                   <div className="lead-tip">
-                    💡 Dica: {leadName(best)} tem vantagem de tipo aqui.
+                    Dica: {leadName(best)} tem vantagem de tipo aqui.
                   </div>
                 )}
               </div>
@@ -682,7 +684,7 @@ function LeadPrompt({onDone}: {onDone: () => void}) {
                   <span className="switch-info">
                     <span>
                       <MonName mon={m} /> Nv.{m.level}
-                      {m.uid === best.uid && bestIsGood && <span className="lead-best"> 👍 Boa escolha</span>}
+                      {m.uid === best.uid && bestIsGood && <span className="lead-best"> Boa escolha</span>}
                     </span>
                     <Types name={m.species} />
                     <HpBar hp={m.hp} maxhp={maxHpOf(m)} showNumbers />

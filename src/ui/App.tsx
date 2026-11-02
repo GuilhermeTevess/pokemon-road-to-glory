@@ -93,7 +93,7 @@ export function App() {
           }}
           title="Pular animações: batalhas, capturas, evoluções e sorteios mais rápidos"
         >
-          {fastOn ? '⏩' : '▶'} <span className="nav-label">{fastOn ? 'Rápido' : 'Animações'}</span>
+          <PixelIcon name={fastOn ? 'fast' : 'play'} /> <span className="nav-label">{fastOn ? 'Rápido' : 'Animações'}</span>
         </button>
         <button className="btn small ghost" onClick={() => setGuideOpen(true)} title="Guia dos biomas: quem aparece em cada lugar e com que chance">
           <PixelIcon name="book" /> <span className="nav-label">Guia</span>

@@ -382,7 +382,7 @@ export function TournamentScreen() {
               </div>
               {foe.friend ? (
                 <button className="btn primary" onClick={() => setDuel(true)}>
-                  ⚡ Partida ao vivo
+                  Partida ao vivo
                 </button>
               ) : (
                 <button className="btn primary" onClick={tourFight}>
@@ -496,7 +496,7 @@ function ScoutToggle({name, wave, team, pid}: {name: string; wave: number; team:
   return (
     <>
       <button className="link" onClick={() => setOpen(true)}>
-        💻 Estudar {name} no PC
+        Estudar {name} no PC
       </button>
       {open && (
         <Modal onClose={() => setOpen(false)} wide>
@@ -505,7 +505,7 @@ function ScoutToggle({name, wave, team, pid}: {name: string; wave: number; team:
               <div className="pc-cam" />
               <div className="pc-screen">
                 <div className="pc-titlebar">
-                  <span>📁 Banco de dados · {name}</span>
+                  <span>Banco de dados · {name}</span>
                   <span className="pc-dots">
                     <i />
                     <i />

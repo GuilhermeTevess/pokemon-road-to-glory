@@ -1,4 +1,4 @@
-// Time dos Sonhos: monta o próprio time (até 5 guardados) e batalha contra o computador,
+// Dream Team: monta o próprio time (até 5 guardados) e batalha contra o computador,
 // contra os times dos amigos (o computador joga com eles) ou online, cada um no seu aparelho.
 import {useEffect, useMemo, useState} from 'react';
 import {ALL_TYPES, PLAYABLE, TYPE_PT, dex, isLegendary, species} from '../../data/dex';
@@ -15,14 +15,14 @@ import {quickPid, useGame} from '../../game/store';
 import {STAT_IDS} from '../../game/types';
 import type {OwnedMon, StatId} from '../../game/types';
 import {RIVALS} from '../../data/rivals';
-import {CategoryIcon, MatchupPanel, PixelIcon, Sprite, TeamWeakness, TypeBadge, Types} from '../components';
+import {CategoryIcon, MatchupPanel, PixelIcon, ShinyStar, Sprite, TeamWeakness, TypeBadge, Types} from '../components';
 import {playCry} from '../audio';
 import {LocalDuel, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 import {TrainerAvatar} from './StartScreens';
 import {OnlineBuilt} from './OnlineBuilt';
 
-export const BUILDER_NAME = 'Time dos Sonhos';
+export const BUILDER_NAME = 'Dream Team';
 
 const ALL_NATURES = dex.natures.all().map(n => n.name).sort();
 
@@ -72,7 +72,7 @@ export function BuilderScreen() {
         <button className="btn small" onClick={() => setScreen('title')}>
           <PixelIcon name="back" /> Voltar
         </button>
-        <h2>🛠️ {BUILDER_NAME}</h2>
+        <h2>{BUILDER_NAME}</h2>
         <span className="muted">
           {teams.length}/{MAX_TEAMS} times
         </span>
@@ -95,21 +95,23 @@ export function BuilderScreen() {
                   <Sprite key={i} name={m.species} size={48} still />
                 ))}
               </span>
-              {problems.length > 0 && <p className="tb-warn">⚠️ {problems[0]}</p>}
+              {problems.length > 0 && <p className="tb-warn">
+                  <PixelIcon name="warning" size={12} /> {problems[0]}
+                </p>}
               <div className="tb-team-actions">
                 <button className="btn primary" disabled={problems.length > 0} onClick={() => setPlaying(t)}>
-                  ⚔️ Jogar
+                  Jogar
                 </button>
                 <button className="btn small" onClick={() => setEditing(structuredClone(t))}>
-                  ✏️ Editar
+                  Editar
                 </button>
                 {confirmDel === t.id ? (
                   <button className="btn small danger" onClick={() => removeTeam(t.id)}>
                     Apagar mesmo?
                   </button>
                 ) : (
-                  <button className="btn small" onClick={() => setConfirmDel(t.id)}>
-                    🗑️
+                  <button className="btn small" onClick={() => setConfirmDel(t.id)} title="Apagar time" aria-label="Apagar time">
+                    <PixelIcon name="trash" />
                   </button>
                 )}
               </div>
@@ -120,10 +122,10 @@ export function BuilderScreen() {
           <div className="panel tb-team tb-new">
             <b>Novo time</b>
             <button className="btn primary" onClick={() => setEditing(emptyTeam())}>
-              ➕ Montar do zero
+              Montar do zero
             </button>
             <button className="btn" onClick={() => setPremades(p => !p)}>
-              📋 Começar de um time pronto {premades ? '▴' : '▾'}
+              Começar de um time pronto {premades ? '▴' : '▾'}
             </button>
           </div>
         )}
@@ -184,7 +186,7 @@ function TeamEditor({initial, onSave, onCancel}: {initial: BuiltTeam; onSave: (t
         </button>
         <input className="tb-name" value={team.name} maxLength={20} onChange={e => setTeam({...team, name: e.target.value})} aria-label="Nome do time" />
         <button className="btn primary" disabled={!team.mons.length} onClick={() => onSave({...team, name: team.name.trim() || 'Meu time'})}>
-          💾 Salvar
+          Salvar
         </button>
       </header>
       <div className="tb-slots">
@@ -211,7 +213,9 @@ function TeamEditor({initial, onSave, onCancel}: {initial: BuiltTeam; onSave: (t
       {problems.length > 0 && team.mons.length > 0 && (
         <div className="tb-warn">
           {problems.map(p => (
-            <div key={p}>⚠️ {p}</div>
+            <div key={p}>
+              <PixelIcon name="warning" size={12} /> {p}
+            </div>
           ))}
         </div>
       )}
@@ -321,19 +325,19 @@ function MonEditor({mon, team, onChange, onSwap, onRemove}: {mon: BuiltMon; team
           </small>
           <div className="tb-editor-btns">
             <button className="btn small" onClick={() => onChange({...suggestedSet(mon.species), shiny: mon.shiny})} title="Monta tudo sozinho com um set que funciona">
-              ✨ Montar sozinho
+              Montar sozinho
             </button>
             <button className="btn small" onClick={onSwap}>
-              🔄 Trocar Pokémon
+              Trocar Pokémon
             </button>
             <button className="btn small" onClick={onRemove}>
-              🗑️ Tirar do time
+              Tirar do time
             </button>
             <button className={`btn small ${weak ? 'on' : ''}`} onClick={() => setWeak(!weak)}>
               Fraquezas {weak ? '▴' : '▾'}
             </button>
             <label className="rush-check">
-              <input type="checkbox" checked={!!mon.shiny} onChange={e => onChange({...mon, shiny: e.target.checked})} /> Shiny ✨
+              <input type="checkbox" checked={!!mon.shiny} onChange={e => onChange({...mon, shiny: e.target.checked})} /> Shiny <ShinyStar />
             </label>
           </div>
         </div>
@@ -412,7 +416,8 @@ function MovesTab({mon, onChange}: {mon: BuiltMon; onChange: (m: BuiltMon) => vo
   };
   return (
     <div className="tb-moves">
-      <p className="hint small">⭐ = do mesmo tipo dele (bate 1,5x mais forte). A lista começa pelos golpes que mais combinam com ele.</p>
+      <p className="hint small">
+        <PixelIcon name="star" size={12} color="var(--butter-d)" /> = do mesmo tipo dele (bate 1,5x mais forte). A lista começa pelos golpes que mais combinam com ele.</p>
       <div className="tb-move-slots">
         {[0, 1, 2, 3].map(i => {
           const id = mon.moves[i];
@@ -422,7 +427,7 @@ function MovesTab({mon, onChange}: {mon: BuiltMon; onChange: (m: BuiltMon) => vo
               {mv ? (
                 <>
                   <button className="tb-move-pick" onClick={() => setSlot(slot === i ? null : i)}>
-                    <TypeBadge type={mv.type} small /> <b>{mv.name}</b> {sp.types.includes(mv.type) && mv.category !== 'Status' && '⭐'}
+                    <TypeBadge type={mv.type} small /> <b>{mv.name}</b> {sp.types.includes(mv.type) && mv.category !== 'Status' && <PixelIcon name="star" size={12} color="var(--butter-d)" />}
                     <small className="muted">{mv.basePower ? ` Poder ${mv.basePower}` : ' Status'}</small>
                   </button>
                   <button className="btn small" title="Tirar golpe" onClick={() => onChange({...mon, moves: mon.moves.filter((_, k) => k !== i)})}>
@@ -455,7 +460,9 @@ function MovesTab({mon, onChange}: {mon: BuiltMon; onChange: (m: BuiltMon) => vo
                     <TypeBadge type={mv.type} small />
                     <CategoryIcon category={mv.category} />
                     <b>{mv.name}</b>
-                    {sp.types.includes(mv.type) && mv.category !== 'Status' && <span title="Mesmo tipo: 1,5x">⭐</span>}
+                    {sp.types.includes(mv.type) && mv.category !== 'Status' && <span title="Mesmo tipo: 1,5x">
+                        <PixelIcon name="star" size={12} color="var(--butter-d)" />
+                      </span>}
                     <small className="muted">
                       {mv.basePower ? `Poder ${mv.basePower}` : ''}
                       {mv.accuracy !== true ? ` · Precisão ${mv.accuracy}%` : ''}
@@ -585,9 +592,13 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
         </span>
         <div className="prep-cols tb-play">
           <div className="panel">
-            <h3>📴 Offline</h3>
+            <h3>
+              <PixelIcon name="phone" /> Offline
+            </h3>
             <button className="rush-mode" onClick={() => startVs({player: cpuFoe(), team: botTeam(), kind: 'cpu'})}>
-              <b>🤖 Contra o computador</b>
+              <b>
+                <PixelIcon name="robot" /> Contra o computador
+              </b>
               <span>Ele usa um dos times prontos, montados com estratégia (chuva, sol, areia...).</span>
             </button>
             <h4>Times dos amigos</h4>
@@ -614,7 +625,9 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
             </div>
           </div>
           <div className="panel">
-            <h3>🌐 Online</h3>
+            <h3>
+              <PixelIcon name="globe" /> Online
+            </h3>
             <p className="hint small">Cada um no seu aparelho, com o time que montou. Um cria a sala e manda o código.</p>
             <button className="btn primary big" onClick={() => setOnline({role: 'host'})}>
               Criar sala e pegar o código
