@@ -53,6 +53,22 @@ describe('histórico do treinador', () => {
     expect(withWin({who: 'Vaz', dots: [false, false, true, true, true], w: 3, l: 2})).toMatchObject({dots: [true, false, false, true, true], w: 4, l: 2});
   });
 
+  it('tela de vitória lista as 5 últimas com o nome do adversário', () => {
+    let h = base();
+    h = addMatch(h, m('rush:nv50', true, {vs: 'Gary', vsKind: 'cpu'}));
+    h = addMatch(h, m('gym', false, {vs: 'Brock', vsKind: 'gym'}));
+    expect(cardOf(h, 'Juliana').last).toEqual([
+      {vs: 'Brock', won: false},
+      {vs: 'Gary', won: true},
+    ]);
+    // Computador venceu: as linhas dele são contra você.
+    expect(mirrorCard(h, 'Gary', x => x.vs === 'Gary', 'Juliana').last).toEqual([{vs: 'Juliana', won: false}]);
+    // Amigo online: a vitória de agora entra no topo; aparelho antigo (sem lista) fica sem.
+    const vaz = {who: 'Vaz', dots: [false], w: 0, l: 1, last: [{vs: 'Ana', won: false}]};
+    expect(withWin(vaz, 'Juliana').last).toEqual([{vs: 'Juliana', won: true}, {vs: 'Ana', won: false}]);
+    expect(withWin({who: 'Vaz', dots: [], w: 0, l: 0}, 'Juliana').last).toBeUndefined();
+  });
+
   it('perfil do adversário: resumo mandado pela rede ou as partidas contra você', () => {
     let h = base();
     h = addMatch(h, m('rush:nv50', true, {vs: 'Gary'}));

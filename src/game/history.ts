@@ -277,22 +277,27 @@ export interface HistCard {
   l: number;
   /** Ex.: "contra você" quando o histórico é o seu, ao contrário. */
   note?: string;
+  /** As mesmas últimas partidas, com o nome do adversário (aparelhos antigos não mandam). */
+  last?: {vs: string; won: boolean}[];
 }
 
 /** O seu histórico (todas as partidas). */
 export function cardOf(h: History, who: string): HistCard {
   const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
-  return {who, dots: h.list.slice(0, 5).map(m => m.won), w: all.w, l: all.l};
+  const last = h.list.slice(0, 5).map(m => ({vs: m.vs, won: m.won}));
+  return {who, dots: last.map(m => m.won), w: all.w, l: all.l, last};
 }
 
 /** Histórico de quem só existe neste aparelho (computador, amigo no mesmo PC): o seu contra ele, ao contrário. */
-export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean): HistCard {
+export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean, me = 'Você'): HistCard {
   const games = h.list.filter(match);
   const w = games.filter(m => !m.won).length;
-  return {who, dots: games.slice(0, 5).map(m => !m.won), w, l: games.length - w, note: 'contra você'};
+  const last = games.slice(0, 5).map(m => ({vs: me, won: !m.won}));
+  return {who, dots: last.map(m => m.won), w, l: games.length - w, note: 'contra você', last};
 }
 
 /** Soma uma vitória que acabou de acontecer num resumo recebido de outro aparelho. */
-export function withWin(c: HistCard): HistCard {
-  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1};
+export function withWin(c: HistCard, vs?: string): HistCard {
+  const last = vs && Array.isArray(c.last) ? [{vs, won: true}, ...c.last].slice(0, 5) : undefined;
+  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1, last};
 }

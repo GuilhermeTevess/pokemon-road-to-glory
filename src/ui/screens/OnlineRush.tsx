@@ -29,7 +29,7 @@ const keepFoe = (snap: unknown) => rememberFoe(useGame.getState().trainer?.id, s
 /** Histórico de quem venceu: o seu (já com esta partida) ou o do amigo (o que ele mandou + esta vitória). */
 function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe: HistCard | null): HistCard | null {
   if (winner === meIdx) return myCard(players[meIdx].name);
-  return foe ? withWin(foe) : null;
+  return foe ? withWin(foe, players[meIdx].name) : null;
 }
 
 /** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
