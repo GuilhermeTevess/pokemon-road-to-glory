@@ -14,6 +14,7 @@ import type {HistCard} from '../../game/history';
 import {useGame} from '../../game/store';
 import {playCrowd, playCry, playFanfare} from '../audio';
 import {fast} from '../settings';
+import {requestLeave, useMatchGuard} from '../leaveGuard';
 import {BattleView, DraftView, LuckyReveal, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 
@@ -32,7 +33,7 @@ function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe
 }
 
 /** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
-function logRush(s: Shared, me: 0 | 1, winner: number) {
+function logRush(s: Shared, me: 0 | 1, winner: number, note = 'Cada um no seu aparelho') {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
     mode: `online-rush:${s.mode}`,
@@ -43,9 +44,17 @@ function logRush(s: Shared, me: 0 | 1, winner: number) {
     vsKind: 'player',
     mine: s.teams[me],
     theirs: s.teams[1 - me],
-    note: 'Cada um no seu aparelho',
+    note,
   });
 }
+
+/** Partida em andamento (do sorteio até o fim da batalha): sair conta como derrota. */
+const playing = (step?: Shared['step']) => step === 'draft' || step === 'lucky' || step === 'prep' || step === 'battle';
+const QUIT = 'Saiu no meio da partida';
+const FOE_QUIT = 'O adversário saiu da partida';
+
+/** "Fulano venceu! Ciclano saiu da partida." */
+export const quitTitle = (players: [Player, Player], winner: number) => `${players[winner].name} venceu! ${players[1 - winner].name} saiu da partida.`;
 
 interface Shared {
   step: 'lobby' | 'draft' | 'lucky' | 'prep' | 'battle' | 'end';
@@ -110,6 +119,24 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   sharedRef.current = shared;
   /** Histórico que o amigo mandou ao entrar (para mostrar se ele vencer). */
   const foeHist = useRef<HistCard | null>(null);
+  /** O amigo saiu no meio: vitória sua. */
+  const [foeQuit, setFoeQuit] = useState(false);
+  const foeLeft = () => {
+    const s = sharedRef.current;
+    if (!playing(s.step) || ctl.current?.ended) return false;
+    logRush(s, 0, 0, FOE_QUIT);
+    setFoeQuit(true);
+    sharedRef.current = {...s, step: 'end', winner: 0};
+    setShared(sharedRef.current);
+    playFanfare(1);
+    return true;
+  };
+  useMatchGuard(playing(shared.step) && !error, () => {
+    if (ctl.current?.ended) return;
+    logRush(sharedRef.current, 0, 1, QUIT);
+    send({t: 'forfeit'});
+  });
+  const leave = () => requestLeave(onExit);
 
   const send = (msg: Msg) => link.current?.send(msg);
   const publish = (s: Shared) => {
@@ -127,6 +154,8 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     playCry(pair[k]);
     const names = (): [string[], string[]] => [teams.current[0].map(m => m.species), teams.current[1].map(m => m.species)];
     const toPrep = () => {
+      // O amigo pode ter saído durante a roleta.
+      if (sharedRef.current.step !== 'draft' && sharedRef.current.step !== 'lucky') return;
       publish({...sharedRef.current, teams: names(), step: 'prep'});
       send({t: 'prep', team: teams.current[1], mega: megaMode(mode)});
     };
@@ -176,6 +205,8 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
       publish({...s, players: [s.players[0], msg.player as Player], step: 'draft', pairs: drawPairs(mode)});
     } else if (msg.t === 'snap') {
       keepFoe(msg.snap);
+    } else if (msg.t === 'forfeit') {
+      foeLeft();
     } else if (msg.t === 'pick' && s.step === 'draft' && s.round % 2 === 1) {
       pick(msg.k as 0 | 1);
     } else if (msg.t === 'prepDone' && s.step === 'prep') {
@@ -197,7 +228,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
       code,
       m => onMsg(m),
       () => send({t: 'state', s: sharedRef.current}),
-      () => alive && setError('Seu amigo saiu da sala.'),
+      () => alive && !foeLeft() && sharedRef.current.step !== 'end' && setError('Seu amigo saiu da sala.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
     ).then(l => {
       if (alive) link.current = l;
@@ -216,7 +247,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   if (s.step === 'draft') return <DraftView players={s.players} mode={s.mode} round={s.round} total={s.pairs.length} pair={s.pairs[s.round]} teams={s.teams} canPick={s.round % 2 === 0} onPick={pick} />;
   if (s.step === 'lucky' && s.lucky) return <LuckyReveal players={s.players} lucky={s.lucky} />;
   if (s.step === 'prep') {
-    if (myPrep) return <Lobby title="Preparação" status={`Esperando ${s.players[1].name} terminar a preparação...`} onExit={onExit} />;
+    if (myPrep) return <Lobby title="Preparação" status={`Esperando ${s.players[1].name} terminar a preparação...`} onExit={leave} />;
     return (
       <PrepScreen
         player={s.players[0]}
@@ -251,7 +282,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     );
   }
   const w = s.winner ?? 0;
-  return <RushResult winner={s.players[w]} team={teams.current[w]} history={winnerCard(0, w, s.players, foeHist.current)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
+  return <RushResult title={foeQuit ? quitTitle(s.players, w) : undefined} winner={s.players[w]} team={teams.current[w]} history={winnerCard(0, w, s.players, foeHist.current)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
 }
 
 // ------------------------------------------------------------------ Amigo que entrou
@@ -270,8 +301,29 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   const [hostHist, setHostHist] = useState<HistCard | null>(null);
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
+  /** A batalha já acabou (o resultado chega uns segundos depois). */
+  const over = useRef(false);
+  const [foeQuit, setFoeQuit] = useState(false);
 
   const send = (msg: Msg) => link.current?.send(msg);
+  /** O dono da sala saiu no meio: vitória sua. */
+  const foeLeft = () => {
+    const s = sharedRef.current;
+    if (over.current || !s || !playing(s.step)) return false;
+    over.current = true;
+    logRush(s, 1, 1, FOE_QUIT);
+    setReq(null);
+    setFoeQuit(true);
+    setEnded(1);
+    playFanfare(1);
+    return true;
+  };
+  useMatchGuard(connected && playing(shared?.step) && ended === null && !error, () => {
+    over.current = true;
+    if (sharedRef.current) logRush(sharedRef.current, 1, 0, QUIT);
+    send({t: 'forfeit'});
+  });
+  const leave = () => requestLeave(onExit);
 
   useEffect(() => {
     let alive = true;
@@ -284,7 +336,9 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
           setBatches(b => [...b, msg.events as BattleEvent[]]);
           setBalls(msg.balls as {p1: boolean[]; p2: boolean[]});
         } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
+        else if (msg.t === 'forfeit') foeLeft();
         else if (msg.t === 'end') {
+          over.current = true;
           setReq(null);
           if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number);
           setHostHist((msg.hist as HistCard | undefined) ?? null);
@@ -303,7 +357,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         setConnected(true);
         send({t: 'hello', player: me, hist: myCard(me.name), snap: mySnap(me)});
       },
-      () => alive && setError('A conexão com a sala caiu.'),
+      () => alive && !foeLeft() && !over.current && setError('A conexão com a sala caiu.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
     ).then(l => {
       if (alive) link.current = l;
@@ -318,12 +372,12 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
 
   if (error && ended === null) return <Lobby title="Rush online" status="" error={error} onExit={onExit} />;
   if (!connected || !shared || shared.step === 'lobby') return <Lobby title="Rush online" status={connected ? 'Conectado! Esperando o dono da sala...' : `Entrando na sala ${code}...`} onExit={onExit} />;
-  if (ended !== null) return <RushResult winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} history={winnerCard(1, ended, shared.players, hostHist)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
+  if (ended !== null) return <RushResult title={foeQuit ? quitTitle(shared.players, ended) : undefined} winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} history={winnerCard(1, ended, shared.players, hostHist)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
   const s = shared;
   if (s.step === 'draft') return <DraftView players={s.players} mode={s.mode} round={s.round} total={s.pairs.length} pair={s.pairs[s.round]} teams={s.teams} canPick={s.round % 2 === 1} onPick={k => send({t: 'pick', k})} />;
   if (s.step === 'lucky' && s.lucky) return <LuckyReveal players={s.players} lucky={s.lucky} />;
   if (s.step === 'prep') {
-    if (!prepTeam || prepSent) return <Lobby title="Preparação" status={prepSent ? `Esperando ${s.players[0].name} terminar a preparação...` : 'Carregando seu time...'} onExit={onExit} />;
+    if (!prepTeam || prepSent) return <Lobby title="Preparação" status={prepSent ? `Esperando ${s.players[0].name} terminar a preparação...` : 'Carregando seu time...'} onExit={leave} />;
     return (
       <PrepScreen
         player={s.players[1]}

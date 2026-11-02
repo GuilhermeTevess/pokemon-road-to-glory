@@ -21,6 +21,7 @@ import {LocalDuel, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 import {TrainerAvatar} from './StartScreens';
 import {OnlineBuilt} from './OnlineBuilt';
+import {useMatchGuard} from '../leaveGuard';
 
 export const BUILDER_NAME = 'Dream Team';
 
@@ -567,6 +568,22 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
       .then(setFriends)
       .catch(() => setFriendErr(true));
   }, [trainer]);
+
+  // Sair no meio da partida conta como derrota.
+  useMatchGuard(!online && !!foe && (step === 'prep' || step === 'battle'), () => {
+    if (!foe) return;
+    recordMatch(trainer?.id, {
+      mode: 'built',
+      online: false,
+      won: false,
+      vs: foe.kind === 'friend' ? `${foe.player.name} (${foe.team.name})` : foe.player.name,
+      vsAvatar: foe.player.avatar,
+      vsKind: foe.kind === 'friend' ? 'friend' : 'cpu',
+      mine: teams[0].map(m => m.species),
+      theirs: teams[1].map(m => m.species),
+      note: 'Saiu no meio da partida',
+    });
+  });
 
   const startVs = (f: Foe) => {
     setFoe(f);

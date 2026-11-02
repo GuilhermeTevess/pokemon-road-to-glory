@@ -25,6 +25,8 @@ import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
 import {FX, playMoveFx} from '../fx';
+import {MonInfo} from './BiomeGuide';
+import {useMatchGuard} from '../leaveGuard';
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
@@ -242,6 +244,20 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
 
   const [online, setOnline] = useState<{role: 'host' | 'guest'; code?: string} | null>(null);
   const [joinCode, setJoinCode] = useState('');
+  // Sair no meio do sorteio ou da batalha conta como derrota para quem está neste aparelho.
+  useMatchGuard(!online && (step === 'draft' || step === 'lucky' || step === 'prep' || step === 'battle'), () =>
+    recordMatch(useGame.getState().trainer?.id, {
+      mode: `rush:${mode}`,
+      online: false,
+      won: false,
+      vs: players[1].name,
+      vsAvatar: players[1].avatar,
+      vsKind: vsCpu ? 'cpu' : 'friend',
+      mine: teams[0].map(m => m.species),
+      theirs: teams[1].map(m => m.species),
+      note: 'Saiu no meio da partida',
+    }),
+  );
   const start = () => {
     if (vsCpu) setCpu(cpuFoe());
     setPairs(drawPairs(mode));
@@ -478,6 +494,7 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
   onPick: (k: 0 | 1) => void;
 }) {
   const who = round % 2;
+  const [info, setInfo] = useState<string | null>(null);
   return (
     <div className="screen quickplay">
       <header className="bar">
@@ -514,7 +531,9 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
               <b>{p.name}</b>
               <span className="team-row">
                 {teams[i].map((sp, k) => (
-                  <Sprite key={k} name={sp} size={44} still />
+                  <button key={k} className="rush-slot" onClick={() => setInfo(sp)} title={`Ver ${species(sp).name}: tipos, stats e habilidade`}>
+                    <Sprite name={sp} size={44} still />
+                  </button>
                 ))}
                 {Array.from({length: 6 - teams[i].length}, (_, k) => (
                   <span key={k} className="rush-empty" />
@@ -523,7 +542,9 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
             </div>
           ))}
         </div>
+        <p className="hint small rush-slot-hint">Toque num Pokémon dos times para ver os tipos, os stats e a habilidade.</p>
       </div>
+      {info && <MonInfo name={info} onClose={() => setInfo(null)} />}
     </div>
   );
 }
@@ -1146,7 +1167,6 @@ export function RushResult({title, newLabel, winner, team, teamNames, history, o
           <Sprite key={k} name={sp} size={56} />
         ))}
       </span>
-      {history && <HistorySummary card={history} />}
       <div className="rush-result-actions">
         {onRematch && (
           <button className="btn" onClick={onRematch}>
@@ -1160,6 +1180,7 @@ export function RushResult({title, newLabel, winner, team, teamNames, history, o
           Sair
         </button>
       </div>
+      {history && <HistorySummary card={history} />}
     </div>
   );
 }
