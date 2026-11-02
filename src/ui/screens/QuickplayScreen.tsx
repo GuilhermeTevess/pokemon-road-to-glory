@@ -769,7 +769,7 @@ export function BattleView({players, bottom, batches, balls, req, waiting, curta
                   {req.moves.map(m => {
                     const eff = effectivenessLabel(m.eff);
                     return (
-                      <button key={m.id + m.index} className="move-btn" disabled={m.disabled || (!m.locked && m.pp <= 0)} style={{['--mc' as string]: TYPE_COLORS[m.type]}} onClick={() => choose(`move ${m.index}`)}>
+                      <button key={m.id + m.index} className="move-btn" title={moveDescPt(m.name)} disabled={m.disabled || (!m.locked && m.pp <= 0)} style={{['--mc' as string]: TYPE_COLORS[m.type]}} onClick={() => choose(`move ${m.index}`)}>
                         <span className="move-name">{m.name}</span>
                         <span className="move-meta">
                           <TypeBadge type={m.type} small />
