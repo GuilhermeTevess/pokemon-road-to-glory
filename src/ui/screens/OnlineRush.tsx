@@ -3,13 +3,14 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, megaMode, rollLucky, rushMon} from '../../game/rush';
+import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
-import {recordMatch} from '../../game/history';
+import {cardOf, loadHistory, recordMatch, rememberFoe, snapOf, withWin} from '../../game/history';
+import type {HistCard} from '../../game/history';
 import {useGame} from '../../game/store';
 import {playCrowd, playCry, playFanfare} from '../audio';
 import {fast} from '../settings';
@@ -17,6 +18,18 @@ import {BattleView, DraftView, LuckyReveal, PrepScreen, RushResult} from './Quic
 import type {Player} from './QuickplayScreen';
 
 type Msg = Record<string, unknown>;
+
+/** Resuminho do seu histórico agora (vai para o outro aparelho mostrar se você vencer). */
+const myCard = (name: string): HistCard => cardOf(loadHistory(useGame.getState().trainer?.id), name);
+/** Seu perfil para o amigo poder abrir depois (tocando no seu nome no histórico dele). */
+const mySnap = (p: Player) => snapOf(loadHistory(useGame.getState().trainer?.id), p.name, p.avatar);
+const keepFoe = (snap: unknown) => rememberFoe(useGame.getState().trainer?.id, snap);
+
+/** Histórico de quem venceu: o seu (já com esta partida) ou o do amigo (o que ele mandou + esta vitória). */
+function winnerCard(meIdx: 0 | 1, winner: number, players: [Player, Player], foe: HistCard | null): HistCard | null {
+  if (winner === meIdx) return myCard(players[meIdx].name);
+  return foe ? withWin(foe) : null;
+}
 
 /** Histórico do perfil: grava o Rush online do ponto de vista de quem está neste aparelho. */
 function logRush(s: Shared, me: 0 | 1, winner: number) {
@@ -95,6 +108,8 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   const [, force] = useState(0);
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
+  /** Histórico que o amigo mandou ao entrar (para mostrar se ele vencer). */
+  const foeHist = useRef<HistCard | null>(null);
 
   const send = (msg: Msg) => link.current?.send(msg);
   const publish = (s: Shared) => {
@@ -132,8 +147,9 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     send({t: 'events', events, balls: duelBalls(c.battle)});
     if (c.ended) {
       const winner = c.won ? 0 : 1;
-      send({t: 'end', winner});
+      send({t: 'end', winner, hist: myCard(sharedRef.current.players[0].name)});
       logRush(sharedRef.current, 0, winner);
+      send({t: 'snap', snap: mySnap(sharedRef.current.players[0])});
       setTimeout(() => {
         playFanfare(1);
         playCrowd(1, 3);
@@ -155,15 +171,18 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   const onMsg = (msg: Msg) => {
     const s = sharedRef.current;
     if (msg.t === 'hello' && s.step === 'lobby') {
+      foeHist.current = (msg.hist as HistCard | undefined) ?? null;
+      keepFoe(msg.snap);
       publish({...s, players: [s.players[0], msg.player as Player], step: 'draft', pairs: drawPairs(mode)});
+    } else if (msg.t === 'snap') {
+      keepFoe(msg.snap);
     } else if (msg.t === 'pick' && s.step === 'draft' && s.round % 2 === 1) {
       pick(msg.k as 0 | 1);
     } else if (msg.t === 'prepDone' && s.step === 'prep') {
       const order = msg.order as string[];
       const t = teams.current[1];
       teams.current[1] = order.map(uid => t.find(m => m.uid === uid)!).filter(Boolean).map(m => ({...m, item: undefined}));
-      const holder = teams.current[1].find(m => m.uid === msg.stone);
-      if (megaMode(mode) && holder) giveMegaStone(holder);
+      if (megaMode(mode)) giveAllMegaStones(teams.current[1]);
       prepped.current[1] = true;
       if (prepped.current[0]) startBattle();
       else force(x => x + 1);
@@ -232,7 +251,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     );
   }
   const w = s.winner ?? 0;
-  return <RushResult winner={s.players[w]} team={teams.current[w]} onRematch={undefined} onNew={onExit} onExit={onExit} />;
+  return <RushResult winner={s.players[w]} team={teams.current[w]} history={winnerCard(0, w, s.players, foeHist.current)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
 }
 
 // ------------------------------------------------------------------ Amigo que entrou
@@ -248,6 +267,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   const [balls, setBalls] = useState<{p1: boolean[]; p2: boolean[]}>({p1: [], p2: []});
   const [req, setReq] = useState<DuelReq | null>(null);
   const [ended, setEnded] = useState<number | null>(null);
+  const [hostHist, setHostHist] = useState<HistCard | null>(null);
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
 
@@ -267,6 +287,11 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         else if (msg.t === 'end') {
           setReq(null);
           if (sharedRef.current) logRush(sharedRef.current, 1, msg.winner as number);
+          setHostHist((msg.hist as HistCard | undefined) ?? null);
+          const sh = sharedRef.current;
+          if (sh) send({t: 'snap', snap: mySnap(sh.players[1])});
+        } else if (msg.t === 'snap') {
+          keepFoe(msg.snap);
           setTimeout(() => {
             playFanfare(1);
             playCrowd(1, 3);
@@ -276,7 +301,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
       },
       () => {
         setConnected(true);
-        send({t: 'hello', player: me});
+        send({t: 'hello', player: me, hist: myCard(me.name), snap: mySnap(me)});
       },
       () => alive && setError('A conexão com a sala caiu.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
@@ -293,7 +318,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
 
   if (error && ended === null) return <Lobby title="Rush online" status="" error={error} onExit={onExit} />;
   if (!connected || !shared || shared.step === 'lobby') return <Lobby title="Rush online" status={connected ? 'Conectado! Esperando o dono da sala...' : `Entrando na sala ${code}...`} onExit={onExit} />;
-  if (ended !== null) return <RushResult winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} onRematch={undefined} onNew={onExit} onExit={onExit} />;
+  if (ended !== null) return <RushResult winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} history={winnerCard(1, ended, shared.players, hostHist)} onRematch={undefined} onNew={onExit} onExit={onExit} />;
   const s = shared;
   if (s.step === 'draft') return <DraftView players={s.players} mode={s.mode} round={s.round} total={s.pairs.length} pair={s.pairs[s.round]} teams={s.teams} canPick={s.round % 2 === 1} onPick={k => send({t: 'pick', k})} />;
   if (s.step === 'lucky' && s.lucky) return <LuckyReveal players={s.players} lucky={s.lucky} />;
@@ -307,8 +332,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         mega={prepTeam.mega}
         curtain={false}
         onDone={team => {
-          const holder = team.find(m => m.item);
-          send({t: 'prepDone', order: team.map(m => m.uid), stone: holder?.uid});
+          send({t: 'prepDone', order: team.map(m => m.uid)});
           setPrepSent(true);
         }}
       />

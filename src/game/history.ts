@@ -36,6 +36,53 @@ export interface History {
   version: 1;
   list: MatchLog[];
   totals: Record<string, ModeTotals>;
+  /** Perfil de quem você enfrentou online (o que o aparelho dele mandou na última partida). */
+  foes?: Record<string, FoeSnap>;
+}
+
+/** Resumo do histórico de alguém que mora em outro aparelho (mandado pela rede). */
+export interface FoeSnap {
+  name: string;
+  avatar: string;
+  at: number;
+  list: MatchLog[];
+  totals: Record<string, ModeTotals>;
+}
+
+const SNAP_KEEP = 20;
+const FOES_KEEP = 30;
+
+/** Seu perfil para mandar ao adversário (só as últimas partidas, para ficar leve). */
+export function snapOf(h: History, name: string, avatar: string): FoeSnap {
+  return {name, avatar, at: Date.now(), list: h.list.slice(0, SNAP_KEEP), totals: h.totals};
+}
+
+export function isSnap(x: unknown): x is FoeSnap {
+  const s = x as FoeSnap | null;
+  return !!s && typeof s.name === 'string' && Array.isArray(s.list) && typeof s.totals === 'object';
+}
+
+/** Guarda o perfil que o adversário mandou (o mais novo de cada nome). */
+export function rememberFoe(trainerId: string | null | undefined, snap: unknown): void {
+  if (!trainerId || !isSnap(snap)) return;
+  const h = loadHistory(trainerId);
+  const foes = {...h.foes, [snap.name]: {...snap, list: snap.list.slice(0, SNAP_KEEP)}};
+  const keep = Object.values(foes).sort((a, b) => b.at - a.at).slice(0, FOES_KEEP);
+  save(trainerId, {...h, foes: Object.fromEntries(keep.map(f => [f.name, f]))});
+}
+
+/** Histórico vindo de um resumo (para abrir o perfil). */
+export function historyOfSnap(s: FoeSnap): History {
+  return {version: 1, list: s.list, totals: s.totals};
+}
+
+/** Histórico de alguém sem perfil próprio (computador, amigo no mesmo PC): as suas partidas contra ele, ao contrário. */
+export function mirrorHistory(h: History, vs: string, me: {name: string; avatar: string}): History {
+  let out: History = {version: 1, list: [], totals: {}};
+  for (const m of [...h.list].reverse().filter(x => x.vs === vs && x.vsKind !== 'run')) {
+    out = addMatch(out, {...m, won: !m.won, mine: m.theirs, theirs: m.mine, vs: me.name, vsAvatar: me.avatar, vsKind: 'player'});
+  }
+  return out;
 }
 
 export const HISTORY_KEEP = 60;
@@ -204,4 +251,34 @@ export function mvpOf(list: MatchLog[]): {name: string; games: number; wins: num
   }
   const best = [...by].sort((a, b) => b[1].games - a[1].games || b[1].wins - a[1].wins)[0];
   return best ? {name: best[0], ...best[1]} : null;
+}
+
+// ------------------------------------------------------------------ Tela de vitória
+
+/** Resuminho do histórico de alguém: últimas partidas (mais recente primeiro) e V/D. */
+export interface HistCard {
+  who: string;
+  dots: boolean[];
+  w: number;
+  l: number;
+  /** Ex.: "contra você" quando o histórico é o seu, ao contrário. */
+  note?: string;
+}
+
+/** O seu histórico (todas as partidas). */
+export function cardOf(h: History, who: string): HistCard {
+  const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
+  return {who, dots: h.list.slice(0, 5).map(m => m.won), w: all.w, l: all.l};
+}
+
+/** Histórico de quem só existe neste aparelho (computador, amigo no mesmo PC): o seu contra ele, ao contrário. */
+export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean): HistCard {
+  const games = h.list.filter(match);
+  const w = games.filter(m => !m.won).length;
+  return {who, dots: games.slice(0, 5).map(m => !m.won), w, l: games.length - w, note: 'contra você'};
+}
+
+/** Soma uma vitória que acabou de acontecer num resumo recebido de outro aparelho. */
+export function withWin(c: HistCard): HistCard {
+  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1};
 }

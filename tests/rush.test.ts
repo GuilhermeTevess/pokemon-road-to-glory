@@ -66,3 +66,25 @@ describe('rush', () => {
     expect(ctl.ended).toBe(true);
   });
 });
+
+describe('mega no Rush', () => {
+  it('todos levam a pedra, mas só 1 mega-evolui por luta', async () => {
+    const {giveAllMegaStones} = await import('../src/game/rush');
+    const a = ['Charizard', 'Gengar', 'Garchomp'].map(n => rushMon(n, 'mega'));
+    const b = ['Snorlax', 'Snorlax', 'Snorlax'].map(n => rushMon(n, 'nv50'));
+    giveAllMegaStones(a);
+    expect(a.every(m => m.item)).toBe(true);
+    const ctl = new BattleController(a, {mon: b[0], team: b, rarity: 'rare', boss: true, trainer: 'Bia', versus: 'Ju'});
+    ctl.initialEvents();
+    expect(ctl.canMega()).toBeTruthy();
+    ctl.chooseP2('move 1');
+    ctl.chooseMove(1, true);
+    expect(ctl.battle.p1.active[0].species.name).toContain('Mega');
+    // Troca para outro que também tem pedra: não pode mais.
+    if (!ctl.ended) {
+      ctl.chooseP2('move 1');
+      ctl.chooseSwitchSlot(2);
+      expect(ctl.canMega()).toBeFalsy();
+    }
+  });
+});

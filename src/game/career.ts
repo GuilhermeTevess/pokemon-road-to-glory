@@ -1,3 +1,4 @@
+import type {FoeSnap} from './history';
 // Carreira multiplayer: o host cria com regras, os amigos entram com o código e cada um
 // joga a própria run no seu tempo. Nos torneios, as chaves usam os times reais de todo mundo.
 import {species} from '../data/dex';
@@ -75,6 +76,8 @@ export interface PlayerDoc {
   badges?: {gym: string; wave: number; team: string[]; tries: number}[];
   legends?: string[];
   partner?: string;
+  /** Resumo do histórico (perfil com vitórias e últimas partidas). */
+  hist?: FoeSnap;
   updatedAt: number;
 }
 

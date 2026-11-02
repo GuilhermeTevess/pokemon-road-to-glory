@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {HISTORY_KEEP, addMatch, modeLabel, nemesisOf, streakOf, sumRows, tableOf, winRate} from '../src/game/history';
+import {HISTORY_KEEP, addMatch, cardOf, historyOfSnap, isSnap, mirrorCard, mirrorHistory, snapOf, withWin, modeLabel, nemesisOf, streakOf, sumRows, tableOf, winRate} from '../src/game/history';
 import type {History, MatchLog} from '../src/game/history';
 
 const base = (): History => ({version: 1, list: [], totals: {}});
@@ -38,5 +38,32 @@ describe('histórico do treinador', () => {
     expect(streakOf(list)).toEqual({won: true, n: 2});
     expect(nemesisOf(list)).toMatchObject({vs: 'Gary', w: 2, l: 1});
     expect(modeLabel('online-rush:legend')).toBe('Rush online · Lendários');
+  });
+
+  it('tela de vitória mostra o histórico de quem venceu', () => {
+    let h = base();
+    h = addMatch(h, m('rush:nv50', true, {vsKind: 'cpu'}));
+    h = addMatch(h, m('gym', true, {vsKind: 'gym'}));
+    h = addMatch(h, m('rush:nv50', false, {vsKind: 'cpu'}));
+    // Computador venceu: o histórico dele contra você é o seu ao contrário.
+    const cpu = mirrorCard(h, 'Computador', x => x.vsKind === 'cpu');
+    expect(cpu).toMatchObject({who: 'Computador', dots: [true, false], w: 1, l: 1});
+    expect(cardOf(h, 'Juliana')).toMatchObject({dots: [false, true, true], w: 2, l: 1});
+    // Amigo online venceu: o resumo que ele mandou + esta vitória.
+    expect(withWin({who: 'Vaz', dots: [false, false, true, true, true], w: 3, l: 2})).toMatchObject({dots: [true, false, false, true, true], w: 4, l: 2});
+  });
+
+  it('perfil do adversário: resumo mandado pela rede ou as partidas contra você', () => {
+    let h = base();
+    h = addMatch(h, m('rush:nv50', true, {vs: 'Gary'}));
+    h = addMatch(h, m('rush:nv50', false, {vs: 'Gary'}));
+    h = addMatch(h, m('gym', true, {vs: 'Brock'}));
+    const gary = mirrorHistory(h, 'Gary', {name: 'Juliana', avatar: 'dawn'});
+    expect(gary.totals['rush:nv50']).toEqual({w: 1, l: 1});
+    expect(gary.list[0]).toMatchObject({won: true, vs: 'Juliana', mine: ['Eevee'], theirs: ['Pikachu']});
+    const snap = snapOf(h, 'Juliana', 'dawn');
+    expect(isSnap(snap)).toBe(true);
+    expect(isSnap({name: 'x'})).toBe(false);
+    expect(historyOfSnap(snap).totals.gym).toEqual({w: 1, l: 0});
   });
 });
