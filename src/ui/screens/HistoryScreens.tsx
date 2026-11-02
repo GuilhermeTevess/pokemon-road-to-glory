@@ -138,7 +138,7 @@ function ModeTable({title, rows, empty}: {title: string; rows: TableRow[]; empty
 
 const when = (at: number) => {
   const d = new Date(at);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} - ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
 function Team({list}: {list: string[]}) {
