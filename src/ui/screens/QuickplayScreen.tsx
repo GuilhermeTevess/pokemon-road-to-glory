@@ -1051,16 +1051,19 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
             </div>
           ) : req ? (
             <>
-              <p className="versus-turn">
-                <b>{players[who].name}</b>, {req.forced ? 'escolha quem entra' : 'o que vai fazer?'}
-              </p>
+              {/* "Mega evoluir" na mesma linha da pergunta: sobra altura para os golpes caberem na tela. */}
+              <div className="versus-turn">
+                <span>
+                  <b>{players[who].name}</b>, {req.forced ? 'escolha quem entra' : 'o que vai fazer?'}
+                </span>
+                {menu === 'main' && !req.forced && req.canMega && (
+                  <button className={`mega-toggle ${mega ? 'on' : ''}`} onClick={() => setMega(v => !v)}>
+                    <span className="mega-box">{mega ? '✓' : ''}</span> Mega evoluir
+                  </button>
+                )}
+              </div>
               {menu === 'main' && !req.forced ? (
                 <div className="move-grid">
-                  {req.canMega && (
-                    <button className={`mega-toggle ${mega ? 'on' : ''}`} onClick={() => setMega(v => !v)}>
-                      <span className="mega-box">{mega ? '✓' : ''}</span> Mega evoluir
-                    </button>
-                  )}
                   {req.moves.map(m => {
                     const eff = effectivenessLabel(m.eff);
                     return (
