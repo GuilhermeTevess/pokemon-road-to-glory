@@ -1,0 +1,142 @@
+/* Modo escuro: noite em pixel art. Fica num arquivo separado para não mexer no tema claro.
+   As cores-base trocam pelas variáveis; abaixo, só ajustes onde o tema claro usa cor fixa. */
+:root[data-theme="dark"] {
+  --bg: #17152a;
+  --bg-dots: #221f3a;
+  --panel: #282544;
+  --panel-2: #312d52;
+  --ink: #eee8fb;
+  --ink-soft: #aea6cc;
+  --line: #0b0a14;
+  /* Pastéis viram tons fundos (fundos com texto claro); as versões "-d" clareiam (texto, ícones, bordas). */
+  --mint: #2c5e49;
+  --mint-d: #74d39b;
+  --sky: #2b4b78;
+  --sky-d: #7db6f2;
+  --peach: #74422e;
+  --peach-d: #f3a37c;
+  --butter: #75581c;
+  --butter-d: #f0c95a;
+  --lilac: #4a3d78;
+  --lilac-d: #bba8f2;
+  --pink: #6c3352;
+  --pink-d: #f08fba;
+  --red: #7c2f37;
+  /* Tons fixos do tema escuro, usados só aqui. */
+  --dk-gold: #5e4a16;
+  --dk-gold-soft: #3e3420;
+  --dk-gold-line: #d9a93a;
+  --dk-track: #15131f;
+  --dk-input: #1d1b31;
+  --dk-bad: #ff8f86;
+  --dk-good: #8fe0a6;
+  --dk-shadow: rgba(0, 0, 0, .45);
+  color-scheme: dark;
+}
+
+/* ---------- Base: sombras duras e botões */
+[data-theme="dark"] :is(.panel, .modal, .detail, .cell, .biome-card, .reward-card, .mon-row, .switch-btn, .move-btn, .bag-row, .matchups, .info-box, .battle-bottom, .help-group, .toast) {
+  box-shadow: 4px 4px 0 var(--dk-shadow);
+}
+[data-theme="dark"] .btn { box-shadow: inset -3px -3px 0 rgba(0, 0, 0, .3), inset 3px 3px 0 rgba(255, 255, 255, .05), 3px 3px 0 var(--dk-shadow); }
+[data-theme="dark"] .btn:active:not(:disabled) { box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .3); }
+[data-theme="dark"] .btn.primary:hover:not(:disabled) { background: #7d6427; }
+[data-theme="dark"] .btn.ghost { box-shadow: none; }
+[data-theme="dark"] .btn.ghost:hover { background: rgba(255, 255, 255, .07); }
+[data-theme="dark"] .modal-backdrop, [data-theme="dark"] .sb-backdrop { background: rgba(0, 0, 0, .6); }
+@media (max-width: 1079px) {
+  [data-theme="dark"] .run-sidebar.open { box-shadow: -6px 0 0 var(--dk-shadow); }
+}
+
+/* ---------- Campos de texto */
+[data-theme="dark"] :is(.field input, .rename input, .avatar-search, .guide-controls select, .guide-search, .tb-search, .tb-field select, .tb-ev-num, .builder .bar input.tb-name) {
+  background: var(--dk-input); color: var(--ink);
+}
+
+/* ---------- Barras (HP, EXP, atributos) */
+[data-theme="dark"] :is(.hp-track, .exp-track, .bs-track) { background: var(--dk-track); }
+[data-theme="dark"] .bs-hp { background: #5cb582; } [data-theme="dark"] .bs-atk { background: #e88a5a; } [data-theme="dark"] .bs-def { background: #e0b43a; }
+[data-theme="dark"] .bs-spa { background: #5f9fe0; } [data-theme="dark"] .bs-spd { background: #9a83d6; } [data-theme="dark"] .bs-spe { background: #e47ea6; }
+[data-theme="dark"] .scout-bar { background: rgba(255, 255, 255, .08); }
+[data-theme="dark"] .iv-web .iv-grid { stroke: #4a4568; }
+
+/* ---------- Título */
+[data-theme="dark"] .logo-main { color: #ffe28a; }
+[data-theme="dark"] .legend-vs { text-shadow: 3px 3px 0 #000; }
+[data-theme="dark"] .mon-slot.choosing::after { text-shadow: 1px 1px 0 #000; }
+
+/* ---------- Dicas flutuantes (fundo era a tinta escura) */
+[data-theme="dark"] .touch-tip { background: #0f0d1c; color: var(--ink); border-color: #4a4568; }
+
+/* ---------- Fraquezas e calculadora de tipos */
+[data-theme="dark"] .mu-x4 .mu-label, [data-theme="dark"] .weak-line, [data-theme="dark"] .tw-weak { color: var(--dk-bad); }
+[data-theme="dark"] .eff-4 { background: #8a3238; }
+[data-theme="dark"] .eff-1 { border-color: #4a4568; }
+[data-theme="dark"] .eff-0 { background: #24222f; color: #77718f; }
+[data-theme="dark"] .tw-cell.danger { background: #4a2233; }
+[data-theme="dark"] .calc-box.good { background: #1f3b2c; }
+[data-theme="dark"] .calc-box.bad { background: #432228; }
+[data-theme="dark"] :is(.calc-table td.mu-x2, .mult-card.mu-x2 .mult-label) { background: #5a2a2a; color: #ffb3aa; }
+[data-theme="dark"] .mult-card.mu-x4 .mult-label { background: #7a2a26; color: #ffd0c8; }
+[data-theme="dark"] :is(.calc-table td.mu-half, .mult-card.mu-half .mult-label) { background: #21395a; color: #a9d4ff; }
+[data-theme="dark"] :is(.calc-table td.mu-immune, .mult-card.mu-immune .mult-label) { background: #2a2838; color: #a39dba; }
+[data-theme="dark"] .calc-btn { background: var(--dk-gold); border-color: var(--dk-gold-line); }
+
+/* ---------- Destaques dourados (vencedor, selecionado, "você") */
+[data-theme="dark"] :is(.match-side.won, .gym-card.won, .ach.done, .tb-premade:hover, .tb-species:hover, .tb-move:hover:not(:disabled)) { background: var(--dk-gold-soft); }
+[data-theme="dark"] :is(.rank-row.me, .podium-step.p1) { background: var(--dk-gold-soft); }
+[data-theme="dark"] :is(.rank-row.me, .diary-row.here, .gym-card.won .gym-badge) { box-shadow: 0 0 0 3px var(--dk-gold-line); }
+[data-theme="dark"] :is(.rush-mode.on, .tb-slot.on, .rush-prep-mon.lead, .tb-move-slot.on .tb-move-pick, .versus-name.on, .lucky-player.on) { background: var(--dk-gold); }
+[data-theme="dark"] :is(.rush-mode.on, .tb-slot.on) { box-shadow: inset 0 0 0 2px var(--dk-gold-line); }
+[data-theme="dark"] .quickplay-btn { background: linear-gradient(135deg, #6a5420, #7a4a1c); }
+[data-theme="dark"] .reward-money { background: var(--dk-gold-soft); }
+[data-theme="dark"] .achieve-pop { background: linear-gradient(135deg, #4a3c1a, var(--panel)); box-shadow: 4px 4px 0 var(--dk-shadow), 0 0 16px rgba(255, 216, 74, .35); }
+[data-theme="dark"] .bracket-slot.me { background: #4d2440; }
+[data-theme="dark"] .career-btn { background: #23395a; }
+
+/* ---------- Narrador e caixas de aviso */
+[data-theme="dark"] .message.narrator { color: #ffd59a; background: #3a2c1a; }
+[data-theme="dark"] .dialogue.narrator { background: #3a2c1a; }
+[data-theme="dark"] .lucky-banner { background: #3a2c1a; border-color: var(--dk-gold-line); }
+[data-theme="dark"] :is(.lucky-banner.mix, .mega-hint) { background: #33244d; border-color: #b77be8; }
+[data-theme="dark"] .mega-toggle.on { background: linear-gradient(90deg, #6a2d5c, #4a3d82, #23527a); }
+
+/* ---------- Coleção, creche, naturezas */
+[data-theme="dark"] .trainer-card .run-status { color: var(--ink-soft); }
+[data-theme="dark"] .trainer-card .run-status.on { background: #1f3b23; color: var(--dk-good); border-color: #5fb356; }
+[data-theme="dark"] .parent-slot.mom { background: #4a2236; }
+[data-theme="dark"] .parent-slot.dad { background: #1f3354; }
+[data-theme="dark"] :is(.nat-cell, .ability-row) { background: #24213b; }
+[data-theme="dark"] :is(.nat-grid th.up, .nat-corner .up, .nat-up, .tb-ev-label.plus, .error-text, .ml-bad) { color: var(--dk-bad); }
+[data-theme="dark"] .gym-badge { background: color-mix(in srgb, var(--tc) 35%, #2a2838); }
+[data-theme="dark"] .evo-dot.on { background: var(--ink); }
+
+/* ---------- Cerimônias (palco claro vira palco à noite com holofote) */
+[data-theme="dark"] .ceremony-stage { background: radial-gradient(ellipse at 50% 20%, #4a3c22, #221d2e 75%); }
+
+/* ---------- Telas com fundo fixo escuro: mantêm, só a borda de fora some menos */
+[data-theme="dark"] :is(.pc-lid, .pc-base) { border-color: #0b0a14; }
+[data-theme="dark"] .pc-base { background: linear-gradient(#8e88a6, #5f5a78); }
+[data-theme="dark"] .room-code { background: #0f0d1c; }
+[data-theme="dark"] .fog-mon { background: #4a4568; }
+
+/* ---------- Ícones de corações vazios no tema escuro (cor fixa no código) */
+[data-theme="dark"] .pixel-icon rect:is([fill="#d9d0e6"], [fill="#cfc6dd"]) { fill: #4f4a6b; }
+
+/* ---------- Fundos na cor do bioma/raridade (são claros): texto escuro por cima */
+[data-theme="dark"] :is(.arena-biome, .tier-tag, .biome-card:hover, .roulette-slot.lit .biome-card) { color: #2a2440; }
+[data-theme="dark"] :is(.biome-card:hover, .roulette-slot.lit .biome-card) :is(.muted, .hint) { color: #4a4266; }
+
+/* ---------- Tutorial (pergunta da entrada e destaque) */
+[data-theme="dark"] :is(.btn.tut-yes, .tut-next):hover:not(:disabled) { background: #377559; }
+[data-theme="dark"] .btn.tut-no:hover:not(:disabled) { background: #96404a; }
+[data-theme="dark"] .tut-skip:hover:not(:disabled) { background: #96404a !important; }
+[data-theme="dark"] .btn.tut-never { background: #3a3652; color: var(--ink-soft); }
+[data-theme="dark"] .btn.tut-never:hover:not(:disabled) { background: #46415f; }
+[data-theme="dark"] .tut-ask-backdrop { background: rgba(0, 0, 0, .6); }
+[data-theme="dark"] .tut-ask { box-shadow: 8px 8px 0 var(--dk-shadow); }
+[data-theme="dark"] .tut-ring { box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7), 0 0 0 7px var(--butter-d), 0 0 22px 8px #fff3a0; animation-name: tut-glow-dark; }
+@keyframes tut-glow-dark {
+  50% { border-color: #ffffff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7), 0 0 0 7px #ffe28a, 0 0 34px 14px #fff8c8; }
+}
+[data-theme="dark"] .tut-blocker.dim { background: rgba(0, 0, 0, .7); }

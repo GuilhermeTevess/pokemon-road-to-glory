@@ -19,7 +19,7 @@ import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
 import {GloryScreen} from './screens/GloryScreen';
 import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
-import {fast, setFast} from './settings';
+import {fast, setFast, setTheme, theme} from './settings';
 import {Tutorial} from './Tutorial';
 
 export function App() {
@@ -41,6 +41,13 @@ export function App() {
   }, [worldWave]);
   const [sound, setSound] = useState(soundEnabled());
   const [fastOn, setFastOn] = useState(fast);
+  const [themeNow, setThemeNow] = useState(theme);
+  useEffect(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const sync = () => setThemeNow(theme());
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
   const [panelOpen, setPanelOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
 
@@ -112,6 +119,18 @@ export function App() {
           title="Som"
         >
           <PixelIcon name={sound ? 'sound' : 'mute'} /> <span className="nav-label">{sound ? 'Som' : 'Mudo'}</span>
+        </button>
+        <button
+          className="btn small ghost"
+          onClick={() => {
+            const next = themeNow === 'dark' ? 'light' : 'dark';
+            setTheme(next);
+            setThemeNow(next);
+          }}
+          title={themeNow === 'dark' ? 'Voltar para o modo claro' : 'Modo escuro: mais confortável à noite'}
+          aria-label={themeNow === 'dark' ? 'Modo claro' : 'Modo escuro'}
+        >
+          <PixelIcon name={themeNow === 'dark' ? 'sun' : 'moon'} /> <span className="nav-label">{themeNow === 'dark' ? 'Claro' : 'Escuro'}</span>
         </button>
       </nav>
       {inRun ? (

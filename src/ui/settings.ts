@@ -43,3 +43,53 @@ export function setAskLead(on: boolean): void {
     /* ignora */
   }
 }
+
+export type Theme = 'light' | 'dark';
+
+function savedTheme(): Theme | null {
+  try {
+    const v = localStorage.getItem('rtg-theme');
+    return v === 'dark' || v === 'light' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function systemTheme(): Theme {
+  try {
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+/** Tema atual: o que o jogador escolheu ou, se nunca escolheu, o do aparelho. */
+export function theme(): Theme {
+  return savedTheme() ?? systemTheme();
+}
+
+function applyTheme(t: Theme): void {
+  document.documentElement.dataset.theme = t;
+}
+
+export function setTheme(t: Theme): void {
+  try {
+    localStorage.setItem('rtg-theme', t);
+  } catch {
+    /* ignora */
+  }
+  applyTheme(t);
+}
+
+/** Aplica o tema na abertura e segue o aparelho enquanto o jogador não escolher um. */
+export function installTheme(): void {
+  applyTheme(theme());
+  try {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (savedTheme()) return;
+      applyTheme(theme());
+    });
+  } catch {
+    /* ignora */
+  }
+}
