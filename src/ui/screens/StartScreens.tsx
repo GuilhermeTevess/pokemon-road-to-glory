@@ -387,7 +387,7 @@ export function TitleScreen() {
             </button>
           )}
           <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>
-            ⚡ Quickplay <small>Rush com amigo · Campeonato rápido</small>
+            ⚡ Quickplay <small>Rush · Campeonato rápido (online ou offline)</small>
           </button>
           <div className="menu-tiles">
             {tiles.map(t => (

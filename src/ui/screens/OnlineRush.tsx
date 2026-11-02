@@ -27,8 +27,8 @@ interface Shared {
 
 const ERRORS: Record<string, string> = {
   'peer-unavailable': 'Sala não encontrada. Confira o código (e se o seu amigo ainda está com a sala aberta).',
-  'unavailable-id': 'Esse código já está em uso. Volte e crie outra sala.',
-  network: 'Sem conexão com o servidor de salas. Confira a internet.',
+  'room-full': 'Essa sala já tem dois jogadores. Peça para o seu amigo criar outra.',
+  network: 'Sem conexão com a internet agora. Confira o Wi-Fi ou os dados móveis.',
 };
 
 export function OnlineRush({role, code: joinCode, me, mode, onExit}: {role: 'host' | 'guest'; code?: string; me: Player; mode: RushMode; onExit: () => void}) {
