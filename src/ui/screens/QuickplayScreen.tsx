@@ -19,14 +19,14 @@ import {ArenaBackdrop} from '../scene';
 import {ArenaStage} from '../arenas';
 import {randomArena} from '../../game/arenas';
 import {TrainerAvatar} from './StartScreens';
-import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
+import {playClick, playCrowd, playCry, playFanfare, playHit, playMega, playMove} from '../audio';
 import {fast} from '../settings';
 import {OnlineRush} from './OnlineRush';
 import {HistorySummary} from './HistoryScreens';
 import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
-import {FX, playMoveFx} from '../fx';
+import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
 import {useMatchGuard} from '../leaveGuard';
 
@@ -865,9 +865,23 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         }
         if (ev.forme) {
           const f = ev.forme;
-          setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
-          playCry(f.species);
-          await wait(700);
+          const el = arenaRef.current?.querySelector<HTMLElement>(f.side === bottom ? '.player-slot' : '.wild-slot');
+          if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
+            // Megaevolução animada: junta energia, clarão e a forma nova aparece.
+            playMega('charge');
+            await Promise.race([
+              playMegaFx(fxRef.current, el, () => {
+                playMega('burst');
+                setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: undefined} : null}));
+                playCry(f.species);
+              }),
+              wait(3000),
+            ]);
+          } else {
+            setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
+            playCry(f.species);
+            await wait(700);
+          }
         }
         if (ev.move) {
           const mv = ev.move;

@@ -531,3 +531,83 @@ export function throwBallFx(layer: HTMLElement, src?: string): Promise<void> {
   fly(layer, {file: 'pokeball.png', src, size: 28}, {x: 20, y: 90}, POS.p2, 480, {spin: true});
   return sleep(500);
 }
+
+/** Cores da megaevolução: um arco-íris de brilhos (paletas de tipos já existentes). */
+const MEGA_COLORS = ['Fairy', 'Psychic', 'Dragon', 'Electric', 'Ice', 'Grass'];
+
+/** É megaevolução (ou reversão primal) e não outra troca de forma? */
+export function isMegaForme(forme: string | undefined): boolean {
+  return !!forme && /^(Mega|Primal)/.test(forme);
+}
+
+/**
+ * Megaevolução: brilhos coloridos se juntam no Pokémon, ele vira uma silhueta branca,
+ * um clarão troca o sprite (`swap`) e os brilhos explodem para fora. Cerca de 1,5 s.
+ */
+export async function playMegaFx(layer: HTMLElement, slot: HTMLElement | null, swap: () => void): Promise<void> {
+  const st = new Stage(layer);
+  const lr = layer.getBoundingClientRect();
+  // O sprite é ampliado por CSS: o centro certo é o da imagem, não o da caixa.
+  const sr = (slot?.querySelector('img') ?? slot)?.getBoundingClientRect();
+  const center: Point = sr && sr.width && lr.width && lr.height
+    ? {x: ((sr.left + sr.width / 2 - lr.left) / lr.width) * 100, y: ((sr.top + sr.height * 0.55 - lr.top) / lr.height) * 100}
+    : POS.p1;
+  const c = st.pt(center);
+  const R = 46 * st.u;
+  const charge = 800;
+
+  let swapped = false;
+  // O Pokémon fica branco e pulsa enquanto junta energia.
+  const glow = slot?.animate(
+    [
+      {filter: 'none'},
+      {filter: 'brightness(1.6) drop-shadow(0 0 4px #fff)', offset: 0.4},
+      {filter: 'brightness(0) invert(1) drop-shadow(0 0 8px #ffe6ff)'},
+    ],
+    {duration: charge, easing: 'ease-in', fill: 'forwards'},
+  );
+
+  // Brilhos vindo de todos os lados até o centro.
+  st.during(0, charge - 120, k => {
+    for (let i = 0; i < 3; i++) {
+      const ang = rand(-Math.PI, Math.PI);
+      const r = R * rand(0.8, 1.15) * (1 - k * 0.35);
+      const life = rand(0.28, 0.4);
+      const from = {x: c.x + Math.cos(ang) * r, y: c.y + Math.sin(ang) * r};
+      st.add(MEGA_COLORS[(Math.random() * MEGA_COLORS.length) | 0], from, {
+        speed: [r / life / st.u, r / life / st.u], angle: ang + Math.PI, spread: 0, life: [life, life], shape: Math.random() < 0.5 ? 'star' : 'sq', size: 2,
+      });
+    }
+  });
+  // Anéis que se fecham, cada vez mais rápido.
+  for (let i = 0; i < 3; i++) st.at(i * 240, () => st.add('Fairy', c, {speed: [0, 0], life: [0.35, 0.35], shape: 'ring', size: 6 - i * 2}));
+
+  // Clarão: troca de forma, explosão de brilhos e a forma nova saindo do branco.
+  st.at(charge, () => {
+    st.flash('#ffffff', 320);
+    swapped = true;
+    swap();
+    glow?.cancel();
+    slot?.animate(
+      [
+        {filter: 'brightness(0) invert(1) drop-shadow(0 0 8px #ffe6ff)', transform: 'scale(1.12)'},
+        {filter: 'brightness(1.4) drop-shadow(0 0 6px #fff)', transform: 'scale(1.04)', offset: 0.5},
+        {filter: 'none', transform: 'scale(1)'},
+      ],
+      {duration: 600, easing: 'ease-out'},
+    );
+    for (const type of MEGA_COLORS) {
+      for (let i = 0; i < 9; i++) st.add(type, c, {speed: [70, 190], life: [0.35, 0.75], jitter: 3, shape: i % 3 ? 'star' : 'sq', size: 2});
+    }
+    for (let i = 0; i < 2; i++) st.add('Normal', c, {speed: [0, 0], life: [0.4, 0.5], shape: 'ring', size: 4 + i * 6});
+  });
+  // Brilhinhos que continuam subindo por um instante.
+  st.during(charge + 100, charge + 650, () => {
+    if (Math.random() < 0.6) st.add(MEGA_COLORS[(Math.random() * MEGA_COLORS.length) | 0], {x: c.x + rand(-18, 18) * st.u, y: c.y + rand(-6, 16) * st.u}, {speed: [30, 60], angle: -Math.PI / 2, spread: 0.15, life: [0.35, 0.55], shape: 'star', size: 1});
+  });
+
+  await st.run(2500);
+  // Se a animação foi cortada antes do clarão (aba em segundo plano), troca mesmo assim.
+  glow?.cancel();
+  if (!swapped) swap();
+}

@@ -29,10 +29,10 @@ import {
   isNarration,
   Narrated,
 } from '../components';
-import {playBall, playCry, playHit, playJingle, playMove, playPlin, playShake} from '../audio';
+import {playBall, playCry, playHit, playJingle, playMega, playMove, playPlin, playShake} from '../audio';
 import {askLead, fast, setAskLead} from '../settings';
 import {asksLead, firstFoes, leadAdvice} from '../../game/lead';
-import {FX, playMoveFx, throwBallFx} from '../fx';
+import {FX, isMegaForme, playMegaFx, playMoveFx, throwBallFx} from '../fx';
 import {lineRoot} from '../../game/meta';
 import type {OwnedMon} from '../../game/types';
 import {Hearts} from './CollectionScreen';
@@ -135,9 +135,23 @@ export function BattleScreen() {
         }
         if (ev.forme) {
           const f = ev.forme;
-          setterOf(f.side)(at(v => (v ? {...v, species: f.species, anim: 'enter'} : v), slot));
-          playCry(f.species);
-          await wait(700);
+          const el = arenaRef.current?.querySelector<HTMLElement>(`.${f.side === 'p1' ? 'player-slot' : 'wild-slot'}.s${slot}`);
+          if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
+            // Megaevolução animada: junta energia, clarão e a forma nova aparece.
+            playMega('charge');
+            await Promise.race([
+              playMegaFx(fxRef.current, el, () => {
+                playMega('burst');
+                setterOf(f.side)(at(v => (v ? {...v, species: f.species, anim: undefined} : v), slot));
+                playCry(f.species);
+              }),
+              wait(3000),
+            ]);
+          } else {
+            setterOf(f.side)(at(v => (v ? {...v, species: f.species, anim: 'enter'} : v), slot));
+            playCry(f.species);
+            await wait(700);
+          }
         }
         if (ev.move) {
           const mv = ev.move;
