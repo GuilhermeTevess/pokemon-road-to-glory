@@ -689,13 +689,17 @@ function FoePreview({foe}: {foe: {player: Player; team: string[]}}) {
         <TrainerAvatar avatar={foe.player.avatar} name={foe.player.name} size={44} />
         <b>Time de {foe.player.name}</b>
       </div>
-      <p className="hint small">Você vê o time dele, mas não quem ele vai mandar primeiro. Ele também não sabe o seu.</p>
+      <p className="hint small">Você vê o time dele, mas não quem ele vai mandar primeiro. Ele também não sabe o seu. Toque num Pokémon para ver a ficha dele.</p>
       {/* Em ordem alfabética: a ordem do time mostraria quem ele escolheu para abrir. */}
       {[...foe.team].sort((a, b) => a.localeCompare(b)).map(name => (
         <div key={name} className="prep-foe-mon">
-          <Sprite name={name} size={52} still />
+          <SpeciesButton name={name}>
+            <Sprite name={name} size={52} still />
+          </SpeciesButton>
           <span className="prep-foe-info">
-            <b>{species(name).name}</b>
+            <b>
+              <SpeciesButton name={name} />
+            </b>
             <Types name={name} info />
           </span>
           <button className={`weak-btn ${open === name ? 'open' : ''}`} onClick={() => setOpen(open === name ? null : name)}>
@@ -1122,7 +1126,7 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
   return (
     <Modal onClose={onClose} wide>
       <h2>Os times</h2>
-      <p className="hint">Toque num tipo para abrir a calculadora.</p>
+      <p className="hint">Toque num Pokémon para ver a ficha dele (tipos, atributos base e evoluções). Toque num tipo para abrir a calculadora.</p>
       <div className="teams-cols">
         {players.map((p, i) => (
           <div key={i} className="teams-col">
@@ -1134,10 +1138,12 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
               const out = down[i === 0 ? 'p1' : 'p2'].includes(name);
               return (
                 <div key={name} className={`prep-foe-mon ${out ? 'fainted' : ''}`}>
-                  <Sprite name={name} size={44} still />
+                  <SpeciesButton name={name}>
+                    <Sprite name={name} size={44} still />
+                  </SpeciesButton>
                   <span className="prep-foe-info">
                     <b>
-                      {species(name).name} {out && <small className="muted">(desmaiou)</small>}
+                      <SpeciesButton name={name} /> {out && <small className="muted">(desmaiou)</small>}
                     </b>
                     <Types name={name} info />
                   </span>
