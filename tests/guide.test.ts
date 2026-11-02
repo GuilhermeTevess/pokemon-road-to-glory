@@ -43,3 +43,14 @@ describe('névoa do PokéPC', () => {
     expect(r.seen).toEqual([]);
   });
 });
+
+describe('onde aparece', () => {
+  it('Lucario aparece como Riolu nos mesmos biomas', async () => {
+    const {allSpots, whereFound} = await import('../src/game/guide');
+    const spots = allSpots(20, 'sinnoh');
+    const riolu = whereFound('Riolu', spots);
+    expect(riolu.length).toBeGreaterThan(0);
+    expect(whereFound('Lucario', spots)).toEqual(riolu);
+    for (let i = 1; i < riolu.length; i++) expect(riolu[i - 1].chance).toBeGreaterThanOrEqual(riolu[i].chance);
+  });
+});
