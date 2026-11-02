@@ -1,10 +1,11 @@
 // Treinadores lendários: o "Rastro da lenda" de cada região sobe com chefes, eventos e
 // viajantes. A cada ronda na região, a chance de a lenda te desafiar é o rastro (até 40%).
 import {toID} from '@pkmn/sim';
+import {species} from '../data/dex';
 import {ITEMS} from '../data/items';
 import {legendsOf} from '../data/legends';
 import type {Legend} from '../data/legends';
-import {createMon} from './mon';
+import {createMon, movesFor, stageAt} from './mon';
 import {pick} from './rng';
 import type {Encounter, OwnedMon, RunState} from './types';
 
@@ -32,10 +33,14 @@ export function legendTeam(legend: Legend, party: OwnedMon[]): OwnedMon[] {
   const size = Math.min(6, Math.max(3, party.length));
   const level = Math.min(100, Math.max(5, ...party.map(m => m.level)) + 3);
   return legend.team.slice(0, size).map(l => {
-    const mon = createMon(l.species, {level, ivMin: 31, shinyChance: 0, hiddenAbilityChance: 0});
-    mon.moves = [...l.moves];
+    // Lenda encontrada cedo usa o estágio do nível (Charmeleon no nível 15), com os golpes que ele já sabe.
+    const name = stageAt(l.species, level);
+    const mon = createMon(name, {level, ivMin: 31, shinyChance: 0, hiddenAbilityChance: 0});
+    mon.moves = name === species(l.species).name ? [...l.moves] : movesFor(name, l.moves, level);
     const item = l.item ? toID(l.item) : '';
-    if (item && ITEMS.some(i => i.id === item)) mon.item = item;
+    const def = ITEMS.find(i => i.id === item);
+    // Mega Pedra só faz sentido na forma final.
+    if (def && (def.kind !== 'mega' || name === species(l.species).name)) mon.item = item;
     return mon;
   });
 }

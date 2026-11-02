@@ -10,6 +10,7 @@ import {RIVALS, getRival} from '../data/rivals';
 import type {CareerFight} from './career';
 import {POINTS} from './league';
 import {chance, pick, shuffle} from './rng';
+import {stageAt} from './mon';
 
 export interface WorldBadge {
   gym: string;
@@ -97,7 +98,8 @@ function addPts(b: WorldBot, pts: number, label: string, wave: number) {
 }
 
 function fight(b: WorldBot, f: Omit<CareerFight, 'seen'>) {
-  const seen = shuffle(b.team).slice(0, Math.min(b.team.length, 2 + (Math.random() < 0.5 ? 1 : 0)));
+  // O noticiário mostra a forma do nível de agora (Charmeleon no começo, Charizard depois).
+  const seen = shuffle(b.team).slice(0, Math.min(b.team.length, 2 + (Math.random() < 0.5 ? 1 : 0))).map(s => stageAt(s, botLevel(b, f.wave)));
   b.fights = [{...f, seen}, ...b.fights].slice(0, 12);
   return seen;
 }
@@ -127,7 +129,7 @@ function tick(w: World, b: WorldBot, wave: number, boost: number) {
     const seen = fight(b, {vs: next.leader, won, kind: 'gym', wave});
     if (won) {
       delete b.tries[next.id];
-      b.badges.push({gym: next.id, wave, team: [...b.team], tries});
+      b.badges.push({gym: next.id, wave, team: b.team.map(s => stageAt(s, botLevel(b, wave))), tries});
       addPts(b, POINTS.badge, `${next.badge} (${next.leader})`, wave);
       news(w, {wave, who: b.name, weight: 1 + i / 4, text: `${b.name} ganhou a ${next.badge} de ${next.leader}${tries > 1 ? ` na ${tries}ª tentativa` : ''}, com ${listPt(glimpse(seen, `gym|${next.leader}|${wave}`))} em destaque.`});
       if (b.badges.filter(x => getGym(x.gym)?.region === b.region).length === gyms.length) {
