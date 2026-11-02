@@ -437,6 +437,7 @@ export function BattleScreen() {
                   <button
                     key={m.id + m.index}
                     className="move-btn"
+                    title={moveDescPt(m.name)}
                     disabled={m.disabled || (!m.locked && m.pp <= 0)}
                     style={{['--mc' as string]: TYPE_COLORS[m.type]}}
                     onClick={() => {
