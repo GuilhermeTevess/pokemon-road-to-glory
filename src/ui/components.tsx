@@ -137,6 +137,15 @@ export function HpBar({hp, maxhp, showNumbers}: {hp: number; maxhp: number; show
   );
 }
 
+/** Botão grande da calculadora de tipos (abre já com os tipos passados, se tiver). */
+export function CalcButton({types = [], label = 'Calculadora de tipos'}: {types?: readonly string[]; label?: string}) {
+  return (
+    <button className="btn small calc-btn" onClick={() => useGame.getState().openTypeCalc([...types])} title="Ver quanto cada tipo tira de cada tipo">
+      🧮 {label}
+    </button>
+  );
+}
+
 /** Painel de fraquezas e resistências — o "type calculator" embutido. */
 export function MatchupPanel({types, title}: {types: readonly string[]; title?: string}) {
   const m = defensiveMatchups(types);
