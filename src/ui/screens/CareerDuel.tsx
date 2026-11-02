@@ -63,6 +63,8 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
   const link = useRef<Link | null>(null);
   const [status, setStatus] = useState(host ? `Esperando ${foe.name} entrar na partida...` : `Procurando a partida de ${foe.name}...`);
   const [started, setStarted] = useState(false);
+  const startedRef = useRef(false);
+  startedRef.current = started;
   const [batches, setBatches] = useState<BattleEvent[][]>([]);
   const [balls, setBalls] = useState<{p1: boolean[]; p2: boolean[]}>({p1: [], p2: []});
   const [req, setReq] = useState<DuelReq | null>(null);
@@ -145,7 +147,15 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
         } else setStatus(`Problema de conexão (${e}). Tentando de novo...`);
       };
       const onClose = () => {
-        if (alive && !finished.current) setStatus(`A conexão com ${foe.name} caiu. Tentando reconectar...`);
+        if (!alive || finished.current) return;
+        setStatus(`A conexão com ${foe.name} caiu. Tentando reconectar...`);
+        // Antes da luta começar, dá para abrir a sala de novo (o outro saiu e voltou).
+        if (!startedRef.current) {
+          link.current?.close();
+          link.current = null;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(connect, 3000);
+        }
       };
       const opened = () => {
         if (host) return;

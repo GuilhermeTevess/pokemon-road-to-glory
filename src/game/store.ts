@@ -224,11 +224,19 @@ interface Store {
   careerContinue(): Promise<void>;
   /** Quickplay: começa um campeonato avulso com o time escolhido. */
   startQuickTour(kind: TourKind, team: string[]): void;
+  /** Campeonato rápido online: todos os jogadores da sala (com os times) já prontos. */
+  startQuickTourOnline(kind: TourKind, code: string, players: {pid: string; name: string; avatar: string; team?: OwnedMon[]}[]): void;
   /** Atualiza o run atual após mexer no controlador de batalha. */
   touch(): void;
 }
 
 /** Passe de Estadia e Passe Regional: não ficam na mochila, valem assim que você ganha ou compra. */
+/** Código na nuvem do torneio compartilhado: o da carreira online ou o da sala do campeonato rápido. */
+const sharedCode = (run: RunState): string | undefined => run.career?.code ?? run.quickRoom;
+
+/** Id do jogador no campeonato rápido online (o mesmo da carreira, quando tem treinador). */
+export const quickPid = (trainerId?: string) => playerId(trainerId ?? 'guest');
+
 const isStayPass = (item: {travel?: string}) => item.travel === 'biomeStay' || item.travel === 'regionStay';
 
 function emptyRun(): RunState {
@@ -1286,10 +1294,11 @@ export const useGame = create<Store>((set, get) => {
           const left = won ? ctl.battle.p1.pokemon.filter(p => !p.fainted).length : ctl.battle.p2.pokemon.filter(p => !p.fainted).length;
           const mine = t.shared ? myPending(t) : null;
           recordPlayerResult(t, won, run.party.map(m => m.species), highlightsFromLog(ctl.battle.log, me, foe, won ? me : foe, left), left);
-          if (mine && run.career) {
+          const sc = sharedCode(run);
+          if (mine && sc) {
             // Partida contra bot no torneio da carreira: o resultado vai para a nuvem para os outros.
             const m = t.rounds[mine.round][mine.index];
-            void cloud.putMatch(run.career.code, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights: m.highlights, left: m.left}).catch(() => undefined);
+            void cloud.putMatch(sc, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights: m.highlights, left: m.left}).catch(() => undefined);
             sharedAdvance(t, tourResults);
           }
           if (!won) {
@@ -1503,6 +1512,24 @@ export const useGame = create<Store>((set, get) => {
       set({run, screen: 'run'});
     },
 
+    startQuickTourOnline(kind, code, players) {
+      const info = tourInfo(kind);
+      const run = emptyRun();
+      run.quick = true;
+      run.quickRoom = `QT-${code.toUpperCase()}`;
+      run.wave = info.wave;
+      const myId = quickPid(get().trainer?.id);
+      const mine = players.find(p => p.pid === myId);
+      run.party = (mine?.team ?? []).map(m => structuredClone(m));
+      const tidStr = run.quickRoom;
+      const region = withSeed(tidStr, () => pick(REGIONS).id);
+      const humans = players.map(p => ({name: p.name, avatar: p.avatar, titles: {}, runnerUps: 0, fame: 0, pid: p.pid, team: (p.team ?? []).map(m => structuredClone(m))}));
+      run.tournament = createSharedTournament(info, humans, myId, tidStr, region);
+      run.phase = 'tournament';
+      battle = null;
+      set({run, screen: 'run'});
+    },
+
     async worldSync() {
       const run = get().run;
       const w = run?.world;
@@ -1522,9 +1549,10 @@ export const useGame = create<Store>((set, get) => {
     async tourLoad() {
       const run = get().run;
       const t = run?.tournament;
-      if (!run?.career || !t?.shared || t.shared.ready) return;
+      const sc = run && sharedCode(run);
+      if (!run || !sc || !t?.shared || t.shared.ready) return;
       try {
-        const doc = await cloudTours.createOnce(run.career.code, t.shared.tid, {region: t.region, entrants: t.entrants.map(e => ({...e, player: false, friend: false}))});
+        const doc = await cloudTours.createOnce(sc, t.shared.tid, {region: t.region, entrants: t.entrants.map(e => ({...e, player: false, friend: false}))});
         mutate(r => {
           if (r.tournament?.shared?.tid === t.shared!.tid && !r.tournament.shared.ready) adoptShared(r.tournament, doc);
         });
@@ -1536,8 +1564,8 @@ export const useGame = create<Store>((set, get) => {
     async tourSync() {
       const run = get().run;
       const t = run?.tournament;
-      if (!run?.career || !t?.shared?.ready) return;
-      const code = run.career.code;
+      const code = run && sharedCode(run);
+      if (!run || !code || !t?.shared?.ready) return;
       const tid = t.shared.tid;
       try {
         const list = await cloudMatches.list(code, tid);
@@ -1567,12 +1595,13 @@ export const useGame = create<Store>((set, get) => {
       mutate(run => {
         const t = run.tournament;
         const mine = t?.shared ? myPending(t) : null;
-        if (!t || !mine || !run.career) return;
+        const sc = sharedCode(run);
+        if (!t || !mine || !sc) return;
         recordPlayerResult(t, won, myTeam, highlights, left);
         const m = t.rounds[mine.round][mine.index];
         const me = playerIndex(t);
         m.teams = m.a === me ? [myTeam, foeTeam] : [foeTeam, myTeam];
-        if (host) void cloud.putMatch(run.career.code, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights, left}).catch(() => undefined);
+        if (host) void cloud.putMatch(sc, {tid: t.shared!.tid, key: matchKey(mine.round, mine.index), winner: m.winner!, teams: m.teams, highlights, left}).catch(() => undefined);
         healAll(run);
         sharedAdvance(t, tourResults);
       });

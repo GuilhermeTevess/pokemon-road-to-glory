@@ -72,6 +72,18 @@ async function createOnce<T>(path: string, value: T): Promise<T> {
   throw new Error(`Firestore ${res.status}`);
 }
 
+async function delDoc(path: string): Promise<void> {
+  if (localMode()) {
+    localStorage.removeItem(`rtg-fakecloud/${path}`);
+    return;
+  }
+  const res = await fetch(`${BASE()}/${path}?${KEY()}`, {method: 'DELETE'});
+  if (!res.ok && res.status !== 404) throw new Error(`Firestore ${res.status}`);
+}
+
+/** Acesso direto a documentos (as salas do Rush e do campeonato rápido online usam). */
+export const cloudRaw = {get: getDoc, put: putDoc, del: delDoc, createOnce, list: listDocs};
+
 async function listDocs<T>(path: string): Promise<T[]> {
   if (localMode()) {
     const out: T[] = [];

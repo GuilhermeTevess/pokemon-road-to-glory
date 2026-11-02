@@ -140,6 +140,8 @@ export interface RunState {
   version: 1;
   /** Campeonato rápido (Quickplay): não mexe na coleção e some quando o campeonato acaba. */
   quick?: boolean;
+  /** Campeonato rápido online: a sala (o "código" usado na nuvem, como o de uma carreira). */
+  quickRoom?: string;
   /** Run de uma carreira online (código, temporada e regras do host). */
   career?: RunCareer;
   /** Última ronda de jogo terminada (vitória, torneio encerrado...). */
