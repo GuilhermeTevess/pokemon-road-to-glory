@@ -149,7 +149,10 @@ async function putDoc(path: string, value: unknown): Promise<void> {
     localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify({fields: {json: {stringValue: JSON.stringify(value)}}}));
     return;
   }
-  const res = await call(`${BASE()}/${path}?${KEY()}`, {method: 'PATCH', body: await body(value)}, true);
+  const data = await body(value);
+  // keepalive: mensagens pequenas ainda saem se a pessoa fechar a aba (ex.: avisar que saiu da partida).
+  // O navegador só aceita keepalive até 64 KB, então as grandes (turnos da batalha) vão sem.
+  const res = await call(`${BASE()}/${path}?${KEY()}`, {method: 'PATCH', body: data, keepalive: data.length < 30000}, true);
   if (!res.ok) throw new Error(`Firestore ${res.status}`);
 }
 

@@ -13,6 +13,7 @@ import {playCrowd, playFanfare} from '../audio';
 import {BattleView} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 import {TrainerAvatar} from './StartScreens';
+import {useMatchGuard} from '../leaveGuard';
 
 type Msg = Record<string, unknown>;
 
@@ -49,7 +50,7 @@ function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: strin
   );
 }
 
-export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
+export function CareerDuel({room, host, me, foe, team, forfeitable, onDone, onLeave}: {
   /** Código da sala (o mesmo nos dois PCs). */
   room: string;
   host: boolean;
@@ -57,7 +58,10 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
   foe: Player;
   /** Seu time para esta partida (já curado). */
   team: OwnedMon[];
-  onDone: (r: DuelOutcome) => void;
+  /** Campeonato rápido: sair no meio da luta dá a vitória para o outro (na carreira, não). */
+  forfeitable?: boolean;
+  /** `host` volta true quando o outro saiu: aí é você quem grava o resultado na chave. */
+  onDone: (r: DuelOutcome, wonByQuit?: boolean) => void;
   onLeave: () => void;
 }) {
   const link = useRef<Link | null>(null);
@@ -75,16 +79,29 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
   const send = (msg: Msg) => link.current?.send(msg);
   const players: [Player, Player] = host ? [me, foe] : [foe, me];
 
-  const finish = (r: DuelOutcome) => {
+  const finish = (r: DuelOutcome, wonByQuit?: boolean) => {
     if (finished.current) return;
     finished.current = true;
     setReq(null);
     setTimeout(() => {
       playFanfare(r.won ? 1 : 0);
       playCrowd(1, 2);
-      onDone(r);
+      onDone(r, wonByQuit);
     }, 2500);
   };
+  /** O outro saiu no meio da luta (campeonato rápido): vitória sua. */
+  const foeQuit = () => {
+    if (!forfeitable || !startedRef.current || finished.current) return false;
+    setStatus(`${foe.name} saiu da partida.`);
+    finish({won: true, highlights: [`${foe.name} saiu da partida. Vitória de ${me.name}!`], left: team.length, myTeam: team.map(m => m.species), foeTeam: foeTeam.current}, true);
+    return true;
+  };
+  // A derrota em si o campeonato grava; aqui só avisamos o outro aparelho.
+  useMatchGuard(!!forfeitable && started, () => {
+    if (finished.current) return;
+    finished.current = true;
+    send({t: 'forfeit'});
+  });
 
   // ---------------- dono da partida
   const afterBatch = (events: BattleEvent[]) => {
@@ -114,6 +131,8 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
       setStarted(true);
       send({t: 'start'});
       afterBatch(ctl.current.initialEvents());
+    } else if (msg.t === 'forfeit') {
+      foeQuit();
     } else if (msg.t === 'choice' && ctl.current && duelNeeds(ctl.current.battle, 'p2')) {
       afterBatch(duelChoose(ctl.current, 'p2', msg.choice as string, !!msg.mega));
     }
@@ -122,6 +141,7 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
   // ---------------- quem entra
   const onGuestMsg = (msg: Msg) => {
     if (msg.t === 'start') setStarted(true);
+    else if (msg.t === 'forfeit') foeQuit();
     else if (msg.t === 'events') {
       setBatches(b => [...b, msg.events as BattleEvent[]]);
       setBalls(msg.balls as {p1: boolean[]; p2: boolean[]});
@@ -147,7 +167,7 @@ export function CareerDuel({room, host, me, foe, team, onDone, onLeave}: {
         } else setStatus(`Problema de conexão (${e}). Tentando de novo...`);
       };
       const onClose = () => {
-        if (!alive || finished.current) return;
+        if (!alive || finished.current || foeQuit()) return;
         setStatus(`A conexão com ${foe.name} caiu. Tentando reconectar...`);
         // Antes da luta começar, dá para abrir a sala de novo (o outro saiu e voltou).
         if (!startedRef.current) {

@@ -152,16 +152,18 @@ export function BiomeGuide({onClose}: {onClose: () => void}) {
       {card && (
         <PokemonCard
           name={card}
-          spots={whereFound(card, spots)}
-          wave={wave}
-          regionName={getRegion(regionId).name}
-          biomeName={hiddenName}
-          onPick={setCard}
-          onBiome={id => {
-            setBiome(id);
-            setQuery('');
-            setCard(null);
+          where={{
+            spots: whereFound(card, spots),
+            wave,
+            regionName: getRegion(regionId).name,
+            biomeName: hiddenName,
+            onBiome: id => {
+              setBiome(id);
+              setQuery('');
+              setCard(null);
+            },
           }}
+          onPick={setCard}
           onClose={() => setCard(null)}
         />
       )}
@@ -169,9 +171,22 @@ export function BiomeGuide({onClose}: {onClose: () => void}) {
   );
 }
 
-/** Cartão de um Pokémon no meio da tela: tipos, stats base, habilidades, evoluções e onde aparece. */
-function PokemonCard(props: {name: string; spots: Spot[]; wave: number; regionName: string; biomeName: (b: Spot['biome']) => string; onPick: (n: string) => void; onBiome: (id: string) => void; onClose: () => void}) {
-  const {name, spots, wave, regionName, biomeName, onPick, onBiome, onClose} = props;
+/** Ficha de um Pokémon fora do guia (ex.: sorteio do Rush): o mesmo cartão, sem "Onde aparece". */
+export function MonInfo({name, onClose}: {name: string; onClose: () => void}) {
+  const [shown, setShown] = useState(name);
+  return <PokemonCard name={shown} onPick={setShown} onClose={onClose} />;
+}
+
+interface Where {
+  spots: Spot[];
+  wave: number;
+  regionName: string;
+  biomeName: (b: Spot['biome']) => string;
+  onBiome: (id: string) => void;
+}
+
+/** Cartão de um Pokémon no meio da tela: tipos, stats base, habilidades, evoluções e (no guia) onde aparece. */
+function PokemonCard({name, where, onPick, onClose}: {name: string; where?: Where; onPick: (n: string) => void; onClose: () => void}) {
   const s = species(name);
   const base = baseOf(s);
   const line = evolutionLine(base);
@@ -234,27 +249,31 @@ function PokemonCard(props: {name: string; spots: Spot[]; wave: number; regionNa
           </>
         )}
 
-        <h4>Onde aparece</h4>
-        <p className="hint small">
-          Ronda {wave}, em {regionName}
-          {base.name !== s.name ? `. Aparece como ${base.name} e evolui conforme o nível.` : '.'}
-        </p>
-        {!spots.length && <p className="muted">Não aparece solto na natureza. Dá para conseguir por evento, ovo ou troca.</p>}
-        <div className="mon-card-spots">
-          {spots.map(x =>
-            x.biome.region && biomeName(x.biome) !== x.biome.name ? (
-              <span key={x.biome.id} className="guide-spot locked">
-                <PixelIcon name="lock" size={12} /> Bioma secreto
-                <small>{pct(x.chance)}</small>
-              </span>
-            ) : (
-              <button key={x.biome.id} className="guide-spot" style={{borderLeftColor: x.biome.color}} onClick={() => onBiome(x.biome.id)} title={`Abrir ${x.biome.name} no guia`}>
-                {x.biome.name}
-                <small>{pct(x.chance)}</small>
-              </button>
-            ),
-          )}
-        </div>
+        {where && (
+          <>
+            <h4>Onde aparece</h4>
+            <p className="hint small">
+              Ronda {where.wave}, em {where.regionName}
+              {base.name !== s.name ? `. Aparece como ${base.name} e evolui conforme o nível.` : '.'}
+            </p>
+            {!where.spots.length && <p className="muted">Não aparece solto na natureza. Dá para conseguir por evento, ovo ou troca.</p>}
+            <div className="mon-card-spots">
+              {where.spots.map(x =>
+                x.biome.region && where.biomeName(x.biome) !== x.biome.name ? (
+                  <span key={x.biome.id} className="guide-spot locked">
+                    <PixelIcon name="lock" size={12} /> Bioma secreto
+                    <small>{pct(x.chance)}</small>
+                  </span>
+                ) : (
+                  <button key={x.biome.id} className="guide-spot" style={{borderLeftColor: x.biome.color}} onClick={() => where.onBiome(x.biome.id)} title={`Abrir ${x.biome.name} no guia`}>
+                    {x.biome.name}
+                    <small>{pct(x.chance)}</small>
+                  </button>
+                ),
+              )}
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

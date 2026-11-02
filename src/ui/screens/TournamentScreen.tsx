@@ -287,10 +287,12 @@ export function TournamentScreen() {
         me={{name: trainer?.name ?? 'Você', avatar: trainer?.avatar ?? ''}}
         foe={{name: foe.name, avatar: foe.avatar ?? ''}}
         team={team}
+        forfeitable={!!run.quick}
         onLeave={() => setDuel(false)}
-        onDone={res => {
+        onDone={(res, wonByQuit) => {
           setDuel(false);
-          tourDuelResult({...res, host: t.shared!.me < foe.pid!});
+          // Se o outro saiu, quem ficou grava o resultado na chave (o outro não vai gravar).
+          tourDuelResult({...res, host: wonByQuit || t.shared!.me < foe.pid!});
         }}
       />
     );

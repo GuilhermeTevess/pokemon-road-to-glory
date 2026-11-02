@@ -15,6 +15,8 @@ import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
 import {playCrowd, playFanfare} from '../audio';
 import {BattleView, PrepScreen, RushResult} from './QuickplayScreen';
+import {quitTitle} from './OnlineRush';
+import {requestLeave, useMatchGuard} from '../leaveGuard';
 import type {Player} from './QuickplayScreen';
 
 type Msg = Record<string, unknown>;
@@ -34,7 +36,7 @@ const ERRORS: Record<string, string> = {
   network: 'Sem conexão com a internet agora. Confira o Wi-Fi ou os dados móveis.',
 };
 
-function log(s: Shared, me: 0 | 1, winner: number) {
+function log(s: Shared, me: 0 | 1, winner: number, note?: string) {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
     mode: 'online-built',
@@ -45,9 +47,13 @@ function log(s: Shared, me: 0 | 1, winner: number) {
     vsKind: 'player',
     mine: s.teams[me],
     theirs: s.teams[1 - me],
-    note: `${s.names[me]} contra ${s.names[1 - me]}`,
+    note: note ?? `${s.names[me]} contra ${s.names[1 - me]}`,
   });
 }
+
+const playing = (step?: Shared['step']) => step === 'prep' || step === 'battle';
+const QUIT = 'Saiu no meio da partida';
+const FOE_QUIT = 'O adversário saiu da partida';
 
 function Lobby({code, status, error, onExit}: {code?: string; status: string; error?: string; onExit: () => void}) {
   return (
@@ -90,6 +96,23 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
   const [idle, setIdle] = useState(false);
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
+  const [foeQuit, setFoeQuit] = useState(false);
+  const foeLeft = () => {
+    const s = sharedRef.current;
+    if (!playing(s.step) || ctl.current?.ended) return false;
+    log(s, 0, 0, FOE_QUIT);
+    setFoeQuit(true);
+    sharedRef.current = {...s, step: 'end', winner: 0};
+    setShared(sharedRef.current);
+    playFanfare(1);
+    return true;
+  };
+  useMatchGuard(playing(shared.step) && !error, () => {
+    if (ctl.current?.ended) return;
+    log(sharedRef.current, 0, 1, QUIT);
+    send({t: 'forfeit'});
+  });
+  const leave = () => requestLeave(onExit);
 
   const send = (msg: Msg) => link.current?.send(msg);
   const publish = (s: Shared) => {
@@ -129,6 +152,8 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     if (msg.t === 'hello' && s.step === 'lobby') {
       teams.current[1] = msg.team as OwnedMon[];
       publish({...s, players: [s.players[0], msg.player as Player], names: [s.names[0], msg.name as string], teams: [s.teams[0], teams.current[1].map(m => m.species)], step: 'prep'});
+    } else if (msg.t === 'forfeit') {
+      foeLeft();
     } else if (msg.t === 'prepDone' && s.step === 'prep') {
       const order = msg.order as string[];
       const t = teams.current[1];
@@ -147,7 +172,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
       code,
       m => onMsg(m),
       () => send({t: 'state', s: sharedRef.current}),
-      () => alive && setError('Seu amigo saiu da sala.'),
+      () => alive && !foeLeft() && sharedRef.current.step !== 'end' && setError('Seu amigo saiu da sala.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
     ).then(l => {
       if (alive) link.current = l;
@@ -164,7 +189,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
   if (error && s.step !== 'end') return <Lobby code={code} status="" error={error} onExit={onExit} />;
   if (s.step === 'lobby') return <Lobby code={code} status="Esperando o amigo entrar na sala..." onExit={onExit} />;
   if (s.step === 'prep') {
-    if (myPrep) return <Lobby status={`Esperando ${s.players[1].name} escolher quem abre...`} onExit={onExit} />;
+    if (myPrep) return <Lobby status={`Esperando ${s.players[1].name} escolher quem abre...`} onExit={leave} />;
     return (
       <PrepScreen
         player={s.players[0]}
@@ -200,7 +225,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     );
   }
   const w = s.winner ?? 0;
-  return <RushResult title={`${s.players[w].name} venceu!`} winner={s.players[w]} team={[]} teamNames={s.teams[w]} newLabel="Voltar" onNew={onExit} onExit={onExit} />;
+  return <RushResult title={foeQuit ? quitTitle(s.players, w) : `${s.players[w].name} venceu!`} winner={s.players[w]} team={[]} teamNames={s.teams[w]} newLabel="Voltar" onNew={onExit} onExit={onExit} />;
 }
 
 // ------------------------------------------------------------------ Amigo que entrou
@@ -218,8 +243,27 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
   const [ended, setEnded] = useState<number | null>(null);
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
+  const over = useRef(false);
+  const [foeQuit, setFoeQuit] = useState(false);
 
   const send = (msg: Msg) => link.current?.send(msg);
+  const foeLeft = () => {
+    const s = sharedRef.current;
+    if (over.current || !s || !playing(s.step)) return false;
+    over.current = true;
+    log(s, 1, 1, FOE_QUIT);
+    setReq(null);
+    setFoeQuit(true);
+    setEnded(1);
+    playFanfare(1);
+    return true;
+  };
+  useMatchGuard(connected && playing(shared?.step) && ended === null && !error, () => {
+    over.current = true;
+    if (sharedRef.current) log(sharedRef.current, 1, 0, QUIT);
+    send({t: 'forfeit'});
+  });
+  const leave = () => requestLeave(onExit);
 
   useEffect(() => {
     let alive = true;
@@ -231,7 +275,9 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
           setBatches(b => [...b, msg.events as BattleEvent[]]);
           setBalls(msg.balls as {p1: boolean[]; p2: boolean[]});
         } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
+        else if (msg.t === 'forfeit') foeLeft();
         else if (msg.t === 'end') {
+          over.current = true;
           setReq(null);
           if (sharedRef.current) log(sharedRef.current, 1, msg.winner as number);
           setTimeout(() => {
@@ -245,7 +291,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
         setConnected(true);
         send({t: 'hello', player: me, team: mine, name: team.name});
       },
-      () => alive && setError('A conexão com a sala caiu.'),
+      () => alive && !foeLeft() && !over.current && setError('A conexão com a sala caiu.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
     ).then(l => {
       if (alive) link.current = l;
@@ -261,10 +307,10 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
   if (error && ended === null) return <Lobby status="" error={error} onExit={onExit} />;
   if (!connected || !shared || shared.step === 'lobby') return <Lobby status={connected ? 'Conectado! Esperando o dono da sala...' : `Entrando na sala ${code}...`} onExit={onExit} />;
   if (ended !== null)
-    return <RushResult title={`${shared.players[ended].name} venceu!`} winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} newLabel="Voltar" onNew={onExit} onExit={onExit} />;
+    return <RushResult title={foeQuit ? quitTitle(shared.players, ended) : `${shared.players[ended].name} venceu!`} winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} newLabel="Voltar" onNew={onExit} onExit={onExit} />;
   const s = shared;
   if (s.step === 'prep') {
-    if (prepSent) return <Lobby status={`Esperando ${s.players[0].name} escolher quem abre...`} onExit={onExit} />;
+    if (prepSent) return <Lobby status={`Esperando ${s.players[0].name} escolher quem abre...`} onExit={leave} />;
     return (
       <PrepScreen
         player={s.players[1]}

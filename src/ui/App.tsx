@@ -21,6 +21,9 @@ import {GloryScreen} from './screens/GloryScreen';
 import {TourHistoryScreen, TournamentScreen} from './screens/TournamentScreen';
 import {fast, setFast, setTheme, theme} from './settings';
 import {Tutorial} from './Tutorial';
+import {cancelLeave, confirmLeave, requestLeave, useLeaveAsk, useMatchGuard} from './leaveGuard';
+import {playerIndex, playerMatch} from '../game/tournament';
+import {recordMatch} from '../game/history';
 
 export function App() {
   const {screen, run, toasts, achievePops, setScreen, ivGain, clearIvGain, typeCalc, openTypeCalc} = useGame();
@@ -50,6 +53,7 @@ export function App() {
   }, []);
   const [panelOpen, setPanelOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState<{tab: PartyTab; mon?: string} | null>(null);
+  const leaveAsk = useLeaveAsk();
 
   let body;
   if (screen === 'title') body = <TitleScreen />;
@@ -81,7 +85,7 @@ export function App() {
   return (
     <div className={`app ${inRun ? 'wide' : ''}`}>
       <nav className="topnav">
-        <button className="btn small ghost" onClick={() => setScreen('title')} aria-label="Início">
+        <button className="btn small ghost" onClick={() => requestLeave(() => setScreen('title'))} aria-label="Início">
           <PixelIcon name="home" /> <span className="nav-label">Início</span>
         </button>
         {inRun && (
@@ -169,6 +173,24 @@ export function App() {
           </button>
         </Modal>
       )}
+      {leaveAsk && (
+        <Modal onClose={cancelLeave}>
+          <div className="leave-ask">
+            <PixelIcon name="warning" size={32} />
+            <h2>Sair da partida?</h2>
+            <p className="hint">Se sair agora, a partida conta como derrota no seu histórico.</p>
+            <div className="row center wrap">
+              <button className="btn primary" onClick={cancelLeave}>
+                Continuar jogando
+              </button>
+              <button className="btn danger" onClick={confirmLeave}>
+                Sair e perder
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      <QuickTourGuard />
       <Tutorial />
       <div className="achieve-pops">
         {achievePops.map(a => (
@@ -201,4 +223,31 @@ function AchievePop({name, icon, desc}: {name: string; icon: string; desc: strin
       </span>
     </div>
   );
+}
+
+/**
+ * Campeonato rápido (offline e online): sair no meio conta como derrota contra o próximo adversário.
+ * A carreira e a run normal não entram nisso: dá para sair e voltar depois.
+ */
+function QuickTourGuard() {
+  const run = useGame(s => s.run);
+  const screen = useGame(s => s.screen);
+  const t = run?.quick ? run.tournament : undefined;
+  const next = t && t.stage !== 'done' ? playerMatch(t) : null;
+  const foe = t && next ? t.entrants[next.a === playerIndex(t) ? next.b : next.a] : null;
+  useMatchGuard(screen === 'run' && !!foe, () => {
+    if (!run || !foe) return;
+    recordMatch(useGame.getState().trainer?.id, {
+      mode: run.quickRoom ? 'qtour-online' : 'qtour',
+      online: !!run.quickRoom,
+      won: false,
+      vs: foe.name,
+      vsAvatar: foe.avatar,
+      vsKind: foe.friend ? 'player' : 'bot',
+      mine: run.party.map(m => m.species),
+      theirs: (foe.team ?? []).map(m => m.species),
+      note: 'Saiu no meio do campeonato',
+    });
+  });
+  return null;
 }
