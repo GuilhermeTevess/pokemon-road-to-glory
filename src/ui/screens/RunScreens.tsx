@@ -27,7 +27,7 @@ import {HpBar, ItemIcon, MatchupPanel, MonName, Modal, MoveInfo, PixelIcon, Spri
 import {BiomeCard, RegionCard, TrainerAvatar} from './StartScreens';
 import {BadgeBooksModal} from './GymScreens';
 import {EggInfo} from './DaycareScreen';
-import {fast} from '../settings';
+import {askLead, fast, setAskLead} from '../settings';
 
 /** Lista de Pokémon para escolher em quem usar um item. */
 function TargetPicker({itemId, mons, onPick, children}: {itemId: string; mons: OwnedMon[]; onPick: (uid: string) => void; children?: React.ReactNode}) {
@@ -305,6 +305,24 @@ const BAG_GROUPS: {title: string; kinds: string[]}[] = [
   {title: 'Itens-chave (funcionam sozinhos)', kinds: ['key']},
 ];
 
+/** Liga/desliga o "Quer trocar o Pokémon?" que aparece antes de cada luta. */
+function LeadAskToggle() {
+  const [on, setOn] = useState(askLead());
+  return (
+    <label className="lead-always" title="Antes de cada luta, mostra quem veio e deixa trocar quem começa">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={e => {
+          setAskLead(e.target.checked);
+          setOn(e.target.checked);
+        }}
+      />{' '}
+      Perguntar "Quer trocar o Pokémon?" antes de cada luta
+    </label>
+  );
+}
+
 export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose: () => void; initialTab?: PartyTab; initialMon?: string}) {
   const {run, useItem, takeItem, setLead, swapWithBox} = useGame();
   const [selected, setSelected] = useState<string | null>(initialMon ?? run?.party[0]?.uid ?? null);
@@ -394,6 +412,7 @@ export function PartyPanel({onClose, initialTab = 'party', initialMon}: {onClose
               <MonRow key={m.uid} mon={m} lead={tab !== 'box' && i === 0} selected={m.uid === selected} onClick={() => setSelected(m.uid)} />
             ))}
             {tab === 'box' && !run.box.length && <p className="hint">O PC está vazio.</p>}
+            {tab === 'party' && <LeadAskToggle />}
           </div>
           <div className="party-detail">
             {mon ? (
