@@ -603,6 +603,12 @@ function MatchLine({mine, foe}: {mine: string; foe: string[]}) {
   );
 }
 
+/** Nome do Pokémon como está no time: uma Mega que volta para a luta conta como o Pokémon de antes. */
+function teamName(name: string): string {
+  const sp = species(name);
+  return sp.isMega || sp.isPrimal ? sp.baseSpecies : sp.name;
+}
+
 /** O time do adversário na preparação: só os Pokémon e os tipos (quem abre fica em segredo). */
 function FoePreview({foe}: {foe: {player: Player; team: string[]}}) {
   const [open, setOpen] = useState<string | null>(null);
@@ -613,7 +619,8 @@ function FoePreview({foe}: {foe: {player: Player; team: string[]}}) {
         <b>Time de {foe.player.name}</b>
       </div>
       <p className="hint small">Você vê o time dele, mas não quem ele vai mandar primeiro. Ele também não sabe o seu.</p>
-      {foe.team.map(name => (
+      {/* Em ordem alfabética: a ordem do time mostraria quem ele escolheu para abrir. */}
+      {[...foe.team].sort((a, b) => a.localeCompare(b)).map(name => (
         <div key={name} className="prep-foe-mon">
           <Sprite name={name} size={52} still />
           <span className="prep-foe-info">
@@ -786,7 +793,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
       for (const ev of events) {
         if (ev.switchIn) {
           const sw = ev.switchIn;
-          onField.current[sw.side] = sw.species;
+          onField.current[sw.side] = teamName(sw.species);
           setViews(v => ({...v, [sw.side]: {species: sw.species, level: sw.level ?? 50, hp: sw.hp, maxhp: sw.maxhp, shiny: sw.shiny, anim: 'enter'}}));
           playCry(sw.species);
         }
