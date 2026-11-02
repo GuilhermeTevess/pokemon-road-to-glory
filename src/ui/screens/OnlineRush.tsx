@@ -3,26 +3,29 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, rushMon} from '../../game/rush';
-import type {DuelReq, RushMode} from '../../game/rush';
+import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, megaMode, rollLucky, rushMon} from '../../game/rush';
+import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
 import {playCrowd, playCry, playFanfare} from '../audio';
-import {BattleView, DraftView, PrepScreen, RushResult} from './QuickplayScreen';
+import {fast} from '../settings';
+import {BattleView, DraftView, LuckyReveal, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 
 type Msg = Record<string, unknown>;
 
 interface Shared {
-  step: 'lobby' | 'draft' | 'prep' | 'battle' | 'end';
+  step: 'lobby' | 'draft' | 'lucky' | 'prep' | 'battle' | 'end';
   players: [Player, Player];
   mode: RushMode;
   round: number;
   pairs: [string, string][];
   teams: [string[], string[]];
   winner?: number;
+  /** Tiro de sorte: quem ganhou o Pokémon quebrado. */
+  lucky?: LuckyShot;
 }
 
 const ERRORS: Record<string, string> = {
@@ -89,11 +92,19 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     teams.current[who].push(rushMon(pair[k], mode));
     teams.current[1 - who].push(rushMon(pair[1 - k], mode));
     playCry(pair[k]);
-    const names: [string[], string[]] = [teams.current[0].map(m => m.species), teams.current[1].map(m => m.species)];
+    const names = (): [string[], string[]] => [teams.current[0].map(m => m.species), teams.current[1].map(m => m.species)];
+    const toPrep = () => {
+      publish({...sharedRef.current, teams: names(), step: 'prep'});
+      send({t: 'prep', team: teams.current[1], mega: megaMode(mode)});
+    };
     if (s.round + 1 >= s.pairs.length) {
-      publish({...s, teams: names, step: 'prep'});
-      send({t: 'prep', team: teams.current[1], mega: mode === 'mega'});
-    } else publish({...s, teams: names, round: s.round + 1});
+      if (mode === 'lucky') {
+        // A roleta roda nos dois aparelhos; depois de uns segundos vai para a preparação.
+        const lucky = rollLucky(teams.current);
+        publish({...s, teams: names(), step: 'lucky', lucky});
+        setTimeout(toPrep, fast() ? 4000 : 12000);
+      } else toPrep();
+    } else publish({...s, teams: names(), round: s.round + 1});
   };
 
   const afterBatch = (events: BattleEvent[]) => {
@@ -133,7 +144,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
       const t = teams.current[1];
       teams.current[1] = order.map(uid => t.find(m => m.uid === uid)!).filter(Boolean).map(m => ({...m, item: undefined}));
       const holder = teams.current[1].find(m => m.uid === msg.stone);
-      if (mode === 'mega' && holder) giveMegaStone(holder);
+      if (megaMode(mode) && holder) giveMegaStone(holder);
       prepped.current[1] = true;
       if (prepped.current[0]) startBattle();
       else force(x => x + 1);
@@ -165,13 +176,15 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
   if (error && s.step !== 'end') return <Lobby title="Rush online" code={code} status="" error={error} onExit={onExit} />;
   if (s.step === 'lobby') return <Lobby title="Rush online" code={code} status="Esperando o amigo entrar na sala..." onExit={onExit} />;
   if (s.step === 'draft') return <DraftView players={s.players} mode={s.mode} round={s.round} total={s.pairs.length} pair={s.pairs[s.round]} teams={s.teams} canPick={s.round % 2 === 0} onPick={pick} />;
+  if (s.step === 'lucky' && s.lucky) return <LuckyReveal players={s.players} lucky={s.lucky} />;
   if (s.step === 'prep') {
     if (myPrep) return <Lobby title="Preparação" status={`Esperando ${s.players[1].name} terminar a preparação...`} onExit={onExit} />;
     return (
       <PrepScreen
         player={s.players[0]}
         team={teams.current[0]}
-        mega={mode === 'mega'}
+        foe={{player: s.players[1], team: s.teams[1]}}
+        mega={megaMode(mode)}
         curtain={false}
         onDone={team => {
           teams.current[0] = team;
@@ -188,6 +201,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     return (
       <BattleView
         players={s.players}
+        teams={s.teams}
         bottom="p1"
         batches={batches}
         balls={duelBalls(c.battle)}
@@ -260,12 +274,14 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   if (ended !== null) return <RushResult winner={shared.players[ended]} team={[]} teamNames={shared.teams[ended]} onRematch={undefined} onNew={onExit} onExit={onExit} />;
   const s = shared;
   if (s.step === 'draft') return <DraftView players={s.players} mode={s.mode} round={s.round} total={s.pairs.length} pair={s.pairs[s.round]} teams={s.teams} canPick={s.round % 2 === 1} onPick={k => send({t: 'pick', k})} />;
+  if (s.step === 'lucky' && s.lucky) return <LuckyReveal players={s.players} lucky={s.lucky} />;
   if (s.step === 'prep') {
     if (!prepTeam || prepSent) return <Lobby title="Preparação" status={prepSent ? `Esperando ${s.players[0].name} terminar a preparação...` : 'Carregando seu time...'} onExit={onExit} />;
     return (
       <PrepScreen
         player={s.players[1]}
         team={prepTeam.team}
+        foe={{player: s.players[0], team: s.teams[0]}}
         mega={prepTeam.mega}
         curtain={false}
         onDone={team => {
@@ -279,6 +295,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   return (
     <BattleView
       players={s.players}
+      teams={s.teams}
       bottom="p2"
       batches={batches}
       balls={balls}

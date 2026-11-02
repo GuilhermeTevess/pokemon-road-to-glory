@@ -99,11 +99,12 @@ export function TypeBadge({type, small, info}: {type: string; small?: boolean; i
   );
 }
 
-export function Types({name}: {name: string}) {
+/** Tipos do Pokémon. Com `info`, tocar num tipo abre a calculadora (não usar dentro de outro botão). */
+export function Types({name, info}: {name: string; info?: boolean}) {
   return (
     <span className="types">
       {species(name).types.map(t => (
-        <TypeBadge key={t} type={t} small />
+        <TypeBadge key={t} type={t} small info={info} />
       ))}
     </span>
   );

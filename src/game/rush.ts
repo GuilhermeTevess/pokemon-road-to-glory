@@ -2,12 +2,12 @@
 // quem está na vez fica com um e o outro vai para o adversário. Cada um faz 3 escolhas,
 // então os dois terminam com 6 Pokémon (3 escolhidos + 3 recebidos).
 import type {Species} from '@pkmn/sim';
-import {PLAYABLE, isLegendary} from '../data/dex';
+import {PLAYABLE, isLegendary, species} from '../data/dex';
 import {ITEMS, megaStonesFor} from '../data/items';
 import {createMon} from './mon';
 import type {OwnedMon} from './types';
 
-export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend';
+export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky';
 
 export interface RushModeInfo {
   id: RushMode;
@@ -23,7 +23,14 @@ export const RUSH_MODES: RushModeInfo[] = [
   {id: 'evo3', name: 'Evo 3', about: 'Só a última evolução de linhas de 3 estágios, nível 50.', level: 50},
   {id: 'mega', name: 'Mega', about: 'Só Pokémon que mega-evoluem. Cada um ganha uma Mega Pedra coringa para dar a quem quiser.', level: 50},
   {id: 'legend', name: 'Lendários', about: 'Só lendários e míticos, nível 70. Caos garantido.', level: 70},
+  {id: 'mix', name: 'Misturado', about: 'Normais, Pokémon que mega-evoluem e lendários no mesmo sorteio, todos no nível 50. Cada um ganha uma Mega Pedra coringa.', level: 50},
+  {id: 'lucky', name: 'Tiro de sorte', about: 'Igual ao Clássico, mas no fim a sorte escolhe um dos dois para ganhar um lendário MUITO mais forte que todo mundo.', level: 50},
 ];
+
+/** Modos em que cada um ganha a Mega Pedra coringa. */
+export function megaMode(mode: RushMode): boolean {
+  return mode === 'mega' || mode === 'mix';
+}
 
 export function rushMode(id: RushMode): RushModeInfo {
   return RUSH_MODES.find(m => m.id === id)!;
@@ -34,7 +41,10 @@ const MEGA_SPECIES = new Set(ITEMS.filter(i => i.megaFor).map(i => i.megaFor!));
 function fits(s: Species, mode: RushMode): boolean {
   const legend = isLegendary(s);
   switch (mode) {
+    case 'mix':
+      return (!s.nfe && !legend) || MEGA_SPECIES.has(s.name) || legend;
     case 'nv50':
+    case 'lucky':
       return !s.nfe && !legend;
     case 'evo1':
       return !s.prevo && s.nfe && !legend;
@@ -56,28 +66,82 @@ export function rushPool(mode: RushMode): string[] {
   return POOLS.get(mode)!;
 }
 
+function shuffle<T>(list: T[]): T[] {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * `n` Pokémon sorteados sem repetir. No Misturado, cada vaga sorteia antes a categoria
+ * (metade normais, um quarto megas, um quarto lendários) para os lendários não sumirem
+ * no meio de centenas de normais.
+ */
+export function drawNames(mode: RushMode, n: number): string[] {
+  if (mode !== 'mix') return shuffle(rushPool(mode)).slice(0, n);
+  const legends = shuffle(PLAYABLE.filter(isLegendary).map(s => s.name));
+  const megas = shuffle([...MEGA_SPECIES].filter(name => PLAYABLE.some(p => p.name === name)));
+  const normals = shuffle(rushPool('nv50'));
+  const out: string[] = [];
+  while (out.length < n) {
+    const r = Math.random();
+    const from = r < 0.5 ? normals : r < 0.75 ? megas : legends;
+    const name = from.pop() ?? normals.pop();
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
 /** `rounds` grupos de `size` Pokémon sorteados, sem repetir ninguém. */
 export function drawGroups(mode: RushMode, rounds: number, size: number): string[][] {
-  const pool = [...rushPool(mode)];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
+  const pool = drawNames(mode, rounds * size);
   return Array.from({length: rounds}, (_, i) => pool.slice(i * size, i * size + size));
 }
 
 /** As duplas sorteadas: 6 rodadas de 2 Pokémon, sem repetir ninguém. */
 export function drawPairs(mode: RushMode, rounds = 6): [string, string][] {
-  const pool = [...rushPool(mode)];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
+  const pool = drawNames(mode, rounds * 2);
   return Array.from({length: rounds}, (_, i) => [pool[i * 2], pool[i * 2 + 1]] as [string, string]);
 }
 
 export function rushMon(name: string, mode: RushMode): OwnedMon {
   return createMon(name, {level: rushMode(mode).level, ivMin: 20, shinyChance: 0.02, hiddenAbilityChance: 0.2});
+}
+
+// ------------------------------------------------------------------ Tiro de sorte
+
+/** Os "quebrados": lendários com os maiores atributos do jogo (Mewtwo, Arceus, Rayquaza...). */
+// Regigigas fica de fora: com Slow Start ele passa 5 turnos fraco, não tem graça como prêmio.
+export const LUCKY_POOL: string[] = PLAYABLE.filter(s => isLegendary(s) && bst(s) >= 670 && s.name !== 'Regigigas').map(s => s.name);
+export const LUCKY_LEVEL = 60;
+
+function bst(s: Species): number {
+  return Object.values(s.baseStats).reduce((a, b) => a + b, 0);
+}
+
+export interface LuckyShot {
+  /** Quem ganhou (0 = jogador 1, 1 = jogador 2). */
+  side: 0 | 1;
+  /** O Pokémon quebrado que entrou no time. */
+  species: string;
+  /** Quem saiu para abrir a vaga (o mais fraco do time). */
+  out: string;
+}
+
+/** Sorteia quem ganha o Pokémon quebrado e troca pelo mais fraco do time dele. Mexe em `teams`. */
+export function rollLucky(teams: [OwnedMon[], OwnedMon[]]): LuckyShot {
+  const side: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+  const team = teams[side];
+  const used = new Set([...teams[0], ...teams[1]].map(m => m.species));
+  const options = LUCKY_POOL.filter(n => !used.has(n));
+  const name = options[Math.floor(Math.random() * options.length)];
+  const weakest = [...team].sort((a, b) => bst(species(a.species)) - bst(species(b.species)))[0];
+  const mon = createMon(name, {level: LUCKY_LEVEL, ivMin: 31, shinyChance: 0.1, hiddenAbilityChance: 0.3});
+  team[team.indexOf(weakest)] = mon;
+  return {side, species: mon.species, out: weakest.species};
 }
 
 /** Mega Pedra coringa: vira a pedra certa do Pokémon escolhido. */
