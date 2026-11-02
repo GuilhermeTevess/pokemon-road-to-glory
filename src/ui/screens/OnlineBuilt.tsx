@@ -6,6 +6,8 @@ import type {BattleEvent} from '../../game/battle';
 import {teamToOwned} from '../../game/builder';
 import type {BuiltTeam} from '../../game/builder';
 import {recordMatch} from '../../game/history';
+import {flipKo, koFromLog, saneKo} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import {arenaFor} from '../../game/arenas';
 import type {Link} from '../../game/net';
@@ -37,7 +39,7 @@ const ERRORS: Record<string, string> = {
   network: 'Sem conexão com a internet agora. Confira o Wi-Fi ou os dados móveis.',
 };
 
-function log(s: Shared, me: 0 | 1, winner: number, note?: string) {
+function log(s: Shared, me: 0 | 1, winner: number, note?: string, ko?: Ko[]) {
   const foe = s.players[1 - me];
   recordMatch(useGame.getState().trainer?.id, {
     mode: 'online-built',
@@ -49,6 +51,7 @@ function log(s: Shared, me: 0 | 1, winner: number, note?: string) {
     mine: s.teams[me],
     theirs: s.teams[1 - me],
     note: note ?? `${s.names[me]} contra ${s.names[1 - me]}`,
+    ko,
   });
 }
 
@@ -128,8 +131,9 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     send({t: 'events', events, balls: duelBalls(c.battle)});
     if (c.ended) {
       const winner = c.won ? 0 : 1;
-      send({t: 'end', winner});
-      log(sharedRef.current, 0, winner);
+      const ko = koFromLog(c.battle.log, 'p1');
+      send({t: 'end', winner, ko});
+      log(sharedRef.current, 0, winner, undefined, ko);
       setTimeout(() => {
         playFanfare(1);
         playCrowd(1, 3);
@@ -281,7 +285,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
         else if (msg.t === 'end') {
           over.current = true;
           setReq(null);
-          if (sharedRef.current) log(sharedRef.current, 1, msg.winner as number);
+          if (sharedRef.current) log(sharedRef.current, 1, msg.winner as number, undefined, flipKo(saneKo(msg.ko)));
           setTimeout(() => {
             playFanfare(1);
             playCrowd(1, 3);

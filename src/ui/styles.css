@@ -1566,6 +1566,32 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .hist-teams.mini { justify-content: center; }
 .hist-team { display: inline-flex; flex-wrap: wrap; }
 .hist-team img { image-rendering: pixelated; object-fit: contain; }
+.hist-mon { position: relative; background: none; border: none; padding: 0; cursor: pointer; line-height: 0; }
+.hist-mon:hover img { transform: translateY(-2px); }
+.hist-mon.down img { filter: grayscale(1) brightness(.85); opacity: .75; }
+.hist-mon.down::after { content: ''; position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; background:
+  linear-gradient(45deg, transparent 40%, #d8322a 40%, #d8322a 60%, transparent 60%),
+  linear-gradient(-45deg, transparent 40%, #d8322a 40%, #d8322a 60%, transparent 60%); filter: drop-shadow(1px 1px 0 #fff); }
+.hist-recap-row { grid-column: 1 / -1; display: flex; justify-content: center; }
+.hist-recap-btn { display: inline-flex; align-items: center; gap: 6px; }
+.portal-anchor { display: contents; }
+.recap { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.recap h3 { text-align: center; margin: 0; }
+.recap > p.muted { text-align: center; margin: 0; }
+.recap-score { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.recap-score .v b, .recap-end.v { color: #3fa45f; }
+.recap-score .d b, .recap-end.d { color: #c9473f; }
+.recap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.recap-list li { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--panel-2); border: 2px solid var(--line); }
+.recap-round { font-family: 'Press Start 2P', monospace; font-size: 9px; }
+.recap-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 14px; border-left: 4px solid transparent; padding-left: 6px; }
+.recap-line.won { border-left-color: #3fa45f; }
+.recap-line.lost { border-left-color: #c9473f; }
+.recap-mon { display: inline-flex; align-items: center; gap: 2px; background: none; border: none; padding: 0; font: inherit; color: var(--ink); cursor: pointer; }
+.recap-mon b { text-decoration: underline dotted; }
+.recap-mon img { image-rendering: pixelated; }
+.recap-move { font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: var(--mc); border: 2px solid rgba(0, 0, 0, .35); padding: 0 6px; cursor: pointer; text-shadow: 1px 1px 0 rgba(0, 0, 0, .4); }
+.recap-end { margin: 0; text-align: center; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .trainer-hist { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 @media (max-width: 560px) {
   .hist-match { grid-template-columns: 1fr 1fr; }

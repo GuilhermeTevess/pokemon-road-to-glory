@@ -5,6 +5,8 @@ import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
+import {koFromLog} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import {LUCKY_LEVEL, RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
@@ -443,7 +445,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         teams={teams}
         curtain={curtain && !vsCpu}
         cpu={vsCpu}
-        onEnd={w => {
+        onEnd={(w, ko) => {
           // Histórico do perfil: você é sempre o jogador 1 (esquerda).
           recordMatch(useGame.getState().trainer?.id, {
             mode: `rush:${mode}`,
@@ -455,6 +457,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
             mine: teams[0].map(m => m.species),
             theirs: teams[1].map(m => m.species),
             note: vsCpu ? 'Contra o computador' : 'Amigo no mesmo aparelho',
+            ko,
           });
           setWinner(w);
           setStep('end');
@@ -1123,7 +1126,7 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
 }
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
-export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
+export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number, ko: Ko[]) => void}) {
   // Cada luta sorteia uma das arenas com plateia.
   const [arena] = useState(randomArena);
   // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
@@ -1139,7 +1142,7 @@ export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Play
     if (idle && ctl.ended) {
       playFanfare(1);
       playCrowd(1, 3);
-      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1), 1200);
+      const t = setTimeout(() => onEnd(ctl.won ? 0 : 1, koFromLog(ctl.battle.log, 'p1')), 1200);
       return () => clearTimeout(t);
     }
   }, [idle, ctl, onEnd]);

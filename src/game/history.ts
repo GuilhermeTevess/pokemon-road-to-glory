@@ -3,6 +3,8 @@
 // Fica no aparelho, um por treinador (rtg-history-<id>). A lista guarda só as últimas
 // partidas, mas os totais de vitórias/derrotas de cada modo nunca se perdem.
 import {RUSH_MODES} from './rush';
+import {flipKo, saneKo} from './recap';
+import type {Ko} from './recap';
 
 export type FoeKind = 'cpu' | 'friend' | 'player' | 'bot' | 'gym' | 'legend' | 'rival' | 'run';
 
@@ -21,6 +23,8 @@ export interface MatchLog {
   theirs: string[];
   /** Detalhe curto: "Final · Copa da Liga", "Insígnia da Rocha", "Venceu com 2 de pé"... */
   note?: string;
+  /** Quem desmaiou, em que rodada e como (vira o "Resumo" da partida). Partidas antigas não têm. */
+  ko?: Ko[];
 }
 
 export interface ModeTotals {
@@ -66,7 +70,8 @@ export function isSnap(x: unknown): x is FoeSnap {
 export function rememberFoe(trainerId: string | null | undefined, snap: unknown): void {
   if (!trainerId || !isSnap(snap)) return;
   const h = loadHistory(trainerId);
-  const foes = {...h.foes, [snap.name]: {...snap, list: snap.list.slice(0, SNAP_KEEP)}};
+  const list = snap.list.slice(0, SNAP_KEEP).map(m => (m.ko ? {...m, ko: saneKo(m.ko)} : m));
+  const foes = {...h.foes, [snap.name]: {...snap, list}};
   const keep = Object.values(foes).sort((a, b) => b.at - a.at).slice(0, FOES_KEEP);
   save(trainerId, {...h, foes: Object.fromEntries(keep.map(f => [f.name, f]))});
 }
@@ -80,7 +85,7 @@ export function historyOfSnap(s: FoeSnap): History {
 export function mirrorHistory(h: History, vs: string, me: {name: string; avatar: string}): History {
   let out: History = {version: 1, list: [], totals: {}};
   for (const m of [...h.list].reverse().filter(x => x.vs === vs && x.vsKind !== 'run')) {
-    out = addMatch(out, {...m, won: !m.won, mine: m.theirs, theirs: m.mine, vs: me.name, vsAvatar: me.avatar, vsKind: 'player'});
+    out = addMatch(out, {...m, won: !m.won, mine: m.theirs, theirs: m.mine, ko: flipKo(m.ko), vs: me.name, vsAvatar: me.avatar, vsKind: 'player'});
   }
   return out;
 }

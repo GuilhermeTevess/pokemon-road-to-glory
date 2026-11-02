@@ -8,6 +8,8 @@ import type {DuelReq} from '../../game/rush';
 import {hostRoom, joinRoom} from '../../game/net';
 import type {Link} from '../../game/net';
 import {highlightsFromLog} from '../../game/tournament';
+import {flipKo, koFromLog, saneKo} from '../../game/recap';
+import type {Ko} from '../../game/recap';
 import type {OwnedMon} from '../../game/types';
 import {playCrowd, playFanfare} from '../audio';
 import {BattleView} from './QuickplayScreen';
@@ -23,6 +25,8 @@ export interface DuelOutcome {
   left: number;
   myTeam: string[];
   foeTeam: string[];
+  /** Quem desmaiou (do ponto de vista de quem está neste aparelho). */
+  ko?: Ko[];
 }
 
 function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: string; onLeave: () => void}) {
@@ -118,8 +122,9 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDon
       const left = side.pokemon.filter(p => !p.fainted).length;
       const highlights = highlightsFromLog(c.battle.log, me.name, foe.name, hostWon ? me.name : foe.name, left);
       const mine = team.map(m => m.species);
-      send({t: 'end', hostWon, highlights, left, hostTeam: mine});
-      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current});
+      const ko = koFromLog(c.battle.log, 'p1');
+      send({t: 'end', hostWon, highlights, left, hostTeam: mine, ko});
+      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current, ko});
       return;
     }
     send({t: 'req', req: duelNeeds(c.battle, 'p2') ? duelRequest(c.battle, 'p2') : null});
@@ -150,7 +155,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDon
     } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
     else if (msg.t === 'end') {
       const hostWon = !!msg.hostWon;
-      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[]});
+      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[], ko: flipKo(saneKo(msg.ko))});
     }
   };
 

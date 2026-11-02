@@ -687,7 +687,7 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
         teams={teams}
         curtain={false}
         cpu
-        onEnd={w => {
+        onEnd={(w, ko) => {
           recordMatch(trainer?.id, {
             mode: 'built',
             online: false,
@@ -698,6 +698,7 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
             mine: teams[0].map(m => m.species),
             theirs: teams[1].map(m => m.species),
             note: `${team.name} contra ${foe.team.name}`,
+            ko,
           });
           setWinner(w);
           setStep('end');
