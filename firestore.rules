@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// Regras do banco (Firestore) do jogo online.
+// Como colar no Firebase: veja docs/SEGURANCA-ONLINE.md.
+//
+// Ideia geral:
+// - Só entra quem abriu o jogo (login anônimo automático: cada navegador tem um "dono" secreto).
+// - Cada documento guarda quem o criou (`owner`). Só o dono muda ou apaga.
+// - Chave do torneio, mundo dos bots e vaga na sala são "o primeiro que chegar decide":
+//   depois de criados, ninguém muda.
+// - Só as pastas que o jogo usa existem; o resto é bloqueado.
+// - Tamanho máximo por documento, para ninguém encher o banco com lixo.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    // O jogo grava só `json` (texto) e `owner` (o dono).
+    function validData() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['json', 'owner'])
+        && d.json is string
+        && d.json.size() > 0
+        && d.json.size() <= 600000
+        && d.owner == me();
+    }
+
+    // Código de carreira/sala: letras maiúsculas, números, hífen e _, curtinho.
+    function validCode(code) {
+      return code.size() <= 40 && code.matches('^[A-Z0-9_-]+$');
+    }
+
+    function validId(id) {
+      return id.size() <= 120 && id.matches('^[A-Za-z0-9_.~-]+$');
+    }
+
+    // É meu, ou é antigo (de antes destas regras, sem dono) e passa a ser meu.
+    function mineOrLegacy() {
+      return !('owner' in resource.data) || resource.data.owner == me();
+    }
+
+    function isOwner() {
+      return 'owner' in resource.data && resource.data.owner == me();
+    }
+
+    // Documento da carreira (código, temporadas...): quem criou pode atualizar.
+    match /careers/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validCode(code) && validData();
+      allow update: if signedIn() && validData() && mineOrLegacy();
+      allow delete: if signedIn() && isOwner();
+    }
+
+    // Jogadores, partidas, mensagens das salas e times compartilhados: cada um mexe só no seu.
+    match /careers/{code}/{folder}/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validCode(code) && validId(id)
+        && folder in ['players', 'matches', 'world', 'tours', 'msgs', 'teams']
+        && validData();
+      // Mundo dos bots, chave do torneio e vaga na sala nunca mudam depois de criados.
+      allow update: if signedIn() && validData() && mineOrLegacy()
+        && !(folder in ['world', 'tours'])
+        && !id.matches('.*-seat$');
+      allow delete: if signedIn() && isOwner() && folder in ['msgs', 'teams'];
+    }
+
+    // Qualquer outra coisa: bloqueado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

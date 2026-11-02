@@ -220,3 +220,56 @@ export function groupLog(entries: {label: string; pts: number}[]): {label: strin
   for (const e of entries) map.set(e.label, (map.get(e.label) ?? 0) + e.pts);
   return [...map].map(([label, pts]) => ({label, pts})).sort((a, b) => b.pts - a.pts);
 }
+
+const isNum = (v: unknown, min: number, max: number) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+const isStr = (v: unknown, max: number) => typeof v === 'string' && v.length <= max;
+
+function saneStats(s: unknown, perStat: number, total: number): boolean {
+  if (s === undefined) return true;
+  if (!s || typeof s !== 'object') return false;
+  const vals = Object.values(s as Record<string, unknown>);
+  return vals.length <= 6 && vals.every(v => isNum(v, 0, perStat)) && (vals as number[]).reduce((a, b) => a + b, 0) <= total;
+}
+
+/** Pokémon de outro jogador que o jogo nunca deixaria existir (nível 999, 8 golpes, IV 50...). */
+export function saneMon(m: unknown): boolean {
+  if (!m || typeof m !== 'object') return false;
+  const x = m as Partial<SnapMon>;
+  return (
+    isStr(x.species, 40) &&
+    isNum(x.level, 1, 120) &&
+    Array.isArray(x.moves) &&
+    x.moves.length <= 4 &&
+    x.moves.every(mv => isStr(mv, 40)) &&
+    saneStats(x.ivs, 31, 186) &&
+    saneStats(x.evs, 252, 510) &&
+    (x.nickname == null || isStr(x.nickname, 30))
+  );
+}
+
+function saneTeam(t: unknown): boolean {
+  return Array.isArray(t) && t.length <= 6 && t.every(saneMon);
+}
+
+/**
+ * Confere o documento de outro jogador antes de usar. A nuvem só guarda o que cada navegador
+ * manda, então alguém que mexe no código pode mandar qualquer coisa: o que é impossível no jogo
+ * (time de 7, nível 999, pontos infinitos) fica de fora do ranking e dos torneios.
+ */
+export function sanePlayer(p: unknown): p is PlayerDoc {
+  if (!p || typeof p !== 'object') return false;
+  const x = p as Partial<PlayerDoc>;
+  return (
+    isStr(x.id, 120) &&
+    isStr(x.name, 40) &&
+    isNum(x.season, 1, 1000) &&
+    isNum(x.round, 0, 10000) &&
+    isNum(x.points, -1e6, 1e6) &&
+    isNum(x.banked, -1e7, 1e7) &&
+    saneTeam(x.team) &&
+    !!x.tours &&
+    typeof x.tours === 'object' &&
+    Object.values(x.tours).every(t => t === undefined || saneTeam(t)) &&
+    Array.isArray(x.results)
+  );
+}
