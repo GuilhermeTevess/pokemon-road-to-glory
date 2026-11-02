@@ -4,7 +4,8 @@
 import type {Species} from '@pkmn/sim';
 import {PLAYABLE, isLegendary, species} from '../data/dex';
 import {ITEMS, megaStonesFor} from '../data/items';
-import {createMon} from './mon';
+import {calcStats, createMon} from './mon';
+import {applySet} from './sets';
 import type {OwnedMon} from './types';
 
 export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky';
@@ -107,8 +108,15 @@ export function drawPairs(mode: RushMode, rounds = 6): [string, string][] {
   return Array.from({length: rounds}, (_, i) => [pool[i * 2], pool[i * 2 + 1]] as [string, string]);
 }
 
+/** Pokémon do Quickplay: já vem com set pensado (golpes, natureza, habilidade e EVs). */
 export function rushMon(name: string, mode: RushMode): OwnedMon {
-  return createMon(name, {level: rushMode(mode).level, ivMin: 20, shinyChance: 0.02, hiddenAbilityChance: 0.2});
+  return withSet(createMon(name, {level: rushMode(mode).level, ivMin: 20, shinyChance: 0.02}));
+}
+
+function withSet(mon: OwnedMon): OwnedMon {
+  applySet(mon);
+  mon.hp = calcStats(mon).hp;
+  return mon;
 }
 
 // ------------------------------------------------------------------ Tiro de sorte
@@ -139,9 +147,17 @@ export function rollLucky(teams: [OwnedMon[], OwnedMon[]]): LuckyShot {
   const options = LUCKY_POOL.filter(n => !used.has(n));
   const name = options[Math.floor(Math.random() * options.length)];
   const weakest = [...team].sort((a, b) => bst(species(a.species)) - bst(species(b.species)))[0];
-  const mon = createMon(name, {level: LUCKY_LEVEL, ivMin: 31, shinyChance: 0.1, hiddenAbilityChance: 0.3});
+  const mon = withSet(createMon(name, {level: LUCKY_LEVEL, ivMin: 31, shinyChance: 0.1}));
   team[team.indexOf(weakest)] = mon;
   return {side, species: mon.species, out: weakest.species};
+}
+
+/**
+ * Modos com Mega: todo mundo que pode mega-evoluir já leva a sua pedra. Na batalha o
+ * jogador escolhe quem mega-evolui; o simulador só deixa 1 por time, e não dá para voltar.
+ */
+export function giveAllMegaStones(team: OwnedMon[]): void {
+  for (const m of team) giveMegaStone(m);
 }
 
 /** Mega Pedra coringa: vira a pedra certa do Pokémon escolhido. */

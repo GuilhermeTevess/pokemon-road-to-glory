@@ -1598,3 +1598,7 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .hist-foe-link:hover { color: var(--sky-d); }
 .hist-note { background: var(--butter); border: 2px solid var(--line); padding: 4px 10px; font-size: 14px; }
 @media (max-width: 560px) { .hist-foe-link { max-width: 90px; } }
+.versus-teams { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.calc-btn { background: #fff3c4; border-color: #c99a1a; font-weight: 700; }
+.bar .calc-btn { margin-left: auto; }
+.mega-hint { max-width: 520px; text-align: center; background: #efe2ff; border: var(--px) solid #8a3cc8; padding: 6px 10px; }

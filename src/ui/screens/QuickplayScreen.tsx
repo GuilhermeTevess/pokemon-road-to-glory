@@ -5,7 +5,7 @@ import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
-import {LUCKY_LEVEL, RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, megaMode, rollLucky, rushMode, rushMon} from '../../game/rush';
+import {LUCKY_LEVEL, RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
 import {quickPid, useGame} from '../../game/store';
@@ -14,7 +14,7 @@ import {RIVALS} from '../../data/rivals';
 import {TOURS, tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
 import type {OwnedMon} from '../../game/types';
-import {CategoryIcon, HpBar, MatchupPanel, Modal, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
+import {CalcButton, CategoryIcon, HpBar, MatchupPanel, Modal, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
 import {ArenaBackdrop} from '../scene';
 import {TrainerAvatar} from './StartScreens';
 import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
@@ -108,6 +108,7 @@ export function TourDraft({kind, onBack, onDone}: {kind: TourKind; onBack: () =>
         <span className="muted">
           Escolha {team.length + 1} de {info.teamSize}
         </span>
+        <CalcButton />
       </header>
       <div className="rush-draft">
         <div className="rush-pair three">
@@ -204,8 +205,7 @@ function cpuPick(pair: [string, string]): 0 | 1 {
 function cpuPrep(team: OwnedMon[], mega: boolean): OwnedMon[] {
   const fast = [...team].sort((a, b) => species(b.species).baseStats.spe - species(a.species).baseStats.spe)[0];
   const ordered = [fast, ...team.filter(m => m !== fast)].map(m => ({...m, item: undefined as string | undefined}));
-  const holder = mega ? ordered.find(m => giveMegaTest(m)) : undefined;
-  if (holder) giveMegaStone(holder);
+  if (mega) giveAllMegaStones(ordered);
   return ordered;
 }
 
@@ -471,6 +471,7 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
         <span className="muted">
           Escolha {round + 1} de {total}
         </span>
+        <CalcButton />
       </header>
       <div className="rush-draft">
         <div className="rush-turn">
@@ -680,13 +681,13 @@ export function PrepScreen({player, team, foe, mega, curtain, onDone}: {
   const [hidden, setHidden] = useState(curtain);
   const [lead, setLead] = useState(team[0].uid);
   const [weak, setWeak] = useState(false);
-  const megaOk = team.filter(m => giveMegaTest(m));
-  const [stone, setStone] = useState(megaOk[0]?.uid ?? '');
+  const megaOk = mega ? team.filter(m => giveMegaTest(m)) : [];
   if (hidden) return <Curtain player={player} text="Hora de montar a estratégia. O outro jogador não pode olhar!" onReady={() => setHidden(false)} />;
   return (
     <div className="screen quickplay">
       <header className="bar">
         <h2>Preparação · {player.name}</h2>
+        <CalcButton />
       </header>
       <div className="prep-cols">
         <div className="panel rush-prep">
@@ -701,7 +702,7 @@ export function PrepScreen({player, team, foe, mega, curtain, onDone}: {
                 <Types name={m.species} />
                 {foe && <MatchLine mine={m.species} foe={foe.team} />}
                 {lead === m.uid && <span className="win-tag">Abre</span>}
-                {mega && stone === m.uid && <span className="mega-tag">Mega</span>}
+                {megaOk.includes(m) && <span className="mega-tag">Pode Mega</span>}
               </button>
             ))}
           </div>
@@ -711,25 +712,18 @@ export function PrepScreen({player, team, foe, mega, curtain, onDone}: {
             </button>
           </div>
           {weak && <TeamWeakness party={team} compact />}
-          {mega && megaOk.length > 0 && (
-            <>
-              <p>Quem leva a Mega Pedra coringa?</p>
-              <div className="rush-prep-grid small">
-                {megaOk.map(m => (
-                  <button key={m.uid} className={`rush-prep-mon ${stone === m.uid ? 'lead' : ''}`} onClick={() => setStone(m.uid)}>
-                    <Sprite name={m.species} size={48} still />
-                    {species(m.species).name}
-                  </button>
-                ))}
-              </div>
-            </>
+          {mega && (
+            <p className="hint mega-hint">
+              {megaOk.length > 0
+                ? '💎 Na batalha, qualquer um marcado com "Pode Mega" pode mega-evoluir: é só marcar "Mega evoluir" antes do golpe. Só 1 por luta, e depois não dá para trocar.'
+                : '💎 Ninguém do seu time tem Mega. Quem pode mega-evoluir aparece marcado.'}
+            </p>
           )}
           <button
             className="btn primary big"
             onClick={() => {
               const ordered = [...team.filter(m => m.uid === lead), ...team.filter(m => m.uid !== lead)].map(m => ({...m, item: undefined as string | undefined}));
-              const holder = ordered.find(m => m.uid === stone);
-              if (mega && holder) giveMegaStone(holder);
+              if (mega) giveAllMegaStones(ordered);
               onDone(ordered);
             }}
           >
@@ -924,11 +918,14 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
     <div className="screen battle versus">
       {teamsOpen && teams && <TeamsModal players={players} teams={teams} down={down} onClose={() => setTeamsOpen(false)} />}
       <div className="versus-head">
-        {teams && (
-          <button className="btn small versus-teams" onClick={() => setTeamsOpen(true)} title="Ver os dois times, com os tipos">
-            👥 Times
-          </button>
-        )}
+        <span className="versus-teams">
+          {teams && (
+            <button className="btn small" onClick={() => setTeamsOpen(true)} title="Ver os dois times, com os tipos">
+              👥 Times
+            </button>
+          )}
+          <CalcButton types={views[top] ? species(views[top]!.species).types : []} label="Calculadora" />
+        </span>
         {(['p1', 'p2'] as Side[]).map((side, i) => (
           <span key={side} className={`versus-name ${req && req.side === side ? 'on' : ''}`}>
             <TrainerAvatar avatar={players[i].avatar} name={players[i].name} size={36} /> {players[i].name}
