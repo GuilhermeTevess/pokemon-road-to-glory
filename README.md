@@ -6,6 +6,18 @@ jogar com os amigos.
 
 ## Como jogar
 
+É só abrir no navegador, no celular ou no computador, sem instalar nada:
+
+**https://guilhermetevess.github.io/pokemon-road-to-glory/**
+
+Na primeira vez o jogo oferece um tutorial com destaque em cada tela, e o botão
+**Ajuda** explica rondas e itens. A run é salva automaticamente no navegador, então
+dá para fechar e continuar depois.
+
+## Rodar no seu computador (para desenvolver)
+
+Só precisa disto se for mexer no código. Para jogar, use o link acima.
+
 ```bash
 npm install
 npm run dev      # abre em http://localhost:5173
