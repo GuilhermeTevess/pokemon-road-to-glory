@@ -1670,3 +1670,24 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .calc-btn { background: #fff3c4; border-color: #c99a1a; font-weight: 700; }
 .bar .calc-btn { margin-left: auto; }
 .mega-hint { max-width: 520px; text-align: center; background: #efe2ff; border: var(--px) solid #8a3cc8; padding: 6px 10px; }
+
+/* Guia: busca em todos os biomas e cartão do Pokémon */
+button.guide-mon { font: inherit; color: inherit; text-align: left; border: 2px solid transparent; cursor: pointer; }
+button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: var(--sky); color: var(--ink); }
+.guide-mon.wide span { display: flex; flex-direction: column; white-space: normal; }
+.guide-mon.wide small { font-weight: 400; }
+.mon-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.mon-card h3 { margin: 0; }
+.mon-card h4 { margin: 10px 0 2px; align-self: stretch; text-align: left; }
+.mon-card .base-stats { align-self: stretch; }
+.mon-card-abilities { align-self: stretch; text-align: left; font-size: 13px; }
+.mon-card-abilities p { margin: 2px 0; }
+.mon-card-evos { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.mon-card-evo { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.mon-card-evo .guide-mon { grid-template-columns: 40px auto; }
+.mon-card-spots { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.guide-spot { font: inherit; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; padding: 2px 8px; border: 2px solid var(--line); border-left: 8px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.guide-spot:hover { background: var(--sky); }
+.guide-spot small { font-weight: 700; }
+.guide-spot.locked { opacity: .6; cursor: help; }
+.mon-card .bs { grid-template-columns: 74px 1fr 32px; text-align: left; }

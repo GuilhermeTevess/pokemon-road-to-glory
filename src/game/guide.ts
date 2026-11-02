@@ -1,9 +1,10 @@
 // Guia dos biomas: quem pode aparecer em cada bioma e com que chance, na ronda escolhida.
 // Usa as mesmas contas do sorteio dos selvagens (encounters.ts), então o guia nunca mente.
 import type {Species} from '@pkmn/sim';
-import {biomePools, getBiome} from '../data/biomes';
+import {BIOMES, HIDDEN_BIOMES, biomePools, getBiome} from '../data/biomes';
+import type {Biome} from '../data/biomes';
 import type {Rarity} from '../data/dex';
-import {species} from '../data/dex';
+import {dex, isPlayable, species} from '../data/dex';
 import {getRegion, regionWeight} from '../data/regions';
 import {ORDER, rarityWeights} from './encounters';
 
@@ -57,4 +58,42 @@ export function rarityOdds(biomeId: string, wave: number, luck = 0): [Rarity, nu
   const weights = rarityWeights(wave, !!getBiome(biomeId).region, luck);
   const total = weights.reduce((a, [, w]) => a + w, 0);
   return weights.map(([r, w]) => [r, w / total]);
+}
+
+/** Primeiro estágio da linha (é assim que o selvagem é sorteado; depois evolui pelo nível). */
+export function baseOf(s: Species): Species {
+  let cur = s;
+  for (let guard = 0; guard < 4 && cur.prevo; guard++) {
+    const p = dex.species.get(cur.prevo);
+    if (!isPlayable(p)) break;
+    cur = p;
+  }
+  return cur;
+}
+
+export interface Spot {
+  biome: Biome;
+  /** Chance de ser a linha deste Pokémon numa ronda comum. */
+  chance: number;
+  rarity: Rarity;
+}
+
+/** Para cada Pokémon sorteável (forma básica), os biomas onde aparece, do mais provável ao menos. */
+export function allSpots(wave: number, regionId?: string, luck = 0): Map<string, Spot[]> {
+  const map = new Map<string, Spot[]>();
+  for (const b of [...BIOMES, ...HIDDEN_BIOMES]) {
+    // Bioma secreto: só vale a região dele.
+    for (const r of biomeOdds(b.id, wave, b.region ?? regionId, luck)) {
+      if (r.chance <= 0) continue;
+      map.set(r.species.name, [...(map.get(r.species.name) ?? []), {biome: b, chance: r.chance, rarity: r.rarity}]);
+    }
+  }
+  for (const list of map.values()) list.sort((a, b) => b.chance - a.chance);
+  return map;
+}
+
+/** Onde um Pokémon pode aparecer (pela forma básica da linha; lendários pela própria espécie). */
+export function whereFound(name: string, spots: Map<string, Spot[]>): Spot[] {
+  const s = species(name);
+  return spots.get(s.name) ?? spots.get(baseOf(s).name) ?? [];
 }
