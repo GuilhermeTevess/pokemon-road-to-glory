@@ -1594,7 +1594,8 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 
 /* ------------------------------------------------------------------ Time dos Sonhos */
 .builder-btn { background: linear-gradient(135deg, #b9f0c8, #6fd0a0); }
-.builder .bar input.tb-name { font: inherit; font-weight: 700; flex: 1; min-width: 0; padding: 6px 8px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }
+.builder .bar { flex-wrap: wrap; }
+.builder .bar input.tb-name { font: inherit; font-weight: 700; flex: 1 1 160px; min-width: 120px; padding: 6px 8px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }
 .tb-intro { max-width: 760px; }
 .tb-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .tb-team { display: flex; flex-direction: column; gap: 8px; }

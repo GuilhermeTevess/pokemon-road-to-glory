@@ -240,7 +240,7 @@ const bstOf = (n: string) => Object.values(species(n).baseStats).reduce((a, b) =
 function SpeciesPicker({taken, onPick, onCancel}: {taken: string[]; onPick: (name: string) => void; onCancel?: () => void}) {
   const [q, setQ] = useState('');
   const [type, setType] = useState<string | null>(null);
-  const [legends, setLegends] = useState(true);
+  const [legends, setLegends] = useState(false);
   const [onlyFinal, setOnlyFinal] = useState(true);
   const list = useMemo(() => {
     const query = q.trim().toLowerCase();
