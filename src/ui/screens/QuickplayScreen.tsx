@@ -1,4 +1,4 @@
-// Quickplay: Rush (dois jogadores no mesmo PC) e Campeonato rápido.
+// Quickplay: Rush e Campeonato rápido, cada um online (cada um no seu aparelho) ou offline.
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {TYPE_COLORS, species} from '../../data/dex';
 import {getItem} from '../../data/items';
@@ -8,8 +8,9 @@ import type {BattleEvent, Side} from '../../game/battle';
 import {RUSH_MODES, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, rushMode, rushMon} from '../../game/rush';
 import type {DuelReq} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
-import {useGame} from '../../game/store';
+import {quickPid, useGame} from '../../game/store';
 import {AVATARS} from '../../game/trainers';
+import {RIVALS} from '../../data/rivals';
 import {TOURS, tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
 import type {OwnedMon} from '../../game/types';
@@ -19,6 +20,7 @@ import {TrainerAvatar} from './StartScreens';
 import {playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
 import {fast} from '../settings';
 import {OnlineRush} from './OnlineRush';
+import {QuickTourOnline} from './QuickTourOnline';
 import {FX, playMoveFx} from '../fx';
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
@@ -30,30 +32,43 @@ export interface Player {
 
 /** Menu do Quickplay. */
 export function QuickplayScreen() {
-  const {setScreen, trainer, startQuickTour} = useGame();
-  const [mode, setMode] = useState<'menu' | 'rush' | 'tour'>('menu');
+  const {setScreen, trainer, startQuickTour, startQuickTourOnline} = useGame();
+  const [mode, setMode] = useState<'menu' | 'rush' | 'tourPick' | 'tour' | 'tourOnline'>('menu');
   const [kind, setKind] = useState<TourKind | null>(null);
+  const me = {name: trainer?.name ?? 'Jogador 1', avatar: trainer?.avatar ?? 'red'};
   if (kind) return <TourDraft kind={kind} onBack={() => setKind(null)} onDone={team => startQuickTour(kind, team)} />;
-  if (mode === 'rush') return <RushGame me={{name: trainer?.name ?? 'Jogador 1', avatar: trainer?.avatar ?? 'red'}} onExit={() => setMode('menu')} />;
+  if (mode === 'rush') return <RushGame me={me} onExit={() => setMode('menu')} />;
+  if (mode === 'tourPick')
+    return (
+      <OnlineOffline
+        title="Campeonato rápido"
+        online="Crie uma sala e chame até 7 amigos com o código. Todo mundo na mesma chave; as vagas que sobram ficam com bots."
+        offline="Só você contra 7 bots, sem internet."
+        onPick={on => setMode(on ? 'tourOnline' : 'tour')}
+        onBack={() => setMode('menu')}
+      />
+    );
+  if (mode === 'tourOnline')
+    return <QuickTourOnline me={me} pid={quickPid(trainer?.id)} onBack={() => setMode('tourPick')} onStart={(k, code, players) => startQuickTourOnline(k, code, players)} />;
   return (
     <div className="screen quickplay">
       <header className="bar">
-        <button className="btn small" onClick={() => (mode === 'menu' ? setScreen('title') : setMode('menu'))}>
+        <button className="btn small" onClick={() => (mode === 'menu' ? setScreen('title') : setMode('tourPick'))}>
           <PixelIcon name="back" /> Voltar
         </button>
-        <h2>Quickplay</h2>
+        <h2>{mode === 'tour' ? 'Campeonato rápido offline' : 'Quickplay'}</h2>
       </header>
       {mode === 'menu' && (
         <div className="qp-cards">
           <button className="qp-card" onClick={() => setMode('rush')}>
             <span className="qp-icon">⚡</span>
             <b>Rush</b>
-            <span>Dois jogadores no mesmo PC. Aparecem 2 Pokémon: você fica com um e o outro vai para o seu amigo. Depois, batalha!</span>
+            <span>Aparecem 2 Pokémon: você fica com um e o outro vai para o adversário. Depois, batalha! Online com um amigo ou offline.</span>
           </button>
-          <button className="qp-card" onClick={() => setMode('tour')}>
+          <button className="qp-card" onClick={() => setMode('tourPick')}>
             <span className="qp-icon">🏆</span>
             <b>Campeonato rápido</b>
-            <span>Monte um time na hora e jogue um campeonato inteiro. Acabou o campeonato, acabou o save. Não mexe na sua run nem na coleção.</span>
+            <span>Monte um time na hora e jogue um campeonato inteiro, online com os amigos ou offline contra bots. Não mexe na sua run nem na coleção.</span>
           </button>
         </div>
       )}
@@ -75,7 +90,7 @@ export function QuickplayScreen() {
 }
 
 /** Campeonato rápido: monta o time escolhendo 1 de cada trio. */
-function TourDraft({kind, onBack, onDone}: {kind: TourKind; onBack: () => void; onDone: (team: string[]) => void}) {
+export function TourDraft({kind, onBack, onDone}: {kind: TourKind; onBack: () => void; onDone: (team: string[]) => void}) {
   const info = tourInfo(kind);
   const [groups] = useState(() => drawGroups('nv50', info.teamSize, 3));
   const [team, setTeam] = useState<string[]>([]);
@@ -132,11 +147,77 @@ function TourDraft({kind, onBack, onDone}: {kind: TourKind; onBack: () => void; 
 
 // ------------------------------------------------------------------ Rush
 
-type Step = 'setup' | 'draft' | 'prep' | 'battle' | 'end';
+type Step = 'pick' | 'online' | 'setup' | 'draft' | 'prep' | 'battle' | 'end';
+
+/** Escolha da tela: online ou offline (igual no Rush e no Campeonato rápido). */
+export function OnlineOffline({title, online, offline, onPick, onBack}: {title: string; online: string; offline: string; onPick: (online: boolean) => void; onBack: () => void}) {
+  return (
+    <div className="screen quickplay">
+      <header className="bar">
+        <button className="btn small" onClick={onBack}>
+          <PixelIcon name="back" /> Voltar
+        </button>
+        <h2>{title}</h2>
+      </header>
+      <div className="qp-cards">
+        <button className="qp-card" onClick={() => onPick(true)}>
+          <span className="qp-icon">🌐</span>
+          <b>Online</b>
+          <span>{online}</span>
+        </button>
+        <button className="qp-card" onClick={() => onPick(false)}>
+          <span className="qp-icon">📴</span>
+          <b>Offline</b>
+          <span>{offline}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModePicker({mode, setMode}: {mode: RushMode; setMode: (m: RushMode) => void}) {
+  return (
+    <>
+      <h3>Modo</h3>
+      <div className="rush-modes">
+        {RUSH_MODES.map(m => (
+          <button key={m.id} className={`rush-mode ${mode === m.id ? 'on' : ''}`} onClick={() => setMode(m.id)}>
+            <b>{m.name}</b>
+            <span>{m.about}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** O computador escolhe no sorteio: quase sempre o mais forte, às vezes o que combina com o time. */
+function cpuPick(pair: [string, string]): 0 | 1 {
+  const bst = (n: string) => Object.values(species(n).baseStats).reduce((a, b) => a + b, 0) + Math.random() * 60;
+  return bst(pair[0]) >= bst(pair[1]) ? 0 : 1;
+}
+
+/** Preparação do computador: abre com o mais rápido e dá a Mega Pedra para quem puder usar. */
+function cpuPrep(team: OwnedMon[], mega: boolean): OwnedMon[] {
+  const fast = [...team].sort((a, b) => species(b.species).baseStats.spe - species(a.species).baseStats.spe)[0];
+  const ordered = [fast, ...team.filter(m => m !== fast)].map(m => ({...m, item: undefined as string | undefined}));
+  const holder = mega ? ordered.find(m => giveMegaTest(m)) : undefined;
+  if (holder) giveMegaStone(holder);
+  return ordered;
+}
+
+const cpuFoe = (): Player => {
+  const r = RIVALS[Math.floor(Math.random() * RIVALS.length)];
+  return {name: r.name, avatar: r.avatar};
+};
 
 function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
-  const [step, setStep] = useState<Step>('setup');
-  const [players, setPlayers] = useState<[Player, Player]>(() => [me, {name: 'Amigo', avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]}]);
+  const [step, setStep] = useState<Step>('pick');
+  const [vsCpu, setVsCpu] = useState(true);
+  const [friend, setFriend] = useState<Player>(() => ({name: 'Amigo', avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]}));
+  const [cpu, setCpu] = useState<Player>(cpuFoe);
+  const [mine, setMine] = useState<Player>(me);
+  const players: [Player, Player] = [mine, vsCpu ? cpu : friend];
   const [mode, setMode] = useState<RushMode>('nv50');
   const [curtain, setCurtain] = useState(true);
   const [pairs, setPairs] = useState<[string, string][]>([]);
@@ -148,66 +229,74 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
   const [online, setOnline] = useState<{role: 'host' | 'guest'; code?: string} | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const start = () => {
+    if (vsCpu) setCpu(cpuFoe());
     setPairs(drawPairs(mode));
     setTeams([[], []]);
     setRound(0);
     setStep('draft');
   };
 
-  if (online) return <OnlineRush role={online.role} code={online.code} me={players[0]} mode={mode} onExit={() => setOnline(null)} />;
-  if (step === 'setup')
+  const who = round % 2;
+  const pickMon = (k: 0 | 1) => {
+    const pair = pairs[round];
+    const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
+    next[who].push(rushMon(pair[k], mode));
+    next[1 - who].push(rushMon(pair[1 - k], mode));
+    setTeams(next);
+    playCry(pair[k]);
+    if (round + 1 >= pairs.length) {
+      setPrepFor(0);
+      setStep('prep');
+    } else setRound(round + 1);
+  };
+  // Vez do computador no sorteio: pensa um pouquinho e escolhe.
+  const cpuTurn = step === 'draft' && vsCpu && who === 1;
+  useEffect(() => {
+    if (!cpuTurn) return;
+    const t = setTimeout(() => pickMon(cpuPick(pairs[round])), fast() ? 400 : 1300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cpuTurn, round]);
+
+  if (online) return <OnlineRush role={online.role} code={online.code} me={mine} mode={mode} onExit={() => setOnline(null)} />;
+  if (step === 'pick')
+    return (
+      <OnlineOffline
+        title="Rush"
+        online="Cada um no seu aparelho (celular ou PC). Um cria a sala e manda o código para o outro."
+        offline="Sem internet: contra o computador ou com um amigo no mesmo aparelho."
+        onPick={on => setStep(on ? 'online' : 'setup')}
+        onBack={onExit}
+      />
+    );
+  if (step === 'online')
     return (
       <div className="screen quickplay">
         <header className="bar">
-          <button className="btn small" onClick={onExit}>
+          <button className="btn small" onClick={() => setStep('pick')}>
             <PixelIcon name="back" /> Voltar
           </button>
-          <h2>Rush</h2>
+          <h2>Rush online</h2>
         </header>
         <div className="panel rush-setup">
-          <div className="rush-players">
-            {players.map((p, i) => (
-              <label key={i} className="rush-player">
-                <TrainerAvatar avatar={p.avatar} name={p.name} size={72} />
-                <span>Jogador {i + 1}</span>
-                <input
-                  value={p.name}
-                  maxLength={12}
-                  onChange={e => setPlayers(ps => ps.map((x, k) => (k === i ? {...x, name: e.target.value || `Jogador ${i + 1}`} : x)) as [Player, Player])}
-                />
-                {i === 1 && (
-                  <button className="btn small" onClick={() => setPlayers(ps => [ps[0], {...ps[1], avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]}])}>
-                    Trocar visual
-                  </button>
-                )}
-              </label>
-            ))}
-          </div>
-          <h3>Modo</h3>
-          <div className="rush-modes">
-            {RUSH_MODES.map(m => (
-              <button key={m.id} className={`rush-mode ${mode === m.id ? 'on' : ''}`} onClick={() => setMode(m.id)}>
-                <b>{m.name}</b>
-                <span>{m.about}</span>
-              </button>
-            ))}
-          </div>
-          <label className="rush-check">
-            <input type="checkbox" checked={curtain} onChange={e => setCurtain(e.target.checked)} /> Esconder as escolhas na batalha (passar a vez com cortina)
+          <label className="rush-player">
+            <TrainerAvatar avatar={mine.avatar} name={mine.name} size={72} />
+            <span>Seu nome</span>
+            <input value={mine.name} maxLength={12} onChange={e => setMine({...mine, name: e.target.value || 'Jogador'})} />
           </label>
-          <p className="hint">Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez fica com um e o outro vai para o adversário. No fim, cada um tem 6.</p>
-          <button className="btn primary big" onClick={start}>
-            Começar o sorteio (mesmo PC)
-          </button>
           <div className="rush-online">
-            <h3>Jogar cada um no seu PC</h3>
-            <p className="hint">Crie uma sala e mande o código para o seu amigo. Ele abre o jogo, vai em Quickplay → Rush e entra com o código.</p>
+            <h3>Criar uma sala</h3>
+            <ModePicker mode={mode} setMode={setMode} />
+            <button className="btn primary big" onClick={() => setOnline({role: 'host'})}>
+              Criar sala e pegar o código
+            </button>
+          </div>
+          <div className="rush-online">
+            <h3>Entrar na sala do amigo</h3>
+            <p className="hint">Peça o código de 5 letras para quem criou a sala.</p>
             <div className="rush-online-row">
-              <button className="btn primary" onClick={() => setOnline({role: 'host'})}>
-                Criar sala online
-              </button>
-              <input placeholder="CÓDIGO" maxLength={5} value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} />
-              <button className="btn" disabled={joinCode.length < 5} onClick={() => setOnline({role: 'guest', code: joinCode})}>
+              <input placeholder="CÓDIGO" maxLength={5} value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
+              <button className="btn primary" disabled={joinCode.length < 5} onClick={() => setOnline({role: 'guest', code: joinCode})}>
                 Entrar na sala
               </button>
             </div>
@@ -215,25 +304,75 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         </div>
       </div>
     );
+  if (step === 'setup')
+    return (
+      <div className="screen quickplay">
+        <header className="bar">
+          <button className="btn small" onClick={() => setStep('pick')}>
+            <PixelIcon name="back" /> Voltar
+          </button>
+          <h2>Rush offline</h2>
+        </header>
+        <div className="panel rush-setup">
+          <h3>Contra quem?</h3>
+          <div className="rush-modes">
+            <button className={`rush-mode ${vsCpu ? 'on' : ''}`} onClick={() => setVsCpu(true)}>
+              <b>🤖 Computador</b>
+              <span>Você contra um rival controlado pelo jogo.</span>
+            </button>
+            <button className={`rush-mode ${!vsCpu ? 'on' : ''}`} onClick={() => setVsCpu(false)}>
+              <b>👥 Amigo no mesmo aparelho</b>
+              <span>Os dois jogam aqui, passando a vez.</span>
+            </button>
+          </div>
+          {!vsCpu && (
+            <div className="rush-players">
+              {[mine, friend].map((p, i) => (
+                <label key={i} className="rush-player">
+                  <TrainerAvatar avatar={p.avatar} name={p.name} size={72} />
+                  <span>Jogador {i + 1}</span>
+                  <input
+                    value={p.name}
+                    maxLength={12}
+                    onChange={e => (i === 0 ? setMine({...p, name: e.target.value || 'Jogador 1'}) : setFriend({...p, name: e.target.value || 'Jogador 2'}))}
+                  />
+                  {i === 1 && (
+                    <button className="btn small" onClick={() => setFriend({...friend, avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]})}>
+                      Trocar visual
+                    </button>
+                  )}
+                </label>
+              ))}
+            </div>
+          )}
+          <ModePicker mode={mode} setMode={setMode} />
+          {!vsCpu && (
+            <label className="rush-check">
+              <input type="checkbox" checked={curtain} onChange={e => setCurtain(e.target.checked)} /> Esconder as escolhas na batalha (passar a vez com cortina)
+            </label>
+          )}
+          <p className="hint">Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez fica com um e o outro vai para o adversário. No fim, cada um tem 6.</p>
+          <button className="btn primary big" onClick={start}>
+            Começar o sorteio
+          </button>
+        </div>
+      </div>
+    );
 
   if (step === 'draft') {
-    const who = round % 2;
     const pair = pairs[round];
-    const pickMon = (k: 0 | 1) => {
-    void who;
-      const mine = rushMon(pair[k], mode);
-      const theirs = rushMon(pair[1 - k], mode);
-      const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
-      next[who].push(mine);
-      next[1 - who].push(theirs);
-      setTeams(next);
-      playCry(pair[k]);
-      if (round + 1 >= pairs.length) {
-        setPrepFor(0);
-        setStep('prep');
-      } else setRound(round + 1);
-    };
-    return <DraftView players={players} mode={mode} round={round} total={pairs.length} pair={pair} teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]} canPick onPick={pickMon} />;
+    return (
+      <DraftView
+        players={players}
+        mode={mode}
+        round={round}
+        total={pairs.length}
+        pair={pair}
+        teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]}
+        canPick={!cpuTurn}
+        onPick={pickMon}
+      />
+    );
   }
 
   if (step === 'prep')
@@ -243,12 +382,13 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         player={players[prepFor]}
         team={teams[prepFor]}
         mega={mode === 'mega'}
-        curtain={curtain}
+        curtain={curtain && !vsCpu}
         onDone={team => {
           const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
           next[prepFor] = team;
+          if (prepFor === 0 && vsCpu) next[1] = cpuPrep(next[1], mode === 'mega');
           setTeams(next);
-          if (prepFor === 0) setPrepFor(1);
+          if (prepFor === 0 && !vsCpu) setPrepFor(1);
           else setStep('battle');
         }}
       />
@@ -259,7 +399,8 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
       <LocalDuel
         players={players}
         teams={teams}
-        curtain={curtain}
+        curtain={curtain && !vsCpu}
+        cpu={vsCpu}
         onEnd={w => {
           setWinner(w);
           setStep('end');
@@ -661,15 +802,16 @@ export function BattleView({players, bottom, batches, balls, req, waiting, curta
 }
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
-function LocalDuel({players, teams, curtain, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; onEnd: (winner: number) => void}) {
+function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
+  // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
   const ctl = useMemo(
-    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: players[0].name}),
+    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   const [batches, setBatches] = useState<BattleEvent[][]>(() => [ctl.initialEvents()]);
   const [idle, setIdle] = useState(false);
-  const turn: Side | null = !idle || ctl.ended ? null : duelNeeds(ctl.battle, 'p1') ? 'p1' : duelNeeds(ctl.battle, 'p2') ? 'p2' : null;
+  const turn: Side | null = !idle || ctl.ended ? null : duelNeeds(ctl.battle, 'p1') ? 'p1' : !cpu && duelNeeds(ctl.battle, 'p2') ? 'p2' : null;
   useEffect(() => {
     if (idle && ctl.ended) {
       playFanfare(1);

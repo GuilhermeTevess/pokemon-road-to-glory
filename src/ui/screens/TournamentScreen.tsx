@@ -328,7 +328,11 @@ export function TournamentScreen() {
             <li>Uma partida por rodada: quartas, semifinal e final.</li>
             <li>Seu time é curado antes de cada luta.</li>
             <li>Os adversários usam {info.teamSize} Pokémon.</li>
-            <li>Perder aqui não acaba a run: a temporada segue depois do torneio.</li>
+            {run.quick ? (
+              <li>Campeonato rápido: acabou o campeonato, acabou o save. Não mexe na sua run.</li>
+            ) : (
+              <li>Perder aqui não acaba a run: a temporada segue depois do torneio.</li>
+            )}
           </ul>
           <table className="prize-table">
             <thead>
@@ -374,7 +378,7 @@ export function TournamentScreen() {
                   {ROUND_NAMES[t.rounds.length - 1]}: {trainer?.name ?? 'Você'} vs {foe.name}
                 </b>
                 <ScoutToggle name={foe.name} wave={t.wave} team={foe.team.map(m => m.species)} pid={foe.pid} />
-                {foe.friend && <p className="hint small">Jogador de verdade: a partida é ao vivo, cada um no seu PC. Vocês dois precisam entrar.</p>}
+                {foe.friend && <p className="hint small">Jogador de verdade: a partida é ao vivo, cada um no seu aparelho. Vocês dois precisam entrar.</p>}
               </div>
               {foe.friend ? (
                 <button className="btn primary" onClick={() => setDuel(true)}>
@@ -399,7 +403,7 @@ export function TournamentScreen() {
               </h3>
               <p>{prize}</p>
               <button className="btn primary" onClick={tourFinish}>
-                Seguir a temporada
+                {run.quick ? 'Voltar para o Quickplay' : 'Seguir a temporada'}
               </button>
             </div>
           )}
