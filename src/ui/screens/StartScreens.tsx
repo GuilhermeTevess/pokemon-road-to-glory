@@ -5,6 +5,8 @@ import {BIOMES, biomePools, hiddenBiomeOf} from '../../data/biomes';
 import {getHint} from '../../data/hints';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
+import {FighterProfile, HistoryDots} from './HistoryScreens';
+import {loadHistory, sumRows, tableOf, winRate} from '../../game/history';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
 import {decodeLook, isCustom, lookFromName, lookPixels} from '../../game/look';
@@ -130,6 +132,7 @@ export function TrainerSelect() {
               <TrainerAvatar avatar={t.avatar} name={t.name} />
               <h3>{t.name}</h3>
               <div className={`run-status ${going ? 'on' : ''}`}>{going ? `Run em andamento · ronda ${Math.max(1, roundOf(saved))}` : 'Sem run em andamento'}</div>
+              <TrainerHist trainer={t} />
               <ul className="trainer-stats">
                 <li>Coleção: {st.species}</li>
                 <li>Runs: {st.runs}</li>
@@ -270,6 +273,79 @@ export function TrainerSelect() {
   );
 }
 
+/** Quadradinho do treinador na tela inicial: resumo, últimas partidas, perfil e trocar de treinador. */
+function TrainerCard({trainer, runs, best, species: n, onSwitch}: {trainer: Trainer; runs: number; best: number; species: number; onSwitch: () => void}) {
+  const [open, setOpen] = useState(false);
+  const h = useMemo(() => loadHistory(trainer.id), [trainer.id, open]);
+  const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
+  const rate = winRate(all.w, all.l);
+  return (
+    <div className="panel trainer-badge trainer-card-home">
+      <button className="trainer-card-top" onClick={() => setOpen(true)} title="Ver o perfil">
+        <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={72} />
+        <div>
+          <div className="trainer-name">{trainer.name}</div>
+          <div className="hint small">{trainer.career ? 'Carreira online' : 'Treinador'}</div>
+        </div>
+      </button>
+      <ul className="trainer-mini">
+        <li>
+          <b>{n}</b> <span>Pokémon</span>
+        </li>
+        <li>
+          <b>{runs}</b> <span>runs</span>
+        </li>
+        <li>
+          <b>{best}</b> <span>melhor ronda</span>
+        </li>
+        <li>
+          <b>
+            <span className="v">{all.w}</span> / <span className="d">{all.l}</span>
+          </b>{' '}
+          <span>vitórias / derrotas</span>
+        </li>
+        <li>
+          <b>{rate === null ? '-' : `${rate}%`}</b> <span>de vitórias</span>
+        </li>
+        {all.titles > 0 && (
+          <li>
+            <b>🏆 {all.titles}</b> <span>títulos</span>
+          </li>
+        )}
+      </ul>
+      <div className="trainer-card-last">
+        <small className="muted">Últimas partidas</small>
+        <HistoryDots list={h.list} />
+      </div>
+      <button className="btn primary" onClick={() => setOpen(true)}>
+        📊 Ver perfil e histórico
+      </button>
+      <button className="btn trainer-switch" onClick={onSwitch}>
+        🔄 Trocar de treinador
+      </button>
+      {open && <FighterProfile trainer={trainer} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+/** Resumo do histórico no cartão da escolha de treinador. */
+function TrainerHist({trainer}: {trainer: Trainer}) {
+  const [open, setOpen] = useState(false);
+  const h = useMemo(() => loadHistory(trainer.id), [trainer.id]);
+  const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
+  const rate = winRate(all.w, all.l);
+  return (
+    <div className="trainer-hist">
+      <HistoryDots list={h.list} />
+      {rate !== null && <small className="muted">{rate}% de vitórias</small>}
+      <button className="btn small" onClick={() => setOpen(true)}>
+        📊 Perfil
+      </button>
+      {open && <FighterProfile trainer={trainer} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
 export function TitleScreen() {
   const {run, setScreen, abandonRun, collection, trainer, selectTrainer, career, careerPeers, trainers, playOnline} = useGame();
   const careers = trainers.filter(t => t.career);
@@ -305,18 +381,7 @@ export function TitleScreen() {
         </div>
       </div>
       <div className="title-row">
-        <div className="panel trainer-badge">
-          <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={64} />
-          <div>
-            <div className="trainer-name">{trainer.name}</div>
-            <div className="hint small">
-              {st.runs} runs · melhor ronda {st.bestWave}
-            </div>
-            <button className="link" onClick={() => selectTrainer(null)}>
-              Trocar treinador
-            </button>
-          </div>
-        </div>
+        <TrainerCard trainer={trainer} runs={st.runs} best={st.bestWave} species={Object.keys(collection.entries).length} onSwitch={() => selectTrainer(null)} />
         <div className="menu panel">
           {active && (
             <button className="btn primary big-play" onClick={() => setScreen('run')}>
