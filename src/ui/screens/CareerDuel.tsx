@@ -3,7 +3,8 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {duelBalls, duelChoose, duelNeeds, duelRequest} from '../../game/rush';
+import {duelBalls, duelChoose, duelNeeds, duelRequest, duelScore, guestScore, scoreFor} from '../../game/rush';
+import type {MatchScore} from '../../game/ranking';
 import type {DuelReq} from '../../game/rush';
 import {hostRoom, joinRoom} from '../../game/net';
 import type {Link} from '../../game/net';
@@ -27,6 +28,9 @@ export interface DuelOutcome {
   foeTeam: string[];
   /** Quem desmaiou (do ponto de vista de quem está neste aparelho). */
   ko?: Ko[];
+  /** Como a batalha terminou (pontos de ranking). */
+  score?: MatchScore | null;
+  quit?: 'foe';
 }
 
 function Waiting({me, foe, text, onLeave}: {me: Player; foe: Player; text: string; onLeave: () => void}) {
@@ -99,7 +103,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDon
   const foeQuit = () => {
     if (!forfeitable || !startedRef.current || finished.current) return false;
     setStatus(`${foe.name} saiu da partida.`);
-    finish({won: true, highlights: [`${foe.name} saiu da partida. Vitória de ${me.name}!`], left: team.length, myTeam: team.map(m => m.species), foeTeam: foeTeam.current}, true);
+    finish({won: true, highlights: [`${foe.name} saiu da partida. Vitória de ${me.name}!`], left: team.length, myTeam: team.map(m => m.species), foeTeam: foeTeam.current, quit: 'foe'}, true);
     return true;
   };
   // A derrota em si o campeonato grava; aqui só avisamos o outro aparelho.
@@ -123,8 +127,9 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDon
       const highlights = highlightsFromLog(c.battle.log, me.name, foe.name, hostWon ? me.name : foe.name, left);
       const mine = team.map(m => m.species);
       const ko = koFromLog(c.battle.log, 'p1');
-      send({t: 'end', hostWon, highlights, left, hostTeam: mine, ko});
-      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current, ko});
+      const score = duelScore(c.battle);
+      send({t: 'end', hostWon, highlights, left, hostTeam: mine, ko, score});
+      finish({won: hostWon, highlights, left, myTeam: mine, foeTeam: foeTeam.current, ko, score: scoreFor(score, 'p1')});
       return;
     }
     send({t: 'req', req: duelNeeds(c.battle, 'p2') ? duelRequest(c.battle, 'p2') : null});
@@ -155,7 +160,7 @@ export function CareerDuel({room, host, me, foe, team, forfeitable, arena, onDon
     } else if (msg.t === 'req') setReq(msg.req as DuelReq | null);
     else if (msg.t === 'end') {
       const hostWon = !!msg.hostWon;
-      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[], ko: flipKo(saneKo(msg.ko))});
+      finish({won: !hostWon, highlights: msg.highlights as string[], left: msg.left as number, myTeam: team.map(m => m.species), foeTeam: msg.hostTeam as string[], ko: flipKo(saneKo(msg.ko)), score: guestScore(msg.score)});
     }
   };
 

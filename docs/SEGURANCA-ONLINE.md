@@ -43,12 +43,29 @@ Se o login anônimo falhar, confira em <https://console.cloud.google.com/apis/cr
 O jogo roda inteiro no navegador de cada um. Então quem programa sempre consegue mexer **nas próprias coisas**:
 
 - **O próprio save** (fica no navegador): dá para se dar níveis, itens, dinheiro. Isso vale para o modo offline e para o que a pessoa manda para o online, desde que pareça "possível" (ex.: um time inteiro nível 100 cedo demais passa nas conferências).
-- **Os próprios pontos e resultados** no ranking da carreira, dentro de valores possíveis.
+- **Os próprios pontos e resultados** no ranking da carreira e no ranking online, dentro de valores possíveis (veja abaixo os limites do ranking online).
 - **Lutas ao vivo**: cada aparelho calcula a batalha e manda as escolhas; um navegador modificado pode mandar dados falsos para o próprio lado.
 
 O que **não** dá mais: mexer no jogador, no time, nas salas ou nas mensagens **dos outros**, apagar coisas dos outros, mudar a chave do torneio depois de criada, ou gravar documentos gigantes. (Criar muitos documentos pequenos ainda dá: regras não contam quantos pedidos cada um faz.)
 
 Deixar 100% à prova de trapaça precisaria de um servidor calculando todas as batalhas (como o Showdown tem). Dá para fazer no futuro (Firebase Functions, plano pago), mas é um projeto grande. Para um grupo de amigos, a regra de ouro é: se alguém aparecer com algo absurdo, dá para ver no perfil dele (histórico, times usados).
+
+## Pontos do ranking e elos
+
+Os pontos de cada modo online ficam no documento do jogador (`careers/PLAYERS/players`) num campo
+separado, `score`, que as regras conseguem conferir. Quem tentar se dar pontos pelo console esbarra em:
+
+- no máximo **+50 por modo de cada vez** (o que vale uma vitória perfeita);
+- subir pontos **só 1 vez por minuto**, com a hora conferida pelo próprio banco;
+- o contador de partidas sobe de 1 em 1, nada negativo, só os 4 modos do ranking;
+- ninguém mexe nos pontos dos outros (o documento é do dono).
+
+Ou seja: dá para "roubar" no máximo o mesmo que alguém que ganhasse uma partida perfeita por minuto, sem parar.
+Se alguém aparecer com pontos absurdos, o perfil mostra as partidas que deram esses pontos.
+
+**Ordem para ligar:** cole as regras novas **antes** de juntar o PR do ranking (as regras novas funcionam com a
+versão antiga do jogo). Se juntar antes, nada quebra: a lista de jogadores continua funcionando, só os pontos não
+aparecem no ranking até as regras serem coladas.
 
 ### Por que não ligamos o App Check
 O App Check confere se o pedido veio do site de verdade. Mas quem trapaceia vai usar o site de verdade (abrindo o console do navegador), então ele quase não ajuda aqui e daria mais trabalho de configurar. Fica como opção para depois.

@@ -140,3 +140,8 @@
   50% { border-color: #ffffff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7), 0 0 0 7px #ffe28a, 0 0 34px 14px #fff8c8; }
 }
 [data-theme="dark"] .tut-blocker.dim { background: rgba(0, 0, 0, .7); }
+
+/* Ranking: nome do elo na cor clara, e as cores de vitória/derrota mais vivas. */
+:root[data-theme="dark"] .elo-name { color: var(--elo-l); }
+:root[data-theme="dark"] .hist-pts.v, :root[data-theme="dark"] .ranking-help .v { color: #74d39b; }
+:root[data-theme="dark"] .hist-pts.d, :root[data-theme="dark"] .ranking-help .d { color: #f08a80; }

@@ -21,10 +21,11 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
-    // O jogo grava só `json` (texto) e `owner` (o dono).
+    // O jogo grava só `json` (texto) e `owner` (o dono). A lista de jogadores grava também
+    // `score` (pontos do ranking), em campos que estas regras conseguem conferir.
     function validData() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['json', 'owner'])
+      return d.keys().hasOnly(['json', 'owner', 'score'])
         && d.json is string
         && d.json.size() > 0
         && d.json.size() <= 600000
@@ -52,8 +53,8 @@ service cloud.firestore {
     // Documento da carreira (código, temporadas...): quem criou pode atualizar.
     match /careers/{code} {
       allow read: if signedIn();
-      allow create: if signedIn() && validCode(code) && validData();
-      allow update: if signedIn() && validData() && mineOrLegacy();
+      allow create: if signedIn() && validCode(code) && validData() && !('score' in request.resource.data);
+      allow update: if signedIn() && validData() && mineOrLegacy() && !('score' in request.resource.data);
       allow delete: if signedIn() && isOwner();
     }
 
@@ -66,18 +67,64 @@ service cloud.firestore {
           && request.resource.data.json.size() <= 100000);
     }
 
+    // Pontos do ranking (careers/PLAYERS/players): o jogo calcula no aparelho, então as regras
+    // limitam o estrago de quem tentar trapacear:
+    // - no máximo +50 por modo de cada vez (o máximo de uma vitória perfeita);
+    // - subir pontos só 1 vez por minuto (nenhuma partida acaba mais rápido que isso);
+    // - `n` (partidas que contaram) sobe de 1 em 1 e `t` (hora da gravação) não pode ser inventado;
+    // - nada negativo e só os 4 modos do ranking. Descer pontos sempre pode (derrota).
+    function zeroScore() {
+      return {'pts': {'rush': 0, 'qtour': 0, 'built': 0, 'pvp': 0}, 'n': 0, 't': 0};
+    }
+
+    function modePts(nw, od, k) {
+      return nw.pts[k] is int && nw.pts[k] >= 0 && nw.pts[k] <= od.pts.get(k, 0) + 50;
+    }
+
+    function raised(nw, od) {
+      return nw.pts.rush > od.pts.get('rush', 0) || nw.pts.qtour > od.pts.get('qtour', 0)
+        || nw.pts.built > od.pts.get('built', 0) || nw.pts.pvp > od.pts.get('pvp', 0);
+    }
+
+    function goodScore(nw, od) {
+      let now = request.time.toMillis();
+      return nw.keys().hasOnly(['pts', 'n', 't']) && nw.keys().hasAll(['pts', 'n', 't'])
+        && nw.pts.keys().hasOnly(['rush', 'qtour', 'built', 'pvp'])
+        && nw.pts.keys().hasAll(['rush', 'qtour', 'built', 'pvp'])
+        && modePts(nw, od, 'rush') && modePts(nw, od, 'qtour') && modePts(nw, od, 'built') && modePts(nw, od, 'pvp')
+        && nw.n is int && nw.t is int
+        && (raised(nw, od)
+          ? nw.n == od.get('n', 0) + 1
+            && nw.t >= od.get('t', 0) + 60000
+            && nw.t <= now + 120000
+            && nw.t >= now - 300000
+          : nw.n == od.get('n', 0) && nw.t == od.get('t', 0));
+    }
+
+    function validScoreCreate(code) {
+      return !('score' in request.resource.data)
+        || (code == 'PLAYERS' && goodScore(request.resource.data.score, zeroScore()));
+    }
+
+    function validScoreUpdate(code) {
+      return !('score' in request.resource.data)
+        || (code == 'PLAYERS' && goodScore(request.resource.data.score, resource.data.get('score', zeroScore())));
+    }
+
     // Jogadores, partidas, mensagens das salas e times compartilhados: cada um mexe só no seu.
     match /careers/{code}/{folder}/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && validCode(code) && validId(id)
         && folder in ['players', 'matches', 'world', 'tours', 'msgs', 'teams']
         && validData()
-        && validPlayerCard(code, folder, id);
+        && validPlayerCard(code, folder, id)
+        && validScoreCreate(code);
       // Mundo dos bots, chave do torneio e vaga na sala nunca mudam depois de criados.
       allow update: if signedIn() && validData() && mineOrLegacy()
         && !(folder in ['world', 'tours'])
         && !id.matches('.*-seat$')
-        && validPlayerCard(code, folder, id);
+        && validPlayerCard(code, folder, id)
+        && validScoreUpdate(code);
       allow delete: if signedIn() && isOwner() && folder in ['msgs', 'teams'];
     }
 

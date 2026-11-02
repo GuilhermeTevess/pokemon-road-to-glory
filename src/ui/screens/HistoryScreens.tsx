@@ -11,6 +11,7 @@ import type {Ko} from '../../game/recap';
 import {MonInfo} from './BiomeGuide';
 import {useGame} from '../../game/store';
 import {TrainerAvatar} from './StartScreens';
+import {EloStrip} from './RankingScreens';
 
 const name = (s: string) => {
   try {
@@ -317,6 +318,12 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
         <span className={`hist-badge ${m.online ? 'on' : ''}`}><PixelIcon name={m.online ? 'globe' : 'phone'} size={12} /> {m.online ? 'Online' : 'Offline'}</span>
         <b>{modeLabel(m.mode)}</b>
         {m.note && <small>{m.note}</small>}
+        {typeof m.pts === 'number' && (
+          <small className={`hist-pts ${m.pts > 0 ? 'v' : m.pts < 0 ? 'd' : 'muted'}`}>
+            {m.pts > 0 ? '+' : ''}
+            {m.pts} pts no ranking
+          </small>
+        )}
         <small className="muted">{when(m.at)}</small>
       </div>
       <div className="hist-side foe">
@@ -536,6 +543,7 @@ export function FighterProfile({trainer, history, note, onClose, tag, onlineOnly
             )}
           </div>
         )}
+        {(onlineOnly || on.length > 0) && <EloStrip points={h.points} />}
         <div className="row wrap">
           <button className={`tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
             Estatísticas
