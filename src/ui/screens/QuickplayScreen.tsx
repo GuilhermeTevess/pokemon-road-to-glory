@@ -21,7 +21,8 @@ import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../
 import {fast} from '../settings';
 import {OnlineRush} from './OnlineRush';
 import {HistorySummary} from './HistoryScreens';
-import {recordMatch} from '../../game/history';
+import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
+import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
 import {FX, playMoveFx} from '../fx';
 
@@ -433,11 +434,22 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
     <RushResult
       winner={players[winner ?? 0]}
       team={teams[winner ?? 0]}
+      history={localCard(players, winner ?? 0, vsCpu)}
       onRematch={() => setStep('battle')}
       onNew={() => setStep('setup')}
       onExit={onExit}
     />
   );
+}
+
+/** Histórico de quem venceu o Rush local: o seu, ou o do computador/amigo contra você. */
+function localCard(players: [Player, Player], winner: number, vsCpu: boolean): HistCard | null {
+  const id = useGame.getState().trainer?.id;
+  if (!id) return null;
+  const h = loadHistory(id);
+  if (winner === 0) return cardOf(h, players[0].name);
+  const foe = players[1];
+  return vsCpu ? mirrorCard(h, foe.name, m => m.vsKind === 'cpu' && m.vs === foe.name) : mirrorCard(h, foe.name, m => m.vsKind === 'friend' && m.vs === foe.name);
 }
 
 /** Sorteio do Rush (o mesmo desenho no mesmo PC e no online). */
@@ -1087,8 +1099,10 @@ function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Pla
   );
 }
 
-export function RushResult({winner, team, teamNames, onRematch, onNew, onExit}: {
+export function RushResult({winner, team, teamNames, history, onRematch, onNew, onExit}: {
   winner: Player;
+  /** Histórico de quem venceu (o seu, o do amigo online ou o do computador contra você). */
+  history?: HistCard | null;
   team: OwnedMon[];
   teamNames?: string[];
   onRematch?: () => void;
@@ -1096,7 +1110,6 @@ export function RushResult({winner, team, teamNames, onRematch, onNew, onExit}: 
   onExit: () => void;
 }) {
   const names = teamNames ?? team.map(m => m.species);
-  const me = useGame(s => s.trainer);
   return (
     <div className="screen quickplay rush-result">
       <div className="confetti" />
@@ -1108,7 +1121,7 @@ export function RushResult({winner, team, teamNames, onRematch, onNew, onExit}: 
           <Sprite key={k} name={sp} size={56} />
         ))}
       </span>
-      {me && <HistorySummary trainerId={me.id} who={me.name} />}
+      {history && <HistorySummary card={history} />}
       <div className="rush-result-actions">
         {onRematch && (
           <button className="btn" onClick={onRematch}>

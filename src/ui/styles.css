@@ -1591,6 +1591,13 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 /* O fundo da arena (plateia, arquibancada, holofotes) fica numa camada própria, sempre
    atrás dos Pokémon: as fileiras da plateia têm z-index próprio e passavam na frente. */
 .arena > .arena-bg { z-index: 0; }
+
+/* A etiqueta do perfil ficava cortada no topo da janela (que tem rolagem): aqui ela fica dentro. */
+.modal .profile .event-tag { position: static; display: inline-block; align-self: flex-start; }
+.hist-foe-link { font: inherit; font-weight: 700; color: var(--ink); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline dotted; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+.hist-foe-link:hover { color: var(--sky-d); }
+.hist-note { background: var(--butter); border: 2px solid var(--line); padding: 4px 10px; font-size: 14px; }
+@media (max-width: 560px) { .hist-foe-link { max-width: 90px; } }
 .versus-teams { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .calc-btn { background: #fff3c4; border-color: #c99a1a; font-weight: 700; }
 .bar .calc-btn { margin-left: auto; }
