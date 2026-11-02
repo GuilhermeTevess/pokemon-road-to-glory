@@ -203,3 +203,33 @@ export function mvpOf(list: MatchLog[]): {name: string; games: number; wins: num
   const best = [...by].sort((a, b) => b[1].games - a[1].games || b[1].wins - a[1].wins)[0];
   return best ? {name: best[0], ...best[1]} : null;
 }
+
+// ------------------------------------------------------------------ Tela de vitória
+
+/** Resuminho do histórico de alguém: últimas partidas (mais recente primeiro) e V/D. */
+export interface HistCard {
+  who: string;
+  dots: boolean[];
+  w: number;
+  l: number;
+  /** Ex.: "contra você" quando o histórico é o seu, ao contrário. */
+  note?: string;
+}
+
+/** O seu histórico (todas as partidas). */
+export function cardOf(h: History, who: string): HistCard {
+  const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
+  return {who, dots: h.list.slice(0, 5).map(m => m.won), w: all.w, l: all.l};
+}
+
+/** Histórico de quem só existe neste aparelho (computador, amigo no mesmo PC): o seu contra ele, ao contrário. */
+export function mirrorCard(h: History, who: string, match: (m: MatchLog) => boolean): HistCard {
+  const games = h.list.filter(match);
+  const w = games.filter(m => !m.won).length;
+  return {who, dots: games.slice(0, 5).map(m => !m.won), w, l: games.length - w, note: 'contra você'};
+}
+
+/** Soma uma vitória que acabou de acontecer num resumo recebido de outro aparelho. */
+export function withWin(c: HistCard): HistCard {
+  return {...c, dots: [true, ...c.dots].slice(0, 5), w: c.w + 1};
+}

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {HISTORY_KEEP, addMatch, modeLabel, nemesisOf, streakOf, sumRows, tableOf, winRate} from '../src/game/history';
+import {HISTORY_KEEP, addMatch, cardOf, mirrorCard, withWin, modeLabel, nemesisOf, streakOf, sumRows, tableOf, winRate} from '../src/game/history';
 import type {History, MatchLog} from '../src/game/history';
 
 const base = (): History => ({version: 1, list: [], totals: {}});
@@ -38,5 +38,18 @@ describe('histórico do treinador', () => {
     expect(streakOf(list)).toEqual({won: true, n: 2});
     expect(nemesisOf(list)).toMatchObject({vs: 'Gary', w: 2, l: 1});
     expect(modeLabel('online-rush:legend')).toBe('Rush online · Lendários');
+  });
+
+  it('tela de vitória mostra o histórico de quem venceu', () => {
+    let h = base();
+    h = addMatch(h, m('rush:nv50', true, {vsKind: 'cpu'}));
+    h = addMatch(h, m('gym', true, {vsKind: 'gym'}));
+    h = addMatch(h, m('rush:nv50', false, {vsKind: 'cpu'}));
+    // Computador venceu: o histórico dele contra você é o seu ao contrário.
+    const cpu = mirrorCard(h, 'Computador', x => x.vsKind === 'cpu');
+    expect(cpu).toMatchObject({who: 'Computador', dots: [true, false], w: 1, l: 1});
+    expect(cardOf(h, 'Juliana')).toMatchObject({dots: [false, true, true], w: 2, l: 1});
+    // Amigo online venceu: o resumo que ele mandou + esta vitória.
+    expect(withWin({who: 'Vaz', dots: [false, false, true, true, true], w: 3, l: 2})).toMatchObject({dots: [true, false, false, true, true], w: 4, l: 2});
   });
 });

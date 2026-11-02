@@ -3,7 +3,7 @@
 import {useMemo, useState} from 'react';
 import {species} from '../../data/dex';
 import {loadHistory, mvpOf, nemesisOf, sumRows, streakOf, tableOf, winRate, modeLabel} from '../../game/history';
-import type {History, MatchLog, TableRow} from '../../game/history';
+import type {HistCard, History, MatchLog, TableRow} from '../../game/history';
 import {Modal, Sprite} from '../components';
 import {TrainerAvatar} from './StartScreens';
 
@@ -30,21 +30,30 @@ export function HistoryDots({list, n = 5, size}: {list: MatchLog[]; n?: number; 
   );
 }
 
-/** "Histórico" com as 5 últimas partidas (tela de vitória). */
-export function HistorySummary({trainerId, who}: {trainerId?: string | null; who: string}) {
-  // Lê na hora de mostrar: a partida que acabou de terminar já está gravada.
-  const h = useMemo(() => loadHistory(trainerId), [trainerId]);
-  if (!trainerId) return null;
-  const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
-  const rate = winRate(all.w, all.l);
+/** "Histórico" de quem venceu, com as 5 últimas partidas (tela de vitória). */
+export function HistorySummary({card}: {card: HistCard}) {
+  const rate = winRate(card.w, card.l);
   return (
     <div className="hist-summary panel">
       <b>Histórico</b>
-      <small className="muted">{who}</small>
-      <HistoryDots list={h.list} size="big" />
+      <small className="muted">
+        {card.who}
+        {card.note ? ` · ${card.note}` : ''}
+      </small>
+      {card.dots.length ? (
+        <span className="hist-dots big">
+          {card.dots.map((won, i) => (
+            <span key={i} className={`hist-dot ${won ? 'w' : 'l'}`}>
+              {won ? 'W' : 'L'}
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span className="muted small">Ainda sem partidas</span>
+      )}
       {rate !== null && (
         <small className="muted">
-          {all.w}V · {all.l}D · {rate}% de vitórias
+          {card.w}V · {card.l}D · {rate}% de vitórias
         </small>
       )}
     </div>
