@@ -1,7 +1,7 @@
 // Onde a carreira fica salva: Firestore (pela API REST, sem SDK) ou, para testes, o próprio navegador.
 // Cada documento guarda um único campo `json` com o objeto inteiro.
 import {FIREBASE} from '../data/firebase';
-import type {CareerDoc, PlayerDoc} from './career';
+import {sanePlayer, type CareerDoc, type PlayerDoc} from './career';
 import type {World} from './world';
 import type {Entrant, MatchResult} from './tournament';
 
@@ -21,7 +21,110 @@ export function cloudReady(): boolean {
 const BASE = () => `https://firestore.googleapis.com/v1/projects/${FIREBASE.projectId}/databases/(default)/documents`;
 const KEY = () => `key=${encodeURIComponent(FIREBASE.apiKey)}`;
 
-type Doc = {name?: string; fields?: {json?: {stringValue?: string}}};
+type Doc = {name?: string; fields?: {json?: {stringValue?: string}; owner?: {stringValue?: string}}};
+
+// ---------- Login anônimo ----------
+// Ninguém digita nada: na primeira vez o navegador ganha uma identidade secreta do Firebase
+// (fica guardada aqui) e manda junto em cada pedido. As regras do banco (firestore.rules)
+// usam essa identidade para deixar cada um mexer só nas próprias coisas.
+// Se o login anônimo ainda não estiver ligado no Firebase, o jogo continua sem ele.
+interface Auth {
+  uid: string;
+  idToken: string;
+  refreshToken: string;
+  exp: number;
+}
+
+const AUTH_KEY = 'rtg-auth';
+let authInFlight: Promise<Auth | null> | null = null;
+let authFailedAt = 0;
+
+function loadAuth(): Auth | null {
+  try {
+    const a = JSON.parse(localStorage.getItem(AUTH_KEY) ?? 'null') as Auth | null;
+    return a?.uid && a.refreshToken ? a : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuth(a: Auth): void {
+  try {
+    localStorage.setItem(AUTH_KEY, JSON.stringify(a));
+  } catch {
+    /* ignora */
+  }
+}
+
+async function signIn(): Promise<Auth | null> {
+  const key = encodeURIComponent(FIREBASE.apiKey);
+  const old = loadAuth();
+  if (old) {
+    // Renova o passe (dura 1 hora) mantendo a mesma identidade.
+    const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${key}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(old.refreshToken)}`,
+    });
+    if (res.ok) {
+      const r = (await res.json()) as {id_token: string; refresh_token: string; expires_in: string; user_id: string};
+      const a: Auth = {uid: r.user_id, idToken: r.id_token, refreshToken: r.refresh_token, exp: Date.now() + Number(r.expires_in) * 1000};
+      saveAuth(a);
+      return a;
+    }
+    // Só cria uma identidade nova se a antiga não existe mais (com internet ruim, tenta depois).
+    if (res.status !== 400) throw new Error(`auth ${res.status}`);
+  }
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${key}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({returnSecureToken: true}),
+  });
+  if (!res.ok) throw new Error(`auth ${res.status}`);
+  const r = (await res.json()) as {idToken: string; refreshToken: string; expiresIn: string; localId: string};
+  const a: Auth = {uid: r.localId, idToken: r.idToken, refreshToken: r.refreshToken, exp: Date.now() + Number(r.expiresIn) * 1000};
+  saveAuth(a);
+  return a;
+}
+
+/** Identidade atual (renova sozinha). `null` = sem login (modo de teste ou login desligado). */
+async function auth(): Promise<Auth | null> {
+  if (localMode() || !FIREBASE.apiKey) return null;
+  const a = loadAuth();
+  if (a && a.idToken && a.exp > Date.now() + 60_000) return a;
+  if (Date.now() - authFailedAt < 60_000) return null;
+  authInFlight ??= signIn()
+    .catch(() => {
+      authFailedAt = Date.now();
+      return null;
+    })
+    .finally(() => {
+      authInFlight = null;
+    });
+  return authInFlight;
+}
+
+async function headers(json = false): Promise<Record<string, string>> {
+  const h: Record<string, string> = json ? {'Content-Type': 'application/json'} : {};
+  const a = await auth();
+  if (a) h.Authorization = `Bearer ${a.idToken}`;
+  return h;
+}
+
+/** Pedido ao Firestore com a identidade. Se o passe venceu ou ficou inválido (401), renova e tenta de novo uma vez. */
+async function call(url: string, init: RequestInit = {}, json = false): Promise<Response> {
+  const res = await fetch(url, {...init, headers: await headers(json)});
+  if (localMode() || !(res.status === 401 || (res.status === 400 && /jwt|token|credential/i.test(await res.clone().text())))) return res;
+  const a = loadAuth();
+  if (a) saveAuth({...a, exp: 0});
+  return fetch(url, {...init, headers: await headers(json)});
+}
+
+async function body(value: unknown): Promise<string> {
+  const a = await auth();
+  const doc: Doc = {fields: {json: {stringValue: JSON.stringify(value)}, ...(a ? {owner: {stringValue: a.uid}} : {})}};
+  return JSON.stringify(doc);
+}
 
 function parse<T>(d: Doc | null | undefined): T | null {
   const raw = d?.fields?.json?.stringValue;
@@ -35,19 +138,18 @@ function parse<T>(d: Doc | null | undefined): T | null {
 
 async function getDoc<T>(path: string): Promise<T | null> {
   if (localMode()) return parse<T>(JSON.parse(localStorage.getItem(`rtg-fakecloud/${path}`) ?? 'null'));
-  const res = await fetch(`${BASE()}/${path}?${KEY()}`);
+  const res = await call(`${BASE()}/${path}?${KEY()}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Firestore ${res.status}`);
   return parse<T>(await res.json());
 }
 
 async function putDoc(path: string, value: unknown): Promise<void> {
-  const body: Doc = {fields: {json: {stringValue: JSON.stringify(value)}}};
   if (localMode()) {
-    localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify(body));
+    localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify({fields: {json: {stringValue: JSON.stringify(value)}}}));
     return;
   }
-  const res = await fetch(`${BASE()}/${path}?${KEY()}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const res = await call(`${BASE()}/${path}?${KEY()}`, {method: 'PATCH', body: await body(value)}, true);
   if (!res.ok) throw new Error(`Firestore ${res.status}`);
 }
 
@@ -62,10 +164,10 @@ async function createOnce<T>(path: string, value: T): Promise<T> {
     await putDoc(path, value);
     return value;
   }
-  const body: Doc = {fields: {json: {stringValue: JSON.stringify(value)}}};
-  const res = await fetch(`${BASE()}/${path}?currentDocument.exists=false&${KEY()}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const res = await call(`${BASE()}/${path}?currentDocument.exists=false&${KEY()}`, {method: 'PATCH', body: await body(value)}, true);
   if (res.ok) return value;
-  if (res.status === 409 || res.status === 400) {
+  // 409/400: já existia. 403: as regras não deixam mudar um documento que já existe.
+  if (res.status === 409 || res.status === 400 || res.status === 403) {
     const existing = await getDoc<T>(path);
     if (existing) return existing;
   }
@@ -77,7 +179,7 @@ async function delDoc(path: string): Promise<void> {
     localStorage.removeItem(`rtg-fakecloud/${path}`);
     return;
   }
-  const res = await fetch(`${BASE()}/${path}?${KEY()}`, {method: 'DELETE'});
+  const res = await call(`${BASE()}/${path}?${KEY()}`, {method: 'DELETE'});
   if (!res.ok && res.status !== 404) throw new Error(`Firestore ${res.status}`);
 }
 
@@ -99,7 +201,7 @@ async function listDocs<T>(path: string): Promise<T[]> {
   const out: T[] = [];
   let token = '';
   for (let page = 0; page < 50; page++) {
-    const res = await fetch(`${BASE()}/${path}?pageSize=300${token ? `&pageToken=${encodeURIComponent(token)}` : ''}&${KEY()}`);
+    const res = await call(`${BASE()}/${path}?pageSize=300${token ? `&pageToken=${encodeURIComponent(token)}` : ''}&${KEY()}`);
     if (!res.ok) throw new Error(`Firestore ${res.status}`);
     const data = (await res.json()) as {documents?: Doc[]; nextPageToken?: string};
     for (const d of data.documents ?? []) {
@@ -117,7 +219,7 @@ const code = (c: string) => encodeURIComponent(c.toUpperCase());
 export const cloud = {
   getCareer: (c: string) => getDoc<CareerDoc>(`careers/${code(c)}`),
   putCareer: (doc: CareerDoc) => putDoc(`careers/${code(doc.code)}`, doc),
-  players: (c: string) => listDocs<PlayerDoc>(`careers/${code(c)}/players`),
+  players: async (c: string) => (await listDocs<unknown>(`careers/${code(c)}/players`)).filter(sanePlayer),
   putPlayer: (c: string, p: PlayerDoc) => putDoc(`careers/${code(c)}/players/${encodeURIComponent(p.id)}`, p),
   putMatch: (c: string, m: MatchResult) => cloudMatches.put(c, m),
 };
