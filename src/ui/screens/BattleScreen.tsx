@@ -28,11 +28,13 @@ import {
   effectivenessLabel,
 } from '../components';
 import {playBall, playCry, playHit, playJingle, playMove, playPlin, playShake} from '../audio';
-import {fast} from '../settings';
+import {askLead, fast, setAskLead} from '../settings';
+import {asksLead, firstFoes, leadAdvice} from '../../game/lead';
 import {FX, playMoveFx, throwBallFx} from '../fx';
 import {lineRoot} from '../../game/meta';
 import type {OwnedMon} from '../../game/types';
 import {Hearts} from './CollectionScreen';
+import {maxHp as maxHpOf} from '../../game/mon';
 import {itemSpriteUrl} from '../../data/dex';
 
 interface SideView {
@@ -77,7 +79,9 @@ const waitText = (ms: number) =>
 export function BattleScreen() {
   const run = useGame(s => s.run)!;
   const {finishBattle, consume} = useGame();
-  const ctl = useMemo(() => getBattle(run), [run.encounter?.mon.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Antes da luta: mostra quem veio e pergunta "Quer trocar o Pokémon?". A batalha só nasce depois.
+  const [ready, setReady] = useState(() => !askLead() || !asksLead(run.encounter, run.party));
+  const ctl = useMemo(() => (ready ? getBattle(run) : null), [run.encounter?.mon.uid, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const [players, setPlayers] = useState<Views>([]);
   const [wilds, setWilds] = useState<Views>([]);
   const [targetMove, setTargetMove] = useState<number | null>(null);
@@ -204,6 +208,7 @@ export function BattleScreen() {
     }
   }, [busy, ctl, finishBattle, player?.species, player?.nickname, player]);
 
+  if (!ready) return <LeadPrompt onDone={() => setReady(true)} />;
   if (!ctl) return null;
 
   const act = (fn: () => BattleEvent[]) => {
@@ -549,6 +554,157 @@ export function BattleScreen() {
             <SwitchMenu ctl={ctl} party={run.party} onPick={uid => act(() => ctl.chooseSwitch(uid))} onBack={ctl.mustSwitch ? undefined : () => setMenu('main')} />
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Quem veio, os tipos e as fraquezas dele, e "Quer trocar o Pokémon?" antes da luta começar. */
+function LeadPrompt({onDone}: {onDone: () => void}) {
+  const run = useGame(s => s.run)!;
+  const setLead = useGame(s => s.setLead);
+  const enc = run.encounter!;
+  const [picking, setPicking] = useState(false);
+  const [always, setAlways] = useState(askLead());
+  const foes = firstFoes(enc);
+  const foeNames = foes.map(f => species(f.species).name);
+  const alive = run.party.filter(m => m.hp > 0);
+  const lead = alive[0];
+  const mate = enc.double ? alive[1] : undefined;
+  const advice = new Map(alive.map(m => [m.uid, leadAdvice(m, foes.map(f => f.species))]));
+  const best = [...alive].sort((a, b) => advice.get(b.uid)!.score - advice.get(a.uid)!.score)[0];
+  const bestIsGood = advice.get(best.uid)!.score > advice.get(lead.uid)!.score + 0.5;
+  const biome = getBiome(enc.arena ?? run.biome);
+
+  const title = enc.trainer
+    ? `${enc.trainer} vai começar com ${foeNames[0]}!`
+    : enc.double
+      ? `Dois selvagens apareceram: ${foeNames.join(' e ')}!`
+      : enc.boss
+        ? `O chefe ${foeNames[0]} apareceu!`
+        : `Um ${foeNames[0]} selvagem apareceu!`;
+
+  const finish = (uid?: string) => {
+    if (uid && uid !== run.party[0]?.uid) setLead(uid);
+    setAskLead(always);
+    onDone();
+  };
+
+  const tips = (m: OwnedMon) => {
+    const a = advice.get(m.uid)!;
+    const out: {text: string; cls: string}[] = [];
+    if (a.attack >= 2) out.push({text: `${a.move} é super efetivo ${a.attack >= 4 ? '4x' : '2x'}`, cls: a.attack >= 4 ? 'eff-4' : 'eff-2'});
+    else if (a.attack === 0) out.push({text: 'Seus golpes não pegam nele', cls: 'eff-0'});
+    else if (a.attack < 1) out.push({text: 'Golpes pouco efetivos', cls: 'eff-h'});
+    if (a.defend >= 2) out.push({text: `Toma dano ${a.defend >= 4 ? '4x' : 'dobrado'} dele`, cls: 'eff-4'});
+    else if (a.defend < 1) out.push({text: 'Resiste aos tipos dele', cls: 'eff-h'});
+    if (!out.length) out.push({text: 'Neutro', cls: 'eff-1'});
+    return out;
+  };
+
+  const leadName = (m: OwnedMon) => m.nickname || species(m.species).name;
+
+  return (
+    <div className="screen battle-screen lead-prompt">
+      <div className="lead-foe panel" style={{['--bc' as string]: biome.color}}>
+        <h2>{title}</h2>
+        <div className="lead-foes">
+          {foes.map(f => (
+            <div key={f.uid} className="lead-foe-card">
+              <Sprite name={f.species} shiny={f.shiny} size={96} />
+              <div className="lead-foe-name">
+                {species(f.species).name}
+                {f.shiny && <ShinyStar />} <span className="lv">Nv. {f.level}</span>
+              </div>
+              <div className="row">
+                {species(f.species).types.map(t => (
+                  <TypeBadge key={t} type={t} info />
+                ))}
+              </div>
+              <MatchupPanel types={[...species(f.species).types]} title="Fraquezas dele" />
+            </div>
+          ))}
+        </div>
+        {enc.team && !enc.double && enc.team.length > 1 && (
+          <p className="hint">
+            O time tem {enc.team.length} Pokémon. Você só vê quem entra primeiro.
+          </p>
+        )}
+        <p className="hint">Toque num tipo para abrir a calculadora de tipos.</p>
+      </div>
+
+      <div className="battle-bottom lead-ask">
+        {!picking ? (
+          <>
+            <div className="lead-current">
+              <Sprite name={lead.species} shiny={lead.shiny} size={56} still />
+              <div>
+                <div>
+                  Vai entrar: <strong>{leadName(lead)}</strong>
+                  {mate && (
+                    <>
+                      {' '}e <strong>{leadName(mate)}</strong>
+                    </>
+                  )}
+                </div>
+                <div className="row wrap">
+                  {tips(lead).map(t => (
+                    <span key={t.text} className={`eff ${t.cls}`}>
+                      {t.text}
+                    </span>
+                  ))}
+                </div>
+                {bestIsGood && best.uid !== lead.uid && (
+                  <div className="lead-tip">
+                    💡 Dica: {leadName(best)} tem vantagem de tipo aqui.
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="lead-q">Quer trocar o Pokémon?</p>
+            <div className="row lead-buttons">
+              <button className="btn primary" onClick={() => setPicking(true)}>
+                Sim, escolher outro
+              </button>
+              <button className="btn" onClick={() => finish()}>
+                Não, lutar com {leadName(lead)}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="lead-q">Quem começa a luta{enc.double ? ' (o outro entra junto, ao lado)' : ''}?</p>
+            <div className="switch-list">
+              {alive.map(m => (
+                <button key={m.uid} className={`switch-btn ${m.uid === lead.uid ? 'active' : ''}`} onClick={() => finish(m.uid)}>
+                  <Sprite name={m.species} shiny={m.shiny} size={56} />
+                  <span className="switch-info">
+                    <span>
+                      <MonName mon={m} /> Nv.{m.level}
+                      {m.uid === best.uid && bestIsGood && <span className="lead-best"> 👍 Boa escolha</span>}
+                    </span>
+                    <Types name={m.species} />
+                    <HpBar hp={m.hp} maxhp={maxHpOf(m)} showNumbers />
+                    <span className="row wrap">
+                      {tips(m).map(t => (
+                        <span key={t.text} className={`eff ${t.cls}`}>
+                          {t.text}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              <button className="btn small back" onClick={() => setPicking(false)}>
+                ← Voltar
+              </button>
+            </div>
+          </>
+        )}
+        <label className="lead-always">
+          <input type="checkbox" checked={always} onChange={e => setAlways(e.target.checked)} /> Perguntar antes de toda luta
+          <span className="muted"> (dá para ligar de novo no Painel, aba Time)</span>
+        </label>
       </div>
     </div>
   );
