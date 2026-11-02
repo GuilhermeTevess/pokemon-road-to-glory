@@ -151,7 +151,7 @@ function ModeTable({title, icon, rows, empty}: {title: string; icon: string; row
   );
 }
 
-const when = (at: number) => {
+export const when = (at: number) => {
   const d = new Date(at);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} - ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
@@ -255,13 +255,20 @@ const FILTERS: {id: Filter; label: string}[] = [
   {id: 'l', label: 'Derrotas'},
 ];
 
-function RecentList({h, me, onFoe}: {h: History; me: {name: string; avatar: string}; onFoe?: (m: MatchLog) => void}) {
+function RecentList({h, me, onFoe, canOpen, onlineOnly}: {
+  h: History;
+  me: {name: string; avatar: string};
+  onFoe?: (m: MatchLog) => void;
+  /** Só mostra o link nos adversários que têm perfil. */
+  canOpen?: (m: MatchLog) => boolean;
+  onlineOnly?: boolean;
+}) {
   const [f, setF] = useState<Filter>('all');
   const list = h.list.filter(m => (f === 'off' ? !m.online : f === 'on' ? m.online : f === 'w' ? m.won : f === 'l' ? !m.won : true));
   return (
     <section className="hist-recent">
       <div className="row wrap">
-        {FILTERS.map(x => (
+        {FILTERS.filter(x => !onlineOnly || (x.id !== 'off' && x.id !== 'on')).map(x => (
           <button key={x.id} className={`tab ${f === x.id ? 'active' : ''}`} onClick={() => setF(x.id)}>
             {x.label}
           </button>
@@ -271,7 +278,7 @@ function RecentList({h, me, onFoe}: {h: History; me: {name: string; avatar: stri
       {!list.length && <p className="muted">Nenhuma partida aqui ainda.</p>}
       <div className="hist-list">
         {list.map((m, i) => (
-          <MatchCard key={`${m.at}-${i}`} m={m} me={me} onFoe={onFoe} />
+          <MatchCard key={`${m.at}-${i}`} m={m} me={me} onFoe={onFoe && (!canOpen || canOpen(m)) ? onFoe : undefined} />
         ))}
       </div>
     </section>
@@ -280,7 +287,7 @@ function RecentList({h, me, onFoe}: {h: History; me: {name: string; avatar: stri
 
 /** Perfil do treinador (o seu ou de outro treinador deste aparelho). */
 /** Perfil de quem você enfrentou: outro treinador deste aparelho, o resumo que o aparelho dele mandou, ou (computador e amigo no mesmo PC) as partidas contra você. */
-interface FoeView {
+export interface FoeView {
   trainer: {id?: string; name: string; avatar: string};
   history: History;
   note?: string;
@@ -307,12 +314,18 @@ function useFoeView(me: {id?: string; name: string; avatar: string}, h: History)
 }
 
 /** Perfil do treinador (o seu, de outro treinador deste aparelho ou de um adversário). */
-export function FighterProfile({trainer, history, note, onClose}: {
+export function FighterProfile({trainer, history, note, onClose, tag, onlineOnly, foeLookup}: {
   trainer: {id?: string; name: string; avatar: string};
   /** Histórico pronto (adversário); sem ele, lê o do treinador pelo id. */
   history?: History;
   note?: string;
   onClose: () => void;
+  /** Etiqueta em cima do nome (padrão: perfil do treinador / do adversário). */
+  tag?: string;
+  /** Só partidas online (perfil vindo da lista de jogadores): esconde a tabela offline. */
+  onlineOnly?: boolean;
+  /** Como abrir o perfil de quem aparece nas partidas (lista de jogadores). `null` = sem perfil. */
+  foeLookup?: (m: MatchLog) => FoeView | null;
 }) {
   const h = useMemo(() => history ?? loadHistory(trainer.id), [history, trainer.id]);
   const foeView = useFoeView(trainer, h);
@@ -331,7 +344,7 @@ export function FighterProfile({trainer, history, note, onClose}: {
         <header className="profile-head">
           <TrainerAvatar avatar={trainer.avatar} name={trainer.name} size={88} />
           <div>
-            <span className="event-tag">{history ? 'Perfil do adversário' : 'Perfil do treinador'}</span>
+            <span className="event-tag">{tag ?? (history ? 'Perfil do adversário' : 'Perfil do treinador')}</span>
             <h2>{trainer.name}</h2>
             <span>
               {all.w + all.l} partidas · <b className="v">{all.w} vitórias</b> · <b className="d">{all.l} derrotas</b>
@@ -375,17 +388,35 @@ export function FighterProfile({trainer, history, note, onClose}: {
         </div>
         {tab === 'stats' ? (
           <div className="hist-tables">
-            <ModeTable title="Offline" icon="phone" rows={off} empty="Nenhuma partida offline ainda. Runs, Rush contra o computador e campeonatos rápidos aparecem aqui." />
+            {!onlineOnly && (
+              <ModeTable title="Offline" icon="phone" rows={off} empty="Nenhuma partida offline ainda. Runs, Rush contra o computador e campeonatos rápidos aparecem aqui." />
+            )}
             <ModeTable title="Online (contra pessoas)" icon="globe" rows={on} empty="Nenhuma partida online ainda. Rush online, campeonato online e carreira com amigos aparecem aqui." />
             <p className="hint small">
-              V = vitórias, D = derrotas. A % de vitória é V dividido pelo total de jogos. Os totais nunca se perdem; a lista de partidas guarda as últimas 60.
+              V = vitórias, D = derrotas. A % de vitória é V dividido pelo total de jogos. Os totais nunca se perdem; a lista de partidas guarda as últimas {onlineOnly ? 40 : 60}.
             </p>
           </div>
         ) : (
-          <RecentList h={h} me={trainer} onFoe={history ? undefined : m => setFoe(foeView(m))} />
+          <RecentList
+            h={h}
+            me={trainer}
+            onlineOnly={onlineOnly}
+            onFoe={foeLookup ? m => setFoe(foeLookup(m)) : history ? undefined : m => setFoe(foeView(m))}
+            canOpen={foeLookup ? m => !!foeLookup(m) : undefined}
+          />
         )}
       </div>
-      {foe && <FighterProfile trainer={foe.trainer} history={foe.history} note={foe.note} onClose={() => setFoe(null)} />}
+      {foe && (
+        <FighterProfile
+          trainer={foe.trainer}
+          history={foe.history}
+          note={foe.note}
+          tag={foeLookup ? tag : undefined}
+          onlineOnly={foeLookup ? onlineOnly : undefined}
+          foeLookup={foeLookup}
+          onClose={() => setFoe(null)}
+        />
+      )}
     </Modal>
   );
 }

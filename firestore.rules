@@ -57,16 +57,27 @@ service cloud.firestore {
       allow delete: if signedIn() && isOwner();
     }
 
+    // Lista de jogadores (careers/PLAYERS/players): o documento de cada um começa com
+    // a própria identidade, então ninguém grava no lugar de outro. Resumo pequeno.
+    function validPlayerCard(code, folder, id) {
+      return code != 'PLAYERS'
+        || (folder == 'players'
+          && id.matches('^' + me() + '_[A-Za-z0-9_-]+$')
+          && request.resource.data.json.size() <= 100000);
+    }
+
     // Jogadores, partidas, mensagens das salas e times compartilhados: cada um mexe só no seu.
     match /careers/{code}/{folder}/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && validCode(code) && validId(id)
         && folder in ['players', 'matches', 'world', 'tours', 'msgs', 'teams']
-        && validData();
+        && validData()
+        && validPlayerCard(code, folder, id);
       // Mundo dos bots, chave do torneio e vaga na sala nunca mudam depois de criados.
       allow update: if signedIn() && validData() && mineOrLegacy()
         && !(folder in ['world', 'tours'])
-        && !id.matches('.*-seat$');
+        && !id.matches('.*-seat$')
+        && validPlayerCard(code, folder, id);
       allow delete: if signedIn() && isOwner() && folder in ['msgs', 'teams'];
     }
 

@@ -6,6 +6,7 @@ import {getHint} from '../../data/hints';
 import type {Biome} from '../../data/biomes';
 import {ALL_TYPES, dex, isBaseStage, isLegendary, isPlayable, rarityOf, species} from '../../data/dex';
 import {FighterProfile, HistoryDots} from './HistoryScreens';
+import {PlayersModal} from './PlayersScreen';
 import {loadHistory, sumRows, tableOf, winRate} from '../../game/history';
 import {careerOf, favoriteOf, lineRoot, loadCollection, peekEntry, statsOf, teamCost} from '../../game/meta';
 import {AVATARS, MAX_TRAINERS, avatarUrl} from '../../game/trainers';
@@ -278,6 +279,7 @@ export function TrainerSelect() {
 /** Quadradinho do treinador na tela inicial: resumo, últimas partidas, perfil e trocar de treinador. */
 function TrainerCard({trainer, runs, best, species: n, onSwitch}: {trainer: Trainer; runs: number; best: number; species: number; onSwitch: () => void}) {
   const [open, setOpen] = useState(false);
+  const [players, setPlayers] = useState(false);
   const h = useMemo(() => loadHistory(trainer.id), [trainer.id, open]);
   const all = sumRows([...tableOf(h, false), ...tableOf(h, true)]);
   const rate = winRate(all.w, all.l);
@@ -324,10 +326,14 @@ function TrainerCard({trainer, runs, best, species: n, onSwitch}: {trainer: Trai
       <button className="btn primary" onClick={() => setOpen(true)}>
         Ver perfil e histórico
       </button>
+      <button className="btn" onClick={() => setPlayers(true)} title="Todo mundo que já jogou online e o histórico de cada um">
+        <PixelIcon name="people" /> Jogadores
+      </button>
       <button className="btn trainer-switch" onClick={onSwitch}>
         Trocar de treinador
       </button>
       {open && <FighterProfile trainer={trainer} onClose={() => setOpen(false)} />}
+      {players && <PlayersModal onClose={() => setPlayers(false)} />}
     </div>
   );
 }

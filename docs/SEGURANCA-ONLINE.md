@@ -8,7 +8,8 @@
    - chave de torneio, mundo dos bots e vaga na sala não mudam depois de criados;
    - ninguém consegue se passar por outro dono, criar pastas novas, gravar campos extras ou documentos gigantes (máx. ~600 KB);
    - qualquer outra parte do banco fica fechada.
-3. **O jogo confere os outros jogadores.** Um jogador com time impossível (7 Pokémon, nível 999, IV 50, 5 golpes, pontos infinitos) fica de fora do ranking e dos torneios.
+3. **Lista de jogadores** (`careers/PLAYERS/players`). Quem joga online grava um resumo pequeno do próprio histórico online no fim de cada partida (e quando muda nome ou avatar). O nome do documento começa com a identidade de quem grava, então ninguém escreve no resumo de outro. Quem só joga offline não grava nada.
+4. **O jogo confere os outros jogadores.** Um jogador com time impossível (7 Pokémon, nível 999, IV 50, 5 golpes, pontos infinitos) fica de fora do ranking e dos torneios.
 
 ## Passo a passo no Firebase (uns 5 minutos)
 

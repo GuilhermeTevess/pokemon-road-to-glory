@@ -1517,8 +1517,8 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 .hist-dot.l { background: #c9473f; }
 .hist-summary { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 18px; }
 .hist-summary b { font-family: 'Press Start 2P', monospace; font-size: 11px; font-weight: normal; }
-.hist-profile .v, .hist-table .v { color: #2f8a4c; }
-.hist-profile .d, .hist-table .d { color: #b5473f; }
+.hist-profile .v, .hist-table .v, .players .v { color: #2f8a4c; }
+.hist-profile .d, .hist-table .d, .players .d { color: #b5473f; }
 .hist-facts { display: flex; flex-wrap: wrap; gap: 6px; }
 .hist-facts > span { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 14px; }
 .hist-tables { display: flex; flex-direction: column; gap: 10px; }
@@ -1765,3 +1765,15 @@ button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: v
 .guide-spot small { font-weight: 700; }
 .guide-spot.locked { opacity: .6; cursor: help; }
 .mon-card .bs { grid-template-columns: 74px 1fr 32px; text-align: left; }
+
+/* Lista de jogadores (todo mundo que já jogou online). */
+.players { display: flex; flex-direction: column; gap: 8px; }
+.players-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-right: 28px; }
+.players-head h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.players-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow: auto; }
+.players-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 6px 10px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.players-row:hover { background: var(--panel-2); }
+.players-info { display: flex; flex-direction: column; min-width: 0; }
+.players-info b { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.players-you { font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 2px 4px; background: var(--mint); border: 2px solid var(--line); color: var(--ink); }
+@media (max-width: 560px) { .players-row { grid-template-columns: auto 1fr; } .players-row .hist-dots { grid-column: 1 / -1; } }
