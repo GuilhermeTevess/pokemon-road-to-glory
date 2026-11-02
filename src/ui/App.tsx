@@ -13,6 +13,7 @@ import {AchievementsScreen, RankingScreen} from './screens/LeagueScreens';
 import {BiomeSelect, RegionSelect, StarterSelect, TitleScreen} from './screens/StartScreens';
 import {CollectionScreen} from './screens/CollectionScreen';
 import {QuickplayScreen} from './screens/QuickplayScreen';
+import {BuilderScreen} from './screens/BuilderScreen';
 import {CareerScreen, WaitingScreen} from './screens/CareerScreen';
 import {EventScreen} from './screens/EventScreen';
 import {DaycareScreen} from './screens/DaycareScreen';
@@ -51,6 +52,7 @@ export function App() {
   else if (screen === 'ranking') body = <RankingScreen />;
   else if (screen === 'achievements') body = <AchievementsScreen />;
   else if (screen === 'quickplay') body = <QuickplayScreen />;
+  else if (screen === 'builder') body = <BuilderScreen />;
   else if (screen === 'career') body = <CareerScreen />;
   else if (!run || run.phase === 'starter') body = <StarterSelect />;
   else if (run.phase === 'biome') body = <BiomeSelect mode="start" />;

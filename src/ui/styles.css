@@ -1591,3 +1591,71 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
 /* O fundo da arena (plateia, arquibancada, holofotes) fica numa camada própria, sempre
    atrás dos Pokémon: as fileiras da plateia têm z-index próprio e passavam na frente. */
 .arena > .arena-bg { z-index: 0; }
+
+/* ------------------------------------------------------------------ Time dos Sonhos */
+.builder-btn { background: linear-gradient(135deg, #b9f0c8, #6fd0a0); }
+.builder .bar input.tb-name { font: inherit; font-weight: 700; flex: 1; min-width: 0; padding: 6px 8px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }
+.tb-intro { max-width: 760px; }
+.tb-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.tb-team { display: flex; flex-direction: column; gap: 8px; }
+.tb-team-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tb-team-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tb-new { justify-content: center; align-items: stretch; background: var(--panel-2); }
+.tb-warn { color: #b03a3a; font-size: 13px; margin: 4px 0; }
+.btn.danger { background: var(--red); }
+.tb-premades { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 12px; }
+.tb-premades > p { grid-column: 1 / -1; margin: 0; }
+.tb-premade { font: inherit; color: var(--ink); text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.tb-premade:hover { background: #fff6d6; }
+.tb-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.tb-slot { position: relative; font: inherit; color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 92px; padding: 4px; background: var(--panel); border: var(--px) solid var(--line); cursor: pointer; overflow: hidden; }
+.tb-slot small { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-slot.on { background: #ffe680; box-shadow: inset 0 0 0 2px #c99a1a; }
+.tb-slot.empty { background: var(--panel-2); border-style: dashed; }
+.tb-slot.blank { background: transparent; border-style: dashed; opacity: .35; cursor: default; }
+.tb-plus { font-size: 28px; line-height: 1; }
+@media (max-width: 600px) { .tb-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tb-picker, .tb-editor { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.tb-picker-head { display: flex; justify-content: space-between; align-items: center; }
+.tb-search { font: inherit; padding: 8px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); width: 100%; }
+.tb-type-filter { display: flex; flex-wrap: wrap; gap: 4px; }
+.tb-species-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; max-height: 420px; overflow: auto; }
+.tb-species { font: inherit; color: var(--ink); display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--panel-2); border: 2px solid var(--line); cursor: pointer; text-align: left; }
+.tb-species:hover { background: #fff6d6; }
+.tb-species-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tb-editor-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tb-editor-title { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 220px; }
+.tb-editor-btns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tb-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tb-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-height: 460px; overflow: auto; }
+.tb-options .rush-mode:disabled { opacity: .45; cursor: not-allowed; }
+.tb-move-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; }
+.tb-move-slot { display: flex; gap: 4px; align-items: stretch; }
+.tb-move-pick { font: inherit; color: var(--ink); flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; background: var(--panel); border: var(--px) solid var(--line); cursor: pointer; text-align: left; }
+.tb-move-pick.empty { background: var(--panel-2); border-style: dashed; color: var(--ink-soft); }
+.tb-move-slot.on .tb-move-pick { background: #ffe680; }
+.tb-move-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; max-height: 460px; overflow: auto; margin-top: 6px; }
+.tb-move { font: inherit; color: var(--ink); display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--panel-2); border: 2px solid var(--line); cursor: pointer; text-align: left; }
+.tb-move:hover:not(:disabled) { background: #fff6d6; }
+.tb-move:disabled { opacity: .45; cursor: default; }
+.tb-move-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tb-move-desc { font-size: 12px; color: var(--ink-soft); }
+.tb-stats { display: flex; flex-direction: column; gap: 6px; }
+.tb-field { display: flex; flex-direction: column; gap: 4px; max-width: 340px; }
+.tb-field select { font: inherit; padding: 6px; border: var(--px) solid var(--line); background: var(--panel); color: var(--ink); }
+.tb-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.tb-ev-rows { display: flex; flex-direction: column; gap: 4px; max-width: 560px; }
+.tb-ev-row { display: grid; grid-template-columns: 52px 60px 1fr 64px 40px; gap: 6px; align-items: center; }
+.tb-ev-label { font-weight: 700; }
+.tb-ev-label.plus { color: #c0392b; }
+.tb-ev-label.minus { color: #2c6fbf; }
+.tb-ev-base { font-size: 11px; }
+.tb-ev-num { font: inherit; width: 64px; padding: 2px 4px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); }
+.tb-ev-final { text-align: right; }
+@media (max-width: 520px) { .tb-ev-row { grid-template-columns: 48px 1fr 56px 36px; } .tb-ev-base { display: none; } }
+.tb-mine { margin: 0 0 8px; }
+.tb-play h3 { margin-top: 0; }
+.tb-play .rush-mode { width: 100%; margin-bottom: 6px; }
+.tb-friends { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow: auto; }
+.tb-friend-head { display: flex; align-items: center; gap: 6px; }
+.prep-cols.tb-play { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }

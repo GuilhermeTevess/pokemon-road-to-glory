@@ -714,7 +714,7 @@ export function speciesTypes(name: string): string[] {
 export function aiMoveChoice(battle: Battle, side: Side): string {
   const me = battle[side];
   const foe = battle[side === 'p1' ? 'p2' : 'p1'];
-  const req = me.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]}[]} | null;
+  const req = me.activeRequest as {active?: {moves: {id: string; disabled?: boolean}[]; canMegaEvo?: boolean}[]} | null;
   const doubles = me.active.length > 1;
   const choices: string[] = [];
   me.active.forEach((self, slot) => {
@@ -729,7 +729,7 @@ export function aiMoveChoice(battle: Battle, side: Side): string {
       const kind = battle.dex.moves.get(m.id).target;
       for (const {t, loc} of targets.length ? targets : [{t: undefined, loc: 1}]) {
         let score: number;
-        if (move.category === 'Status' || !t) score = 35;
+        if (move.category === 'Status' || !t) score = statusScore(move, self, t);
         else {
           const stab = self.getTypes().includes(move.type) ? 1.5 : 1;
           score = (move.basePower || 60) * stab * typeMultiplier(move.type, t.getTypes());
@@ -742,9 +742,27 @@ export function aiMoveChoice(battle: Battle, side: Side): string {
         }
       }
     });
-    choices.push(best);
+    // Com Mega Pedra, mega-evolui na primeira chance (só em batalha simples).
+    choices.push(!doubles && best !== 'default' && req?.active?.[slot]?.canMegaEvo ? `${best} mega` : best);
   });
   return choices.length ? choices.join(', ') : 'default';
+}
+
+/** Nota de um golpe de status para a IA: não repete o que já não adianta. */
+function statusScore(move: ReturnType<typeof dex.moves.get>, self: Pokemon, foe: Pokemon | undefined): number {
+  const hpPct = self.hp / self.maxhp;
+  if (move.heal || ['recover', 'roost', 'slackoff', 'synthesis', 'moonlight', 'morningsun', 'softboiled', 'wish', 'rest'].includes(move.id))
+    return hpPct < 0.45 ? 130 : hpPct > 0.75 ? 3 : 30;
+  if (move.boosts && move.target === 'self') {
+    const maxed = Object.entries(move.boosts).every(([k, v]) => (self.boosts[k as keyof typeof self.boosts] ?? 0) >= 2 || (v ?? 0) <= 0);
+    return maxed ? 3 : hpPct > 0.6 ? 70 : 15;
+  }
+  if (move.status && foe && (foe.status || (move.status === 'slp' && foe.side.pokemon.some(p => p.status === 'slp')))) return 2;
+  if (move.volatileStatus === 'leechseed' && foe && (foe.volatiles.leechseed || foe.hasType('Grass'))) return 2;
+  if (move.sideCondition && foe && foe.side.sideConditions[move.sideCondition.toLowerCase()]) return 2;
+  if (move.weather && self.battle.field.isWeather(move.weather)) return 2;
+  if (move.stallingMove) return 12;
+  return 35;
 }
 
 /** Escolhe quem entra depois de um desmaio: o que tem os melhores golpes contra o adversário em campo. */
