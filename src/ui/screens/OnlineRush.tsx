@@ -6,6 +6,7 @@ import type {BattleEvent} from '../../game/battle';
 import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
+import {arenaFor} from '../../game/arenas';
 import type {Link} from '../../game/net';
 import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
@@ -269,6 +270,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
     const mine = idle && duelNeeds(c.battle, 'p1') ? duelRequest(c.battle, 'p1') : null;
     return (
       <BattleView
+        arena={arenaFor(code)}
         players={s.players}
         teams={s.teams}
         bottom="p1"
@@ -394,6 +396,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
   }
   return (
     <BattleView
+      arena={arenaFor(code)}
       players={s.players}
       teams={s.teams}
       bottom="p2"

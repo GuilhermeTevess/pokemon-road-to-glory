@@ -7,6 +7,7 @@ import {teamToOwned} from '../../game/builder';
 import type {BuiltTeam} from '../../game/builder';
 import {recordMatch} from '../../game/history';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
+import {arenaFor} from '../../game/arenas';
 import type {Link} from '../../game/net';
 import {duelBalls, duelChoose, duelNeeds, duelRequest} from '../../game/rush';
 import type {DuelReq} from '../../game/rush';
@@ -212,6 +213,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     const mine = idle && duelNeeds(c.battle, 'p1') ? duelRequest(c.battle, 'p1') : null;
     return (
       <BattleView
+        arena={arenaFor(code)}
         players={s.players}
         teams={s.teams}
         bottom="p1"
@@ -328,6 +330,7 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
   }
   return (
     <BattleView
+      arena={arenaFor(code)}
       players={s.players}
       teams={s.teams}
       bottom="p2"

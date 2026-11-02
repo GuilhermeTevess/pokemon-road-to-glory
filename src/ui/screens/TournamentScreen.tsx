@@ -2,6 +2,7 @@ import {getItem} from '../../data/items';
 import {roundOf} from '../../game/career';
 import {maxHp} from '../../game/mon';
 import {CareerDuel} from './CareerDuel';
+import {arenaFor} from '../../game/arenas';
 // Torneios: explicação, sorteio animado, chaveamento e histórico.
 import {useEffect, useState} from 'react';
 import {useGame} from '../../game/store';
@@ -288,6 +289,7 @@ export function TournamentScreen() {
         foe={{name: foe.name, avatar: foe.avatar ?? ''}}
         team={team}
         forfeitable={!!run.quick}
+        arena={run.quick ? arenaFor(`${t.shared.tid}-${r}-${i}`) : undefined}
         onLeave={() => setDuel(false)}
         onDone={(res, wonByQuit) => {
           setDuel(false);
