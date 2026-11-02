@@ -402,13 +402,13 @@ export function BattleScreen() {
               <button className="btn act fight" onClick={() => setMenu('fight')}>
                 <img className="act-icon" src={FX('fist.png')} alt="" /> Lutar
               </button>
-              <button className="btn act" onClick={() => setMenu('balls')} disabled={!balls.length || !!ballBlock} title={ballBlock}>
+              <button className="btn act" data-tut="act-ball" onClick={() => setMenu('balls')} disabled={!balls.length || !!ballBlock} title={ballBlock}>
                 <img className="act-icon" src={itemSpriteUrl('poke-ball')} alt="" /> Pokébola
               </button>
-              <button className="btn act" onClick={() => setMenu('bag')} disabled={!heals.length || !!bagBlock} title={bagBlock}>
+              <button className="btn act" data-tut="act-bag" onClick={() => setMenu('bag')} disabled={!heals.length || !!bagBlock} title={bagBlock}>
                 <img className="act-icon" src={itemSpriteUrl('potion')} alt="" /> Mochila
               </button>
-              <button className="btn act" onClick={() => setMenu('switch')} disabled={!ctl.canSwitch() || party.filter(p => p.hp > 0).length < 2}>
+              <button className="btn act" data-tut="act-switch" onClick={() => setMenu('switch')} disabled={!ctl.canSwitch() || party.filter(p => p.hp > 0).length < 2}>
                 <img className="act-icon" src={FX('switchright.png')} alt="" /> Trocar
               </button>
               <button className="btn act" onClick={() => finishBattle('fled')} disabled={!ctl.canFlee()}>

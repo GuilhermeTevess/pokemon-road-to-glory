@@ -126,3 +126,17 @@
 /* ---------- Fundos na cor do bioma/raridade (são claros): texto escuro por cima */
 [data-theme="dark"] :is(.arena-biome, .tier-tag, .biome-card:hover, .roulette-slot.lit .biome-card) { color: #2a2440; }
 [data-theme="dark"] :is(.biome-card:hover, .roulette-slot.lit .biome-card) :is(.muted, .hint) { color: #4a4266; }
+
+/* ---------- Tutorial (pergunta da entrada e destaque) */
+[data-theme="dark"] :is(.btn.tut-yes, .tut-next):hover:not(:disabled) { background: #377559; }
+[data-theme="dark"] .btn.tut-no:hover:not(:disabled) { background: #96404a; }
+[data-theme="dark"] .tut-skip:hover:not(:disabled) { background: #96404a !important; }
+[data-theme="dark"] .btn.tut-never { background: #3a3652; color: var(--ink-soft); }
+[data-theme="dark"] .btn.tut-never:hover:not(:disabled) { background: #46415f; }
+[data-theme="dark"] .tut-ask-backdrop { background: rgba(0, 0, 0, .6); }
+[data-theme="dark"] .tut-ask { box-shadow: 8px 8px 0 var(--dk-shadow); }
+[data-theme="dark"] .tut-ring { box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7), 0 0 0 7px var(--butter-d), 0 0 22px 8px #fff3a0; animation-name: tut-glow-dark; }
+@keyframes tut-glow-dark {
+  50% { border-color: #ffffff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7), 0 0 0 7px #ffe28a, 0 0 34px 14px #fff8c8; }
+}
+[data-theme="dark"] .tut-blocker.dim { background: rgba(0, 0, 0, .7); }

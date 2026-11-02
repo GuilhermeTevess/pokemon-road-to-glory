@@ -24,6 +24,9 @@ src/
   ui/          telas e componentes React, CSS
     audio.ts     gritos + sons de golpe (amostras CC0 em public/sfx, sintetizador de reserva)
     fx.ts        animações de golpe: partículas pixeladas num canvas por cima da arena
+    Tutorial.tsx tutorial guiado ("Deseja ativar o tutorial?" + destaque passo a passo).
+                 As partes de cada tela ficam em tutorialTours.ts; o estado em tutorialState.ts
+                 (localStorage 'rtg-tutorial'). Botões sem classe única ganham data-tut="...".
 tests/         testes (vitest) que rodam batalhas completas sem UI
 ```
 
