@@ -49,6 +49,16 @@ export interface BattleEvent {
   forme?: {side: Side; species: string};
   /** Fala do narrador (torneios). */
   narrator?: boolean;
+  /** Começo de uma rodada (número do turno). */
+  turn?: number;
+  /** Mudança de estágio de atributo: `amount` soma (Swords Dance +2, Draco Meteor -2), `set` crava (Belly Drum). */
+  boost?: {side: Side; stat: string; amount?: number; set?: number};
+  /** Estágios zerados (Haze, Clear Smog). Sem lado: todos em campo. */
+  clearBoosts?: {side?: Side};
+  /** Estágios de quem está em campo no fim do lote. Corrige os casos raros (Baton Pass, Psych Up, itens X). */
+  boostSync?: {side: Side; slot: number; boosts: Record<string, number>}[];
+  /** O golpe errou, não afetou ou falhou. */
+  outcome?: 'miss' | 'immune' | 'fail';
 }
 
 export interface MoveOption {
@@ -585,7 +595,20 @@ export class BattleController {
         out.push(...ev);
       }
     }
+    const sync = this.boostSync();
+    if (sync.length) out.push({boostSync: sync});
     if (this.encounter.tournament || this.encounter.legend) return withNarration(out, this.foeStatus().filter(Boolean).length, this.battle.p1.pokemon.filter(p => !p.fainted).length, this.encounter.hype);
+    return out;
+  }
+
+  /** Estágios atuais de quem está em campo (públicos: o Showdown mostra todos). */
+  private boostSync(): NonNullable<BattleEvent['boostSync']> {
+    const out: NonNullable<BattleEvent['boostSync']> = [];
+    for (const side of ['p1', 'p2'] as Side[]) {
+      this.battle[side].active.forEach((p, slot) => {
+        if (p && !p.fainted) out.push({side, slot, boosts: {...p.boosts}});
+      });
+    }
     return out;
   }
 
@@ -654,13 +677,13 @@ export class BattleController {
       case '-resisted':
         return [{text: 'Não é muito efetivo...', hit: {side: this.name(a).side, effect: 'resisted'}}];
       case '-immune':
-        return [{text: `Não afeta ${this.name(a).name}...`}];
+        return [{text: `Não afeta ${this.name(a).name}...`, outcome: 'immune'}];
       case '-crit':
         return [{text: 'Acerto crítico!', hit: {side: this.name(a).side, effect: 'crit'}}];
       case '-miss':
-        return [{text: `${this.name(a).name} errou!`}];
+        return [{text: `${this.name(a).name} errou!`, outcome: 'miss'}];
       case '-fail':
-        return [{text: 'Mas falhou!'}];
+        return [{text: 'Mas falhou!', outcome: 'fail'}];
       case '-status': {
         const {side, name} = this.name(a);
         const poke = this.pokeOf(a);
@@ -675,8 +698,17 @@ export class BattleController {
       case '-unboost': {
         const n = Number(c);
         const dir = cmd === '-boost' ? (n >= 2 ? 'aumentou muito' : 'aumentou') : n >= 2 ? 'diminuiu muito' : 'diminuiu';
-        return [{text: `${BOOST_PT[b] ?? b} de ${this.name(a).name} ${dir}!`}];
+        const amount = cmd === '-boost' ? n : -n;
+        return [{text: `${BOOST_PT[b] ?? b} de ${this.name(a).name} ${dir}!`, boost: {side: this.name(a).side, stat: b, amount}}];
       }
+      case '-setboost':
+        return [{text: `${BOOST_PT[b] ?? b} de ${this.name(a).name} foi ao máximo!`, boost: {side: this.name(a).side, stat: b, set: Number(c)}}];
+      case '-clearboost':
+        return [{text: `Os atributos de ${this.name(a).name} voltaram ao normal.`, clearBoosts: {side: this.name(a).side}}];
+      case '-clearallboost':
+        return [{text: 'Os atributos de todos voltaram ao normal.', clearBoosts: {}}];
+      case 'turn':
+        return [{turn: Number(a)}];
       case '-weather':
         if (parts.includes('[upkeep]')) return null;
         return [{text: WEATHER_TEXT[a] ?? `O clima mudou: ${a}.`}];
