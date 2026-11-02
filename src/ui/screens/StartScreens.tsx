@@ -388,26 +388,29 @@ export function TitleScreen() {
               ▶ Continuar · ronda {roundOf(run)}
             </button>
           )}
-          <button
-            className={`btn ${active ? '' : 'primary big-play'}`}
-            disabled={!!trainer.career?.done || (!!trainer.career && !career) || (!active && seasonWait.length > 0)}
-            onClick={() => {
-              if (active && !confirm) return setConfirm(true);
-              abandonRun();
-              useGame.setState({run: null});
-              useGame.getState().setScreen('run');
-            }}
-          >
-            {trainer.career?.done
-              ? 'Carreira encerrada'
-              : active && confirm
-              ? trainer.career ? 'Certeza? A temporada atual acaba aqui' : 'Certeza? A run atual será perdida'
-              : !active && seasonWait.length
-              ? `Esperando ${seasonWait.map(p => p.name).join(', ')} terminar a temporada`
-              : trainer.career
-              ? `${active ? '' : '▶ '}${active ? 'Encerrar e ir para a' : 'Jogar'} temporada ${trainer.career.season + (active ? 1 : 0)}/${career?.rules.seasons ?? '?'}`
-              : active ? 'Nova run' : '▶ Nova run'}
-          </button>
+          {/* Carreira com temporada em andamento: a temporada acaba sozinha no fim (sem botão de encerrar). */}
+          {!(active && trainer.career) && (
+            <button
+              className={`btn ${active ? '' : 'primary big-play'}`}
+              disabled={!!trainer.career?.done || (!!trainer.career && !career) || (!active && seasonWait.length > 0)}
+              onClick={() => {
+                if (active && !confirm) return setConfirm(true);
+                abandonRun();
+                useGame.setState({run: null});
+                useGame.getState().setScreen('run');
+              }}
+            >
+              {trainer.career?.done
+                ? 'Carreira encerrada'
+                : active && confirm
+                ? 'Certeza? A run atual será perdida'
+                : !active && seasonWait.length
+                ? `Esperando ${seasonWait.map(p => p.name).join(', ')} terminar a temporada`
+                : trainer.career
+                ? `▶ Jogar temporada ${trainer.career.season}/${career?.rules.seasons ?? '?'}`
+                : active ? 'Nova run' : '▶ Nova run'}
+            </button>
+          )}
           {trainer.career && (
             <button className="btn career-btn" onClick={() => setScreen('career')}>
               🌐 Carreira {trainer.career.code} <small>Classificação, regras e amigos</small>
@@ -453,6 +456,9 @@ export function TitleScreen() {
           )}
           <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>
             ⚡ Quickplay <small>Rush · Campeonato rápido (online ou offline)</small>
+          </button>
+          <button className="btn quickplay-btn builder-btn" onClick={() => setScreen('builder')}>
+            🛠️ Time dos Sonhos <small>Monte seu time (golpes, EVs, nature...) e jogue online ou offline</small>
           </button>
           <div className="menu-tiles">
             {tiles.map(t => (

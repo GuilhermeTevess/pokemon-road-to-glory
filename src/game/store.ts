@@ -105,7 +105,7 @@ export function getBattle(run: RunState): BattleController | null {
   return battle;
 }
 
-export type Screen = 'title' | 'run' | 'quickplay' | 'career' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
+export type Screen = 'title' | 'run' | 'quickplay' | 'builder' | 'career' | 'collection' | 'daycare' | 'glory' | 'tournaments' | 'ranking' | 'achievements';
 
 export interface Toast {
   id: string;

@@ -157,11 +157,13 @@ const OFFLINE: {key: string; label: string; icon: string; about: string}[] = [
   {key: 'rival', label: 'Rivais', icon: '⚔️', about: 'Rivais que aparecem no caminho.'},
   {key: 'rush:', label: 'Rush', icon: '⚡', about: 'Contra o computador ou um amigo no mesmo aparelho.'},
   {key: 'qtour', label: 'Campeonato rápido', icon: '🎪', about: 'Partidas do campeonato rápido offline.'},
+  {key: 'built', label: 'Time dos Sonhos', icon: '🛠️', about: 'Seu time montado contra o computador ou contra os times dos amigos.'},
 ];
 
 const ONLINE: {key: string; label: string; icon: string; about: string}[] = [
   {key: 'online-rush:', label: 'Rush online', icon: '⚡', about: 'Contra um amigo em outro aparelho.'},
   {key: 'qtour-online', label: 'Campeonato rápido online', icon: '🎪', about: 'Partidas do campeonato com amigos.'},
+  {key: 'online-built', label: 'Time dos Sonhos online', icon: '🛠️', about: 'Seu time montado contra o time de um amigo, cada um no seu aparelho.'},
   {key: 'career-pvp', label: 'Carreira · contra amigos', icon: '🤝', about: 'Partidas ao vivo contra os amigos da carreira.'},
   {key: 'career', label: 'Carreira · contra o jogo', icon: '🌐', about: 'Ginásios, lendas, rivais e bots dentro da carreira online.'},
 ];

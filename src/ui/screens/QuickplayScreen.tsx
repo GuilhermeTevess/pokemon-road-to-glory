@@ -669,13 +669,15 @@ function FoePreview({foe}: {foe: {player: Player; team: string[]}}) {
 }
 
 /** Antes da luta: vê os dois times, escolhe quem abre (e, com Mega Pedra, quem leva a pedra). */
-export function PrepScreen({player, team, foe, mega, curtain, onDone}: {
+export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}: {
   player: Player;
   team: OwnedMon[];
   /** Time do adversário (só os nomes): aparece do lado direito. */
   foe?: {player: Player; team: string[]};
   mega: boolean;
   curtain: boolean;
+  /** Time dos Sonhos: os itens são os que o jogador escolheu (não tira). */
+  keepItems?: boolean;
   onDone: (team: OwnedMon[]) => void;
 }) {
   const [hidden, setHidden] = useState(curtain);
@@ -722,7 +724,7 @@ export function PrepScreen({player, team, foe, mega, curtain, onDone}: {
           <button
             className="btn primary big"
             onClick={() => {
-              const ordered = [...team.filter(m => m.uid === lead), ...team.filter(m => m.uid !== lead)].map(m => ({...m, item: undefined as string | undefined}));
+              const ordered = [...team.filter(m => m.uid === lead), ...team.filter(m => m.uid !== lead)].map(m => (keepItems ? {...m} : {...m, item: undefined as string | undefined}));
               if (mega) giveAllMegaStones(ordered);
               onDone(ordered);
             }}
@@ -1061,7 +1063,7 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
 }
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
-function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
+export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number) => void}) {
   // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
   const ctl = useMemo(
     () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name}),
@@ -1099,7 +1101,10 @@ function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Pla
   );
 }
 
-export function RushResult({winner, team, teamNames, history, onRematch, onNew, onExit}: {
+export function RushResult({title, newLabel, winner, team, teamNames, history, onRematch, onNew, onExit}: {
+  /** Título (padrão: "X venceu o Rush!"). */
+  title?: string;
+  newLabel?: string;
   winner: Player;
   /** Histórico de quem venceu (o seu, o do amigo online ou o do computador contra você). */
   history?: HistCard | null;
@@ -1115,7 +1120,7 @@ export function RushResult({winner, team, teamNames, history, onRematch, onNew, 
       <div className="confetti" />
       <PixelIcon name="trophy" color="#e0a100" size={56} />
       <TrainerAvatar avatar={winner.avatar} name={winner.name} size={140} />
-      <h2>{winner.name} venceu o Rush!</h2>
+      <h2>{title ?? `${winner.name} venceu o Rush!`}</h2>
       <span className="team-row">
         {names.map((sp, k) => (
           <Sprite key={k} name={sp} size={56} />
@@ -1129,7 +1134,7 @@ export function RushResult({winner, team, teamNames, history, onRematch, onNew, 
           </button>
         )}
         <button className="btn primary" onClick={onNew}>
-          Novo Rush
+          {newLabel ?? 'Novo Rush'}
         </button>
         <button className="btn" onClick={onExit}>
           Sair
