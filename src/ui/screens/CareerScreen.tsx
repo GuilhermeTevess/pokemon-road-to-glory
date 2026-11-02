@@ -8,7 +8,7 @@ import {AVATARS} from '../../game/trainers';
 import type {Trainer} from '../../game/trainers';
 import {tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
-import {Modal, Sprite} from '../components';
+import {Medal, Modal, PixelIcon, Sprite} from '../components';
 import {AvatarEditor, TrainerAvatar} from './StartScreens';
 import {ProfileModal} from './ProfileModal';
 import {profileOfBot, profileOfPeer} from '../../game/profile';
@@ -129,7 +129,7 @@ function CareerSetup() {
   if (!cloudReady())
     return (
       <div className="screen career-screen">
-        <h2>🌐 Carreira online</h2>
+        <h2>Carreira online</h2>
         <div className="panel career-panel">
           <p>A carreira online ainda não foi ligada neste site (falta configurar a nuvem grátis). Assim que estiver pronta, este botão funciona.</p>
           <button className="btn" onClick={() => setScreen('title')}>
@@ -174,7 +174,7 @@ function CareerSetup() {
 
   return (
     <div className="screen career-screen">
-      <h2>🌐 Carreira online</h2>
+      <h2>Carreira online</h2>
       {mode === 'menu' && (
         <div className="career-modes">
           <button className="panel qp-card" onClick={() => setMode('create')}>
@@ -236,7 +236,6 @@ function CareerSetup() {
   );
 }
 
-const MEDAL: Record<number, string> = {1: '🥇', 2: '🥈', 3: '🥉'};
 
 function PlayerRow({p, pos, me, seasons, rounds, onPoints, onProfile}: {p: PlayerDoc; pos: number; me: boolean; seasons: number; rounds: number; onPoints: () => void; onProfile?: () => void}) {
   const titles = p.results.filter(r => r.placement === 1);
@@ -253,7 +252,12 @@ function PlayerRow({p, pos, me, seasons, rounds, onPoints, onProfile}: {p: Playe
         </button>
         <small className="hint">
           {p.done ? 'Terminou a carreira' : `Temporada ${p.season}/${seasons} · ronda ${p.round}/${rounds}`}
-          {titles.length > 0 && ` · ${titles.map(t => `🏆 ${tourInfo(t.kind as TourKind).name}`).join(', ')}`}
+          {titles.length > 0 && (
+            <>
+              {' · '}
+              <PixelIcon name="trophy" size={12} /> {titles.map(t => tourInfo(t.kind as TourKind).name).join(', ')}
+            </>
+          )}
         </small>
         <div className="mini-team">
           {p.team.slice(0, 6).map((m, i) => (
@@ -264,7 +268,7 @@ function PlayerRow({p, pos, me, seasons, rounds, onPoints, onProfile}: {p: Playe
         </div>
       </div>
       <button className="pts link-pts" onClick={onPoints} title="Ver de onde vêm os pontos">
-        {MEDAL[pos] ?? ''} {p.banked + p.points} pts
+        {pos <= 3 && <Medal place={pos} />} {p.banked + p.points} pts
       </button>
     </div>
   );
@@ -283,7 +287,7 @@ function CareerHub() {
   const share = `${location.origin}${location.pathname}`;
   return (
     <div className="screen career-screen">
-      <h2>🌐 {career?.name ?? 'Carreira'}</h2>
+      <h2>{career?.name ?? 'Carreira'}</h2>
       <div className="career-top">
         <div className="panel career-code">
           <small>Código para os amigos</small>
@@ -313,7 +317,7 @@ function CareerHub() {
         <div className="row between">
           <h3>Classificação</h3>
           <button className="btn small ghost" onClick={() => void refreshCareer()}>
-            ↻ Atualizar
+            Atualizar
           </button>
         </div>
         <CareerStandings />
@@ -438,7 +442,7 @@ export function WaitingScreen() {
   return (
     <div className="screen career-screen">
       <div className="panel career-panel waiting-panel">
-        <h2>⏳ Esperando os amigos</h2>
+        <h2>Esperando os amigos</h2>
         <p>Você terminou esta ronda! Na carreira as rondas andam juntas: a próxima começa quando todo mundo terminar a sua.</p>
         <div className="blockers">
           {blockers.map(p => (

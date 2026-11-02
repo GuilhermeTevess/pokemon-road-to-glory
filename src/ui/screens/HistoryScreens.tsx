@@ -4,7 +4,7 @@ import {useMemo, useState} from 'react';
 import {species} from '../../data/dex';
 import {historyOfSnap, isSnap, loadHistory, mirrorHistory, mvpOf, nemesisOf, sumRows, streakOf, tableOf, winRate, modeLabel} from '../../game/history';
 import type {HistCard, History, MatchLog, TableRow} from '../../game/history';
-import {Modal, Sprite} from '../components';
+import {Modal, PixelIcon, Sprite} from '../components';
 import {useGame} from '../../game/store';
 import {TrainerAvatar} from './StartScreens';
 
@@ -74,11 +74,13 @@ function RateBar({w, l}: {w: number; l: number}) {
   );
 }
 
-function ModeTable({title, rows, empty}: {title: string; rows: TableRow[]; empty: string}) {
+function ModeTable({title, icon, rows, empty}: {title: string; icon: string; rows: TableRow[]; empty: string}) {
   const sum = sumRows(rows);
   return (
     <section className="hist-table panel">
-      <h3>{title}</h3>
+      <h3>
+        <PixelIcon name={icon} /> {title}
+      </h3>
       {!rows.length ? (
         <p className="muted">{empty}</p>
       ) : (
@@ -98,11 +100,15 @@ function ModeTable({title, rows, empty}: {title: string; rows: TableRow[]; empty
                 <td>
                   <div className="hist-mode-cell">
                     <span className="hist-mode">
-                      {r.icon} {r.label}
+                      <PixelIcon name={r.icon} size={14} /> {r.label}
                     </span>
                     {(r.titles > 0 || r.best) && (
                       <small className="muted">
-                        {r.titles > 0 && `🏆 ${r.titles} título${r.titles > 1 ? 's' : ''}`}
+                        {r.titles > 0 && (
+                          <>
+                            <PixelIcon name="trophy" size={12} /> {r.titles} título{r.titles > 1 ? 's' : ''}
+                          </>
+                        )}
                         {r.titles > 0 && r.best ? ' · ' : ''}
                         {r.best ? `melhor ronda ${r.best}` : ''}
                       </small>
@@ -121,7 +127,15 @@ function ModeTable({title, rows, empty}: {title: string; rows: TableRow[]; empty
           {rows.length > 1 && (
             <tfoot>
               <tr>
-                <td>Total{sum.titles ? ` · 🏆 ${sum.titles}` : ''}</td>
+                <td>
+                  Total
+                  {sum.titles ? (
+                    <>
+                      {' · '}
+                      <PixelIcon name="trophy" size={12} /> {sum.titles}
+                    </>
+                  ) : null}
+                </td>
                 <td>{sum.w + sum.l}</td>
                 <td className="v">{sum.w}</td>
                 <td className="d">{sum.l}</td>
@@ -166,7 +180,7 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
         </div>
       </div>
       <div className="hist-mid">
-        <span className={`hist-badge ${m.online ? 'on' : ''}`}>{m.online ? '🌐 Online' : '📴 Offline'}</span>
+        <span className={`hist-badge ${m.online ? 'on' : ''}`}><PixelIcon name={m.online ? 'globe' : 'phone'} size={12} /> {m.online ? 'Online' : 'Offline'}</span>
         <b>{modeLabel(m.mode)}</b>
         {m.note && <small>{m.note}</small>}
         <small className="muted">{when(m.at)}</small>
@@ -178,7 +192,9 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
               <span className={`hist-tag ${m.won ? 'w' : 'l'}`}>{m.won ? 'COMPLETA' : 'FIM'}</span>
               <b>{m.vs}</b>
             </div>
-            <span className="hist-run">🗺️</span>
+            <span className="hist-run">
+              <PixelIcon name="map" size={30} />
+            </span>
           </>
         ) : (
           <>
@@ -233,8 +249,8 @@ function MatchCard({m, me, onFoe}: {m: MatchLog; me: {name: string; avatar: stri
 type Filter = 'all' | 'off' | 'on' | 'w' | 'l';
 const FILTERS: {id: Filter; label: string}[] = [
   {id: 'all', label: 'Todas'},
-  {id: 'off', label: '📴 Offline'},
-  {id: 'on', label: '🌐 Online'},
+  {id: 'off', label: 'Offline'},
+  {id: 'on', label: 'Online'},
   {id: 'w', label: 'Vitórias'},
   {id: 'l', label: 'Derrotas'},
 ];
@@ -329,10 +345,14 @@ export function FighterProfile({trainer, history, note, onClose}: {
           <div className="hist-facts">
             {streak && streak.n >= 2 && (
               <span className="panel">
-                {streak.won ? '🔥' : '🧊'} {streak.n} {streak.won ? 'vitórias' : 'derrotas'} seguidas
+                <PixelIcon name={streak.won ? 'flame' : 'ice'} color={streak.won ? 'var(--peach-d)' : 'var(--sky-d)'} /> {streak.n} {streak.won ? 'vitórias' : 'derrotas'} seguidas
               </span>
             )}
-            {all.titles > 0 && <span className="panel">🏆 {all.titles} campeonato{all.titles > 1 ? 's' : ''} vencido{all.titles > 1 ? 's' : ''}</span>}
+            {all.titles > 0 && (
+              <span className="panel">
+                <PixelIcon name="trophy" color="var(--butter-d)" /> {all.titles} campeonato{all.titles > 1 ? 's' : ''} vencido{all.titles > 1 ? 's' : ''}
+              </span>
+            )}
             {mvp && (
               <span className="panel">
                 <Sprite name={mvp.name} size={32} still /> Mais usado: {name(mvp.name)} (venceu {mvp.wins} de {mvp.games})
@@ -340,23 +360,23 @@ export function FighterProfile({trainer, history, note, onClose}: {
             )}
             {nemesis && (
               <span className="panel">
-                ⚔️ Mais enfrentado: {nemesis.vs} ({nemesis.w}V · {nemesis.l}D)
+                <PixelIcon name="sword" /> Mais enfrentado: {nemesis.vs} ({nemesis.w}V · {nemesis.l}D)
               </span>
             )}
           </div>
         )}
         <div className="row wrap">
           <button className={`tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
-            📊 Estatísticas
+            Estatísticas
           </button>
           <button className={`tab ${tab === 'recent' ? 'active' : ''}`} onClick={() => setTab('recent')}>
-            📜 Últimas partidas ({h.list.length})
+            Últimas partidas ({h.list.length})
           </button>
         </div>
         {tab === 'stats' ? (
           <div className="hist-tables">
-            <ModeTable title="📴 Offline" rows={off} empty="Nenhuma partida offline ainda. Runs, Rush contra o computador e campeonatos rápidos aparecem aqui." />
-            <ModeTable title="🌐 Online (contra pessoas)" rows={on} empty="Nenhuma partida online ainda. Rush online, campeonato online e carreira com amigos aparecem aqui." />
+            <ModeTable title="Offline" icon="phone" rows={off} empty="Nenhuma partida offline ainda. Runs, Rush contra o computador e campeonatos rápidos aparecem aqui." />
+            <ModeTable title="Online (contra pessoas)" icon="globe" rows={on} empty="Nenhuma partida online ainda. Rush online, campeonato online e carreira com amigos aparecem aqui." />
             <p className="hint small">
               V = vitórias, D = derrotas. A % de vitória é V dividido pelo total de jogos. Os totais nunca se perdem; a lista de partidas guarda as últimas 60.
             </p>

@@ -150,22 +150,22 @@ export function deleteHistory(trainerId: string): void {
 
 /** Linhas fixas de cada tabela, na ordem em que aparecem. Rush entra por modo (prefixo). */
 const OFFLINE: {key: string; label: string; icon: string; about: string}[] = [
-  {key: 'run', label: 'Runs solo', icon: '🗺️', about: 'Vitória = temporada completa (todas as rondas).'},
-  {key: 'gym', label: 'Ginásios', icon: '🏅', about: 'Lutas contra líderes de ginásio nas runs.'},
-  {key: 'legend', label: 'Lendas', icon: '⭐', about: 'Desafios contra treinadores lendários.'},
-  {key: 'tour', label: 'Torneios da temporada', icon: '🏆', about: 'Partidas dos torneios dentro das runs.'},
-  {key: 'rival', label: 'Rivais', icon: '⚔️', about: 'Rivais que aparecem no caminho.'},
-  {key: 'rush:', label: 'Rush', icon: '⚡', about: 'Contra o computador ou um amigo no mesmo aparelho.'},
-  {key: 'qtour', label: 'Campeonato rápido', icon: '🎪', about: 'Partidas do campeonato rápido offline.'},
-  {key: 'built', label: 'Time dos Sonhos', icon: '🛠️', about: 'Seu time montado contra o computador ou contra os times dos amigos.'},
+  {key: 'run', label: 'Runs solo', icon: 'map', about: 'Vitória = temporada completa (todas as rondas).'},
+  {key: 'gym', label: 'Ginásios', icon: 'badge', about: 'Lutas contra líderes de ginásio nas runs.'},
+  {key: 'legend', label: 'Lendas', icon: 'star', about: 'Desafios contra treinadores lendários.'},
+  {key: 'tour', label: 'Torneios da temporada', icon: 'trophy', about: 'Partidas dos torneios dentro das runs.'},
+  {key: 'rival', label: 'Rivais', icon: 'sword', about: 'Rivais que aparecem no caminho.'},
+  {key: 'rush:', label: 'Rush', icon: 'bolt', about: 'Contra o computador ou um amigo no mesmo aparelho.'},
+  {key: 'qtour', label: 'Campeonato rápido', icon: 'bracket', about: 'Partidas do campeonato rápido offline.'},
+  {key: 'built', label: 'Dream Team', icon: 'ball', about: 'Seu time montado contra o computador ou contra os times dos amigos.'},
 ];
 
 const ONLINE: {key: string; label: string; icon: string; about: string}[] = [
-  {key: 'online-rush:', label: 'Rush online', icon: '⚡', about: 'Contra um amigo em outro aparelho.'},
-  {key: 'qtour-online', label: 'Campeonato rápido online', icon: '🎪', about: 'Partidas do campeonato com amigos.'},
-  {key: 'online-built', label: 'Time dos Sonhos online', icon: '🛠️', about: 'Seu time montado contra o time de um amigo, cada um no seu aparelho.'},
-  {key: 'career-pvp', label: 'Carreira · contra amigos', icon: '🤝', about: 'Partidas ao vivo contra os amigos da carreira.'},
-  {key: 'career', label: 'Carreira · contra o jogo', icon: '🌐', about: 'Ginásios, lendas, rivais e bots dentro da carreira online.'},
+  {key: 'online-rush:', label: 'Rush online', icon: 'bolt', about: 'Contra um amigo em outro aparelho.'},
+  {key: 'qtour-online', label: 'Campeonato rápido online', icon: 'bracket', about: 'Partidas do campeonato com amigos.'},
+  {key: 'online-built', label: 'Dream Team online', icon: 'ball', about: 'Seu time montado contra o time de um amigo, cada um no seu aparelho.'},
+  {key: 'career-pvp', label: 'Carreira · contra amigos', icon: 'people', about: 'Partidas ao vivo contra os amigos da carreira.'},
+  {key: 'career', label: 'Carreira · contra o jogo', icon: 'globe', about: 'Ginásios, lendas, rivais e bots dentro da carreira online.'},
 ];
 
 export interface TableRow {

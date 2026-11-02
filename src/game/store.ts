@@ -1487,7 +1487,7 @@ export const useGame = create<Store>((set, get) => {
         }
         statsOf(col).moneyEarned += money;
         if (gained.size) get().toast(`Doces: ${[...gained].map(([n, k]) => `+${k} ${n}`).join(' · ')}`);
-        for (const n of newHearts) get().toast(`❤ ${n} ganhou um coração de amizade!`);
+        for (const n of newHearts) get().toast(`${n} ganhou um coração de amizade!`);
         if (run.egg && (outcome === 'won' || outcome === 'caught')) {
           run.egg.left--;
           if (run.egg.left <= 0) {

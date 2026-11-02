@@ -9,7 +9,7 @@ import type {Gym} from '../data/gyms';
 import {CLASSES} from '../data/trainerSprites';
 import type {Line} from '../game/legend';
 import {avatarUrl} from '../game/trainers';
-import {Sprite} from './components';
+import {PixelIcon, Sprite, unmark} from './components';
 import {FX} from './fx';
 import {fast} from './settings';
 import {TrainerAvatar} from './screens/StartScreens';
@@ -270,13 +270,13 @@ export function DialogueBar({lines, other, me, onDone, end}: {
   const who = line.who === 'legend' ? other : line.who === 'me' ? me : null;
   return (
     <button className={`dialogue ${line.who}`} onClick={next}>
-      {who ? <Bust avatar={who.avatar} name={who.name} /> : <span className="bust narrator-bust">{line.who === 'narrator' ? '🎙️' : '…'}</span>}
+      {who ? <Bust avatar={who.avatar} name={who.name} /> : <span className="bust narrator-bust">{line.who === 'narrator' ? <PixelIcon name="mic" size={28} /> : '…'}</span>}
       <span className="dialogue-body">
         {who && <b>{who.name}</b>}
         {line.who === 'narrator' && <b>Narrador</b>}
-        <span className="dialogue-text">{line.text.replace(/^🎙️ /, '').slice(0, chars)}</span>
+        <span className="dialogue-text">{unmark(line.text).slice(0, chars)}</span>
       </span>
-      <span className="dialogue-next">{full ? (i < lines.length - 1 ? '▶' : '✔') : ''}</span>
+      <span className="dialogue-next">{full ? (i < lines.length - 1 ? '▶' : '✓') : ''}</span>
     </button>
   );
 }

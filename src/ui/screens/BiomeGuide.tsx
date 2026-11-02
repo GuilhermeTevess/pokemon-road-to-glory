@@ -8,7 +8,7 @@ import {REGIONS, getRegion} from '../../data/regions';
 import {SEASON_LENGTH} from '../../game/encounters';
 import {biomeOdds, rarityOdds} from '../../game/guide';
 import {useGame} from '../../game/store';
-import {Modal, Sprite, TypeBadge} from '../components';
+import {Modal, PixelIcon, ShinyStar, Sprite, TypeBadge} from '../components';
 
 const pct = (x: number) => (x <= 0 ? '0%' : x < 0.001 ? '<0,1%' : `${(x * 100).toFixed(x < 0.1 ? 1 : 0).replace('.', ',')}%`);
 
@@ -31,7 +31,7 @@ export function BiomeGuide({onClose}: {onClose: () => void}) {
   return (
     <Modal onClose={onClose} wide>
       <div className="guide">
-        <h2>📖 Guia dos biomas</h2>
+        <h2>Guia dos biomas</h2>
         <p className="hint">Quem pode aparecer em cada lugar e a chance de cada um numa ronda comum. É só para consultar: o jogo nunca mostra isso sozinho.</p>
 
         <div className="chips">
@@ -42,12 +42,12 @@ export function BiomeGuide({onClose}: {onClose: () => void}) {
           ))}
           {HIDDEN_BIOMES.filter(b => known.has(b.id)).map(b => (
             <button key={b.id} className={`chip ${biomeId === b.id ? 'active' : ''}`} style={{borderLeft: `8px solid ${b.color}`}} onClick={() => setBiome(b.id)}>
-              ✨ {b.name}
+              <ShinyStar /> {b.name}
             </button>
           ))}
           {HIDDEN_BIOMES.some(b => !known.has(b.id)) && (
             <span className="chip locked" title="Biomas secretos aparecem aqui depois que você visitar. Um viajante pode dar a dica de onde ficam.">
-              🔒 {HIDDEN_BIOMES.filter(b => !known.has(b.id)).length} biomas secretos
+              <PixelIcon name="lock" size={12} /> {HIDDEN_BIOMES.filter(b => !known.has(b.id)).length} biomas secretos
             </span>
           )}
         </div>

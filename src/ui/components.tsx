@@ -6,6 +6,7 @@ import type {Rarity} from '../data/dex';
 import {getItem} from '../data/items';
 import {moveDescPt} from '../data/movesPt';
 import {STATUS_PT} from '../game/battle';
+import {NARRATOR_MARK} from '../game/narration';
 import {calcStats} from '../game/mon';
 import {useGame} from '../game/store';
 import {STAT_IDS, STAT_LABEL} from '../game/types';
@@ -141,7 +142,7 @@ export function HpBar({hp, maxhp, showNumbers}: {hp: number; maxhp: number; show
 export function CalcButton({types = [], label = 'Calculadora de tipos'}: {types?: readonly string[]; label?: string}) {
   return (
     <button className="btn small calc-btn" onClick={() => useGame.getState().openTypeCalc([...types])} title="Ver quanto cada tipo tira de cada tipo">
-      🧮 {label}
+      {label}
     </button>
   );
 }
@@ -275,7 +276,55 @@ const ICONS: Record<string, string[]> = {
   map: ['##.##.##', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '#.#..#.#', '##.##.##'],
   book: ['........', '.##..##.', '#..##..#', '#..##..#', '#..##..#', '#..##..#', '.##..##.', '...##...'],
   trophy: ['########', '#.####.#', '#.####.#', '.######.', '..####..', '...##...', '..####..', '.######.'],
+  sword: ['.....###', '....####', '...####.', '#.####..', '.####...', '..##....', '.#..#...', '#.......'],
+  shield: ['########', '##....##', '##....##', '##....##', '.##..##.', '.##..##.', '..####..', '...##...'],
+  mic: ['...##...', '..####..', '..####..', '..####..', '.#.##.#.', '..#..#..', '...##...', '..####..'],
+  globe: ['..####..', '.#.##.#.', '#..##..#', '########', '#..##..#', '#..##..#', '.#.##.#.', '..####..'],
+  phone: ['.######.', '.#....#.', '.#....#.', '.#....#.', '.#....#.', '.######.', '.##..##.', '.######.'],
+  bolt: ['....###.', '...###..', '..###...', '.######.', '...###..', '..###...', '.###....', '.#......'],
+  crown: ['........', '#..##..#', '#..##..#', '##.##.##', '########', '########', '########', '........'],
+  medal: ['##....##', '.##..##.', '..####..', '.######.', '########', '########', '.######.', '..####..'],
+  badge: ['...##...', '..####..', '.##..##.', '##....##', '##....##', '.##..##.', '..####..', '...##...'],
+  gem: ['........', '.######.', '##.##.##', '########', '.######.', '..####..', '...##...', '........'],
+  target: ['..####..', '.#....#.', '#..##..#', '#.#..#.#', '#.#..#.#', '#..##..#', '.#....#.', '..####..'],
+  warning: ['...##...', '..####..', '..#..#..', '.##..##.', '.######.', '###..###', '########', '........'],
+  trash: ['..####..', '########', '........', '.######.', '.#.##.#.', '.#.##.#.', '.#.##.#.', '.######.'],
+  lock: ['..####..', '.#....#.', '.#....#.', '########', '###..###', '###..###', '########', '########'],
+  flame: ['...#....', '...##...', '..###.#.', '.######.', '########', '###..###', '##....##', '.######.'],
+  ice: ['...##...', '#..##..#', '.#.##.#.', '########', '########', '.#.##.#.', '#..##..#', '...##...'],
+  people: ['.##..##.', '.##..##.', '........', '.##..##.', '###..###', '###..###', '###..###', '........'],
+  robot: ['...##...', '.######.', '.#.##.#.', '.######.', '..####..', '########', '#.####.#', '..#..#..'],
+  ball: ['..####..', '.######.', '########', '###..###', '#..##..#', '#......#', '.#....#.', '..####..'],
+  bracket: ['##......', '.###....', '##.#....', '...#####', '...#....', '##.#....', '.###....', '##......'],
+  fast: ['........', '#...#...', '##..##..', '###.###.', '###.###.', '##..##..', '#...#...', '........'],
+  play: ['........', '.#......', '.##.....', '.###....', '.###....', '.##.....', '.#......', '........'],
+  anchor: ['...##...', '..#..#..', '...##...', '...##...', '#..##..#', '##.##.##', '.######.', '...##...'],
+  spring: ['.#..#..#', '#..#..#.', '.#..#..#', '........', '########', '#......#', '.######.', '........'],
+  fist: ['........', '.######.', '#.#.#.##', '########', '########', '#######.', '.#####..', '..####..'],
+  orb: ['..####..', '.#....#.', '#..#...#', '#.#....#', '#......#', '.#....#.', '..####..', '.######.'],
 };
+
+/** Cores das medalhas de 1º, 2º e 3º lugar. */
+export const MEDAL_COLORS = ['#e0a100', '#9aa3b5', '#c27a45'];
+
+/** Medalha pixel de pódio (1, 2 ou 3). */
+export function Medal({place, size = 16}: {place: number; size?: number}) {
+  return <PixelIcon name="medal" size={size} color={MEDAL_COLORS[place - 1] ?? 'var(--ink-soft)'} />;
+}
+
+export const isNarration = (text: string) => text.startsWith(NARRATOR_MARK);
+export const unmark = (text: string) => (isNarration(text) ? text.slice(NARRATOR_MARK.length) : text);
+
+/** Fala do narrador: microfone pixel no lugar da marca. */
+export function Narrated({text}: {text: string}) {
+  return isNarration(text) ? (
+    <>
+      <PixelIcon name="mic" size={14} /> {unmark(text)}
+    </>
+  ) : (
+    <>{text}</>
+  );
+}
 
 export function PixelIcon({name, size = 16, color = 'currentColor'}: {name: keyof typeof ICONS | string; size?: number; color?: string}) {
   const rows = ICONS[name] ?? ICONS.star;
@@ -371,7 +420,7 @@ export function TeamWeakness({party, compact, children}: {party: OwnedMon[]; com
           ))}
         </p>
       ) : (
-        <p className="tw-ok">Seu time tem alguém que aguenta cada tipo. 👍</p>
+        <p className="tw-ok">Seu time tem alguém que aguenta cada tipo.</p>
       )}
       <div className="tw-grid">
         {shown.map(r => (
@@ -547,7 +596,7 @@ export function MoveInfo({move, onClose}: {move: string; onClose: () => void}) {
         </div>
         <p className="move-info-desc">{moveDescPt(m.name)}</p>
         {m.priority !== 0 && (
-          <p className="move-tag">{m.priority > 0 ? '⚡ Age antes dos outros golpes' : '🐢 Age depois dos outros golpes'}</p>
+          <p className="move-tag">{m.priority > 0 ? 'Age antes dos outros golpes' : 'Age depois dos outros golpes'}</p>
         )}
         <button className="link" onClick={() => setMore(x => !x)}>
           {more ? 'Menos detalhes ▴' : 'Mais detalhes ▾'}

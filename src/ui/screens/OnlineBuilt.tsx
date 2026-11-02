@@ -1,4 +1,4 @@
-// Time dos Sonhos online: cada um no seu aparelho, com o time que montou.
+// Dream Team online: cada um no seu aparelho, com o time que montou.
 // Igual ao Rush online: quem cria a sala roda a batalha e manda tudo para o amigo.
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
@@ -56,7 +56,7 @@ function Lobby({code, status, error, onExit}: {code?: string; status: string; er
         <button className="btn small" onClick={onExit}>
           <PixelIcon name="back" /> Sair
         </button>
-        <h2>Time dos Sonhos online</h2>
+        <h2>Dream Team online</h2>
       </header>
       <div className="panel rush-lobby">
         {code && (

@@ -14,7 +14,7 @@ import {RIVALS} from '../../data/rivals';
 import {TOURS, tourInfo} from '../../game/tournament';
 import type {TourKind} from '../../game/tournament';
 import type {OwnedMon} from '../../game/types';
-import {CalcButton, CategoryIcon, HpBar, MatchupPanel, Modal, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
+import {CalcButton, CategoryIcon, HpBar, MatchupPanel, Modal, Narrated, PixelIcon, Sprite, StatusBadge, TeamWeakness, TypeBadge, Types, effectivenessLabel} from '../components';
 import {ArenaBackdrop} from '../scene';
 import {TrainerAvatar} from './StartScreens';
 import {playClick, playCrowd, playCry, playFanfare, playHit, playMove} from '../audio';
@@ -64,12 +64,16 @@ export function QuickplayScreen() {
       {mode === 'menu' && (
         <div className="qp-cards">
           <button className="qp-card" onClick={() => setMode('rush')}>
-            <span className="qp-icon">⚡</span>
+            <span className="qp-icon">
+              <PixelIcon name="bolt" size={30} />
+            </span>
             <b>Rush</b>
             <span>Aparecem 2 Pokémon: você fica com um e o outro vai para o adversário. Depois, batalha! Online com um amigo ou offline.</span>
           </button>
           <button className="qp-card" onClick={() => setMode('tourPick')}>
-            <span className="qp-icon">🏆</span>
+            <span className="qp-icon">
+              <PixelIcon name="trophy" size={30} />
+            </span>
             <b>Campeonato rápido</b>
             <span>Monte um time na hora e jogue um campeonato inteiro, online com os amigos ou offline contra bots. Não mexe na sua run nem na coleção.</span>
           </button>
@@ -79,7 +83,9 @@ export function QuickplayScreen() {
         <div className="qp-cards">
           {TOURS.map(t => (
             <button key={t.kind} className="qp-card" onClick={() => setKind(t.kind as TourKind)}>
-              <span className="qp-icon">🏆</span>
+              <span className="qp-icon">
+                <PixelIcon name="trophy" size={30} />
+              </span>
               <b>{t.name}</b>
               <span>
                 Times de {t.teamSize} Pokémon, nível ~{Math.round(t.wave * 0.9) + 1}. Você escolhe {t.teamSize} Pokémon, um de cada trio sorteado.
@@ -165,12 +171,16 @@ export function OnlineOffline({title, online, offline, onPick, onBack}: {title: 
       </header>
       <div className="qp-cards">
         <button className="qp-card" onClick={() => onPick(false)}>
-          <span className="qp-icon">📴</span>
+          <span className="qp-icon">
+            <PixelIcon name="phone" size={30} />
+          </span>
           <b>Offline</b>
           <span>{offline}</span>
         </button>
         <button className="qp-card" onClick={() => onPick(true)}>
-          <span className="qp-icon">🌐</span>
+          <span className="qp-icon">
+            <PixelIcon name="globe" size={30} />
+          </span>
           <b>Online</b>
           <span>{online}</span>
         </button>
@@ -324,11 +334,15 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
           <h3>Contra quem?</h3>
           <div className="rush-modes">
             <button className={`rush-mode ${vsCpu ? 'on' : ''}`} onClick={() => setVsCpu(true)}>
-              <b>🤖 Computador</b>
+              <b>
+                <PixelIcon name="robot" /> Computador
+              </b>
               <span>Você contra um rival controlado pelo jogo.</span>
             </button>
             <button className={`rush-mode ${!vsCpu ? 'on' : ''}`} onClick={() => setVsCpu(false)}>
-              <b>👥 Amigo no mesmo aparelho</b>
+              <b>
+                <PixelIcon name="people" /> Amigo no mesmo aparelho
+              </b>
               <span>Os dois jogam aqui, passando a vez.</span>
             </button>
           </div>
@@ -479,8 +493,10 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
           <b>Vez de {players[who].name}</b>
           <span className="muted">{canPick ? `Fique com um. O outro vai para ${players[1 - who].name}.` : `Esperando ${players[who].name} escolher...`}</span>
         </div>
-        {mode === 'lucky' && <p className="lucky-banner">🎯 Tiro de sorte: no fim do sorteio, a sorte escolhe um dos dois para ganhar um lendário quebrado no lugar do Pokémon mais fraco do time.</p>}
-        {mode === 'mix' && <p className="lucky-banner mix">🎲 Misturado: normais, megas e lendários no mesmo sorteio. Depois cada um dá a Mega Pedra coringa para quem quiser.</p>}
+        {mode === 'lucky' && <p className="lucky-banner">
+            <PixelIcon name="target" /> Tiro de sorte: no fim do sorteio, a sorte escolhe um dos dois para ganhar um lendário quebrado no lugar do Pokémon mais fraco do time.</p>}
+        {mode === 'mix' && <p className="lucky-banner mix">
+            <PixelIcon name="dice" /> Misturado: normais, megas e lendários no mesmo sorteio. Depois cada um dá a Mega Pedra coringa para quem quiser.</p>}
         <div className="rush-pair">
           {pair.map((name, k) => (
             <button key={name} className="rush-pick" disabled={!canPick} onClick={() => onPick(k as 0 | 1)}>
@@ -561,7 +577,7 @@ export function LuckyReveal({players, lucky, onDone}: {players: [Player, Player]
   return (
     <div className="screen quickplay">
       <header className="bar">
-        <h2>🎯 Tiro de sorte!</h2>
+        <h2>Tiro de sorte!</h2>
       </header>
       <div className="panel lucky-reveal">
         <div className="lucky-players">
@@ -612,7 +628,7 @@ function MatchLine({mine, foe}: {mine: string; foe: string[]}) {
     <span className="match-line">
       {hits.length > 0 && (
         <span className="ml-good" title="Golpes do mesmo tipo dele dão 2x (ou mais) nesses">
-          ⚔️ 2x em
+          <PixelIcon name="sword" size={14} /> 2x em
           {hits.map(f => (
             <Sprite key={f} name={f} size={28} still />
           ))}
@@ -620,7 +636,7 @@ function MatchLine({mine, foe}: {mine: string; foe: string[]}) {
       )}
       {hurts.length > 0 && (
         <span className="ml-bad" title="Golpes do tipo desses dão 2x (ou mais) nele">
-          🛡️ toma 2x de
+          <PixelIcon name="shield" size={14} /> toma 2x de
           {hurts.map(f => (
             <Sprite key={f} name={f} size={28} still />
           ))}
@@ -676,7 +692,7 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
   foe?: {player: Player; team: string[]};
   mega: boolean;
   curtain: boolean;
-  /** Time dos Sonhos: os itens são os que o jogador escolheu (não tira). */
+  /** Dream Team: os itens são os que o jogador escolheu (não tira). */
   keepItems?: boolean;
   onDone: (team: OwnedMon[]) => void;
 }) {
@@ -695,7 +711,9 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
         <div className="panel rush-prep">
           <b>Seu time</b>
           <p>Toque em quem vai abrir a luta.</p>
-          {foe && <p className="hint small">⚔️ = os golpes do mesmo tipo dele dão 2x nesses. 🛡️ = os golpes do tipo desses dão 2x nele.</p>}
+          {foe && <p className="hint small">
+              <PixelIcon name="sword" size={12} /> = os golpes do mesmo tipo dele dão 2x nesses. <PixelIcon name="shield" size={12} /> = os golpes do tipo desses dão 2x nele.
+            </p>}
           <div className="rush-prep-grid">
             {team.map(m => (
               <button key={m.uid} className={`rush-prep-mon ${lead === m.uid ? 'lead' : ''}`} onClick={() => setLead(m.uid)}>
@@ -717,8 +735,8 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
           {mega && (
             <p className="hint mega-hint">
               {megaOk.length > 0
-                ? '💎 Na batalha, qualquer um marcado com "Pode Mega" pode mega-evoluir: é só marcar "Mega evoluir" antes do golpe. Só 1 por luta, e depois não dá para trocar.'
-                : '💎 Ninguém do seu time tem Mega. Quem pode mega-evoluir aparece marcado.'}
+                ? 'Na batalha, qualquer um marcado com "Pode Mega" pode mega-evoluir: é só marcar "Mega evoluir" antes do golpe. Só 1 por luta, e depois não dá para trocar.'
+                : 'Ninguém do seu time tem Mega. Quem pode mega-evoluir aparece marcado.'}
             </p>
           )}
           <button
@@ -923,7 +941,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         <span className="versus-teams">
           {teams && (
             <button className="btn small" onClick={() => setTeamsOpen(true)} title="Ver os dois times, com os tipos">
-              👥 Times
+              <PixelIcon name="people" /> Times
             </button>
           )}
           <CalcButton types={views[top] ? species(views[top]!.species).types : []} label="Calculadora" />
@@ -946,7 +964,9 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         {box(bottom, true)}
       </div>
       <div className="battle-bottom">
-        <div className="message">{message}</div>
+        <div className="message">
+          <Narrated text={message} />
+        </div>
         <div className="actions">
           {!idle ? null : showCurtain && req && curtainFor ? (
             <div className="rush-curtain inline">

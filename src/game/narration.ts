@@ -2,6 +2,9 @@
 import type {BattleEvent} from './battle';
 import {pick} from './rng';
 
+/** Marca no começo das falas do narrador. A tela não mostra a marca: troca pelo microfone em pixel. */
+export const NARRATOR_MARK = '🎙️ ';
+
 /** Ficha do treinador que o narrador conhece. */
 export interface NarratorCtx {
   name: string;
@@ -33,7 +36,7 @@ export function introLines(me: NarratorCtx, foe: NarratorCtx, tournamentName: st
   const titles = Object.values(me.titles).reduce<number>((a, b) => a + (b ?? 0), 0);
   if (defending) out.push(`🎙️ Senhoras e senhores, a fera que levou este torneio da última vez: ${me.name} vem defender o título!`);
   else if (me.titles.worlds) out.push(`🎙️ Olha quem chegou: ${me.name}, com título MUNDIAL no currículo! A arena explode!`);
-  else if (me.runnerUps >= 3) out.push(pick([`🎙️ ${me.name}, o eterno vice (${me.runnerUps} finais perdidas!). Será que hoje sai?`, `🎙️ ${me.name} de novo... dizem que coleciona medalhas de prata. 😅`]));
+  else if (me.runnerUps >= 3) out.push(pick([`🎙️ ${me.name}, o eterno vice (${me.runnerUps} finais perdidas!). Será que hoje sai?`, `🎙️ ${me.name} de novo... dizem que coleciona medalhas de prata.`]));
   else if (me.runnerUps === 2 && round === 2) out.push(`🎙️ ${me.name} já perdeu duas finais. A torcida pede: dessa vez vai!`);
   else if (titles >= 3) out.push(`🎙️ ${me.name} chega com ${titles} títulos na bagagem. Respeito!`);
   else if (titles >= 1) out.push(`🎙️ ${me.name} já sabe o que é levantar um troféu.`);

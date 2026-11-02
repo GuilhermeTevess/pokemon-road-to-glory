@@ -3,7 +3,7 @@ import {BUILT_LEVEL, PREMADE, botTeam, evTotal, itemsFor, learnable, premadeTeam
 import {dex, isPlayable, species} from '../src/data/dex';
 import {BattleController} from '../src/game/battle';
 
-describe('Time dos Sonhos', () => {
+describe('Dream Team', () => {
   it('set sugerido tem golpes, habilidade da espécie e EVs válidos', () => {
     for (const n of ['Garchomp', 'Gengar', 'Snorlax', 'Pikachu', 'Ferrothorn', 'Magikarp', 'Ditto', 'Blissey', 'Shedinja', 'Charizard']) {
       const s = suggestedSet(n);

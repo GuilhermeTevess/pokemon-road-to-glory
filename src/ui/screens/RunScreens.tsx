@@ -477,7 +477,7 @@ export function RunSidebar({onOpen, open = false, onClose}: {onOpen: (tab: Party
           <div className="muted">
             Ronda {roundOf(run)}/{roundsOf(run)} · {seasonPoints(run)} pts
           </div>
-          {run.wave > 0 && run.phase === 'travel' && <div className="sb-where muted">🗺️ Escolhendo o destino...</div>}
+          {run.wave > 0 && run.phase === 'travel' && <div className="sb-where muted">Escolhendo o destino...</div>}
           {run.wave > 0 && run.phase !== 'travel' && <div className="sb-where muted" title="Rondas que faltam antes do próximo sorteio">
             <span style={{color: getRegion(run.region).color}}>●</span> {getRegion(run.region).name} · {Math.max(0, Math.ceil((run.regionLeft ?? 0) / waveStep(run)))} rondas
             <br />
@@ -486,7 +486,7 @@ export function RunSidebar({onOpen, open = false, onClose}: {onOpen: (tab: Party
           {run.wave > 0 && <TrailMeter value={trailOf(run)} />}
           {run.career && (
             <details className="sb-career">
-              <summary>🌐 Classificação da carreira</summary>
+              <summary>Classificação da carreira</summary>
               <CareerStandings compact />
             </details>
           )}
@@ -602,7 +602,7 @@ export function MonDetail({mon, actions}: {mon: OwnedMon; actions?: React.ReactN
             </form>
           ) : (
             <button className="btn small ghost" onClick={() => setRename(mon.nickname ?? '')}>
-              ✎ {mon.nickname ? 'Trocar apelido' : 'Dar apelido'}
+              {mon.nickname ? 'Trocar apelido' : 'Dar apelido'}
             </button>
           )}
           <Types name={mon.species} />

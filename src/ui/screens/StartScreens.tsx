@@ -185,7 +185,9 @@ export function TrainerSelect() {
         )}
       </div>
       <div className="panel career-strip">
-        <h3>🌐 Carreira online com amigos</h3>
+        <h3>
+            <PixelIcon name="globe" /> Carreira online com amigos
+          </h3>
         <p className="hint">O host escolhe as regras, os amigos entram com o código e cada um joga no seu tempo. Nos torneios, vocês se enfrentam com os times de verdade.</p>
         {careers.length > 0 && (
           <div className="career-list">
@@ -309,7 +311,9 @@ function TrainerCard({trainer, runs, best, species: n, onSwitch}: {trainer: Trai
         </li>
         {all.titles > 0 && (
           <li>
-            <b>🏆 {all.titles}</b> <span>títulos</span>
+            <b>
+              <PixelIcon name="trophy" size={14} /> {all.titles}
+            </b> <span>títulos</span>
           </li>
         )}
       </ul>
@@ -318,10 +322,10 @@ function TrainerCard({trainer, runs, best, species: n, onSwitch}: {trainer: Trai
         <HistoryDots list={h.list} />
       </div>
       <button className="btn primary" onClick={() => setOpen(true)}>
-        📊 Ver perfil e histórico
+        Ver perfil e histórico
       </button>
       <button className="btn trainer-switch" onClick={onSwitch}>
-        🔄 Trocar de treinador
+        Trocar de treinador
       </button>
       {open && <FighterProfile trainer={trainer} onClose={() => setOpen(false)} />}
     </div>
@@ -339,7 +343,7 @@ function TrainerHist({trainer}: {trainer: Trainer}) {
       <HistoryDots list={h.list} />
       {rate !== null && <small className="muted">{rate}% de vitórias</small>}
       <button className="btn small" onClick={() => setOpen(true)}>
-        📊 Perfil
+        Perfil
       </button>
       {open && <FighterProfile trainer={trainer} onClose={() => setOpen(false)} />}
     </div>
@@ -413,7 +417,7 @@ export function TitleScreen() {
           )}
           {trainer.career && (
             <button className="btn career-btn" onClick={() => setScreen('career')}>
-              🌐 Carreira {trainer.career.code} <small>Classificação, regras e amigos</small>
+              <PixelIcon name="globe" /> Carreira {trainer.career.code} <small>Classificação, regras e amigos</small>
             </button>
           )}
           {!trainer.career && (
@@ -426,7 +430,7 @@ export function TitleScreen() {
                 else setScreen('career');
               }}
             >
-              🌐 Jogar online{' '}
+              <PixelIcon name="globe" /> Jogar online{' '}
               <small>{careers.length === 1 ? `Continuar a carreira ${careers[0].career!.code}` : careers.length ? `${careers.length} carreiras: escolha uma` : 'Carreira com amigos: criar ou entrar com código'}</small>
             </button>
           )}
@@ -455,10 +459,10 @@ export function TitleScreen() {
             </button>
           )}
           <button className="btn quickplay-btn" onClick={() => setScreen('quickplay')}>
-            ⚡ Quickplay <small>Rush · Campeonato rápido (online ou offline)</small>
+            <PixelIcon name="bolt" /> Quickplay <small>Rush · Campeonato rápido (online ou offline)</small>
           </button>
           <button className="btn quickplay-btn builder-btn" onClick={() => setScreen('builder')}>
-            🛠️ Time dos Sonhos <small>Monte seu time (golpes, EVs, nature...) e jogue online ou offline</small>
+            <PixelIcon name="ball" /> Dream Team <small>Monte seu time (golpes, EVs, nature...) e jogue online ou offline</small>
           </button>
           <div className="menu-tiles">
             {tiles.map(t => (
