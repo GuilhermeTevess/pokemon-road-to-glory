@@ -1,6 +1,7 @@
 import {ITEMS, itemUsage} from '../../data/items';
 import type {ItemKind} from '../../data/items';
 import {ItemIcon, Modal} from '../components';
+import {useTutorial} from '../tutorialState';
 
 const GROUPS: {title: string; kinds: ItemKind[]; text: string}[] = [
   {title: 'Pokébolas', kinds: ['ball'], text: 'Use na batalha, pelo botão Pokébola. A chance aumenta com o HP baixo do selvagem e com status (sono, paralisia...).'},
@@ -15,6 +16,18 @@ export function HelpModal({onClose}: {onClose: () => void}) {
   return (
     <Modal onClose={onClose} wide>
       <h2>Como jogar</h2>
+      <div className="help-tutorial panel">
+        <span>Prefere aprender jogando? O tutorial mostra cada botão, tela por tela.</span>
+        <button
+          className="btn tut-yes"
+          onClick={() => {
+            useTutorial.getState().restart();
+            onClose();
+          }}
+        >
+          Ver o tutorial de novo
+        </button>
+      </div>
       <ol className="help-steps">
         <li>Monte seu time inicial e escolha um bioma. Cada ronda é uma batalha contra um Pokémon selvagem.</li>
         <li>Vença para ganhar XP e dinheiro, ou capture com Pokébolas (até 6 no time; o resto vai para o PC).</li>
