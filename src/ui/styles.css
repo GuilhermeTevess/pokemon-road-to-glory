@@ -1463,3 +1463,5 @@ button, .btn, summary, [role="button"] { touch-action: manipulation; -webkit-tap
   gap: 6px;
   padding: 3px 0;
 }
+.qt-players { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 10px 0; }
+.qt-player { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; }

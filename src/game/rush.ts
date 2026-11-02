@@ -1,4 +1,4 @@
-// Quickplay "Rush": dois jogadores no mesmo PC. Aparecem 2 Pokémon sorteados;
+// Quickplay "Rush": dois jogadores (online, no mesmo aparelho ou contra o computador). Aparecem 2 Pokémon sorteados;
 // quem está na vez fica com um e o outro vai para o adversário. Cada um faz 3 escolhas,
 // então os dois terminam com 6 Pokémon (3 escolhidos + 3 recebidos).
 import type {Species} from '@pkmn/sim';
