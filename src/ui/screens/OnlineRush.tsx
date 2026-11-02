@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveMegaStone, megaMode, rollLucky, rushMon} from '../../game/rush';
+import {drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import type {Link} from '../../game/net';
@@ -162,8 +162,7 @@ function Host({me, mode, onExit}: {me: Player; mode: RushMode; onExit: () => voi
       const order = msg.order as string[];
       const t = teams.current[1];
       teams.current[1] = order.map(uid => t.find(m => m.uid === uid)!).filter(Boolean).map(m => ({...m, item: undefined}));
-      const holder = teams.current[1].find(m => m.uid === msg.stone);
-      if (megaMode(mode) && holder) giveMegaStone(holder);
+      if (megaMode(mode)) giveAllMegaStones(teams.current[1]);
       prepped.current[1] = true;
       if (prepped.current[0]) startBattle();
       else force(x => x + 1);
@@ -307,8 +306,7 @@ function Guest({me, code, onExit}: {me: Player; code: string; onExit: () => void
         mega={prepTeam.mega}
         curtain={false}
         onDone={team => {
-          const holder = team.find(m => m.item);
-          send({t: 'prepDone', order: team.map(m => m.uid), stone: holder?.uid});
+          send({t: 'prepDone', order: team.map(m => m.uid)});
           setPrepSent(true);
         }}
       />
