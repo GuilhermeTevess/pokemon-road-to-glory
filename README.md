@@ -1,8 +1,8 @@
 # Pokémon Road to Glory
 
 Roguelike de Pokémon no navegador, no estilo Pokerogue, com batalhas rodando no
-simulador do Pokémon Showdown. Projeto de fã, sem fins comerciais, feito para
-jogar com os amigos.
+simulador do Pokémon Showdown e modos online contra os amigos. Projeto de fã, sem
+fins comerciais.
 
 ## Como jogar
 
@@ -26,110 +26,90 @@ npm run dev      # abre em http://localhost:5173
 Para publicar no GitHub Pages: em **Settings → Pages**, escolha **Source: GitHub
 Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 
-## O que já tem (etapa 1)
+## Modos de jogo
 
-- **Treinadores**: até 3 perfis, cada um com nome, avatar, coleção e run próprios.
-  Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
-- **Time inicial com pontos**: os 3 iniciais de cada geração (1 a 9) numa página
-  só, com filtro por tipo e setinhas para ver as evoluções. Cada linha tem um custo
-  pela força (Pidgey 1, Charmander 3, Dratini 7) e o treinador tem 6 pontos (até 10 com Glória), então
-  dá para começar com mais de um. Capturados ficam numa aba separada.
-- **9 regiões** (Kanto a Paldea). Você escolhe a primeira e fica 20 rondas; depois a próxima
-  é sorteada (pode repetir). Pokémon da geração da região aparecem 3x mais, formas regionais
-  só aparecem na região delas e os chefes das dezenas são da região.
-- **20 biomas**, cada um com seus tipos de Pokémon. Novo bioma sorteado a cada 10 rondas.
-  Na loja: **Mapa de Bioma** e **Mapa de Região** (você escolhe) e **Passes** que dobram a
-  estadia. O preço deles sobe com a ronda e com o seu dinheiro.
-- **Lendas**: cada região tem treinadores lendários (Ash e Red, Lance, Steven, Cynthia, Alder,
-  Diantha, Kukui, Leon, Geeta). O **Rastro da lenda** sobe vencendo chefes e ajudando Pokémon
-  nos eventos; a cada ronda a chance de a lenda te desafiar é o rastro (até 40%). O time dela
-  tem o tamanho do seu (mínimo 3) e nível do seu mais forte +3. Perder não acaba a run.
-- **Viajantes e Diário**: um evento em que alguém pede ajuda (dinheiro, poção ou Pokébola).
-  Ajudar dá uma dica enigmática sobre um lendário (vai para o **Diário**, com onde procurar) e
-  +25% no Rastro da lenda. Na região e no bioma da dica, o lendário tem 30% de chance por ronda.
-- **Biomas ocultos** (um por região: Caverna Celeste, Torre de Lata, Torre do Céu, Mundo
-  Distorcido, Torre Espiral do Dragão, Caverna Terminus, Ultra Espaço, Floresta Adormecida,
-  Área Zero): 3% de chance no sorteio do bioma, 50% com a dica, e entram no Mapa de Bioma.
-- **Ginásios** (botão Ginásios no painel): 8 por região com os líderes oficiais (em Alola, as
-  7 provas com os Cristais Z). Compre o ingresso e marque a ronda (dentro da estadia na
-  região, fora de torneio e chefe). O time cresce com as insígnias que você já tem. Cada
-  insígnia dá Glória uma vez por temporada; a caderneta completa dá um bônus grande. Perder
-  não acaba a run.
-- **Fama e Ranking** (menu inicial): cada run é uma temporada. Pontos de fama vêm dos torneios
-  (Mundial 1000, International 400, Regional 200, League Cup 80 para o campeão), lendas (150),
-  cadernetas (300), insígnias (30), lendários das dicas (50) e viajantes (10). Ranking da
-  temporada contra 15 rivais do circuito, ranking geral e histórico. No fim da temporada:
-  pódio, sua posição e de onde vieram os pontos. (No online, o host vai escolher quantas
-  temporadas.)
-- **Conquistas** (menu inicial): 37 objetivos permanentes, sem bônus.
-- **Batalha em dupla**: às vezes (5%) dois selvagens aparecem juntos e você luta com os dois
-  primeiros do time ao mesmo tempo. Cada Pokémon escolhe o golpe e, se precisar, em quem bater.
-  Para capturar, derrote um e jogue a Pokébola no outro. Nunca acontece com chefes, lendas ou ginásios.
-- **Novas melhorias de Glória**: Mapa detalhado (mais regiões no Mapa de Região), Estadia longa
-  (+5/+10 rondas por região), Faro de lenda (rastro sobe mais rápido), Ouvido atento (lendário da
-  dica mais provável), Trilha oculta (biomas ocultos 2x/3x) e Sócio dos ginásios (ingressos mais baratos).
-- **30 rondas** de batalhas selvagens. Chefes nas rondas 10 e 20, e um lendário na
-  ronda 30 (o lugar onde, na etapa 3, entra o duelo contra outro jogador).
-- **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts,
-  paradoxos) e lendário/mítico. Shiny 1/256.
-- **Batalhas reais do Showdown**: golpes, habilidades, itens de segurar, clima,
-  status, tudo funcionando como no Showdown.
+- **Run solo**: uma temporada de 120 rondas com selvagens, chefes, ginásios, lendas, eventos e
+  quatro torneios. Perder o time inteiro acaba a run.
+- **Carreira online**: o host cria com regras (rondas por temporada, número de temporadas, limite de
+  lendários e de nível, megas, bônus de EXP) e até 8 amigos entram com um código. Cada um joga a
+  própria run no seu tempo; as rondas andam juntas e os torneios usam os times reais de todo mundo,
+  com partidas ao vivo entre jogadores. Os rivais (bots) jogam a mesma temporada, e tudo vira
+  ranking, perfil e jornal. Perder para selvagens não acaba a temporada: custa níveis, itens,
+  dinheiro e pontos.
+- **Quickplay**: partidas rápidas, online (cada um no seu aparelho) ou offline (contra o computador
+  ou um amigo no mesmo aparelho).
+  - **Rush**: aparecem 2 Pokémon sorteados, quem está na vez fica com um e o outro vai para o
+    adversário, até cada um ter 6. Oito modos: Clássico Nv. 50, Evo 1, Evo 2, Evo 3, Mega,
+    Lendários, Misturado e Tiro de sorte.
+  - **Campeonato rápido**: chave com os amigos (até 8) e bots completando as vagas.
+- **Dream Team**: monte até 5 times com Pokémon, habilidade, nature, EVs, golpes e item (todos no
+  nível 50 com IVs perfeitos) e jogue contra o computador, contra os times dos amigos ou online.
+
+Sair no meio de uma partida de Rush, Dream Team ou campeonato rápido conta como derrota.
+
+## O que tem na run
+
+- **Treinadores**: até 3 perfis, cada um com nome, avatar (oficial ou montado em pixel art),
+  coleção e run próprios. Na primeira run só os iniciais clássicos; depois, a coleção daquele treinador.
+- **Time inicial com pontos**: cada linha tem um custo pela força (Pidgey 1, Charmander 3,
+  Dratini 7) e o treinador tem 6 pontos (até 10 com Glória), então dá para começar com mais de um.
+- **9 regiões** (Kanto a Paldea). Você escolhe a primeira e fica 20 rondas; depois a próxima é
+  sorteada. Pokémon da geração da região aparecem 3x mais, formas regionais só na região delas.
+- **20 biomas**, novo a cada 10 rondas, e um **bioma oculto** por região (Caverna Celeste, Torre
+  do Céu, Área Zero...). Na loja: Mapa de Bioma, Mapa de Região e Passes que dobram a estadia.
+  O **Guia** (barra de cima) mostra quem aparece em cada bioma e com que chance.
+- **Raridades**: comum, incomum, raro, super raro (pseudo-lendários, Ultra Beasts, paradoxos) e
+  lendário/mítico. Shiny 1/256.
+- **Batalhas reais do Showdown**: golpes, habilidades, itens de segurar, clima e status. Às vezes
+  (5%) dois selvagens aparecem juntos e a luta é em dupla.
 - **Captura** com Poké/Great/Ultra/Master Ball (chance depende de HP, status e raridade).
-- **Itens a cada ronda** (escolha 1 de 3, sortear de novo, loja por prateleiras):
-  poções, reviver, Doces Raros e de EXP, Pedra da Evolução, Disco Técnico, Mentas
-  (natureza), Cápsula de Habilidade, itens X para a batalha, Bolsa/Pepitas (o cartão
-  mostra quanto dinheiro dá), Incenso Raro e itens de segurar (Restos, Choice Band,
-  Life Orb, Carvão e os outros 17 que fortalecem um tipo...). Dá para usar ou
-  equipar o item na hora em que pega.
-- **Painel lateral** durante a run: time, Mochila, PC e fraquezas do time (com aviso
-  dos tipos que pegam metade do time sem ninguém resistir).
-- **XP, níveis, golpes novos e evolução** (por nível, e por pedra/troca/amizade via
-  Pedra da Evolução).
-- **Tudo mastigado**: tipos sempre visíveis, fraquezas do selvagem na tela, painel
-  completo de fraquezas/resistências e cada golpe mostrando se é super efetivo,
-  pouco efetivo ou sem efeito. Na troca, mostra quem resiste ao selvagem.
-- **Visual pixel art** em cores claras, com fundos de batalha por bioma e animações
-  de golpe em partículas pixeladas por tipo e formato (fogo que sobe e vira fumaça,
-  jato d'água, raios, gelo, folhas, terremoto...).
-- **Sons**: gritos modernos de cada Pokémon e efeitos de golpe gravados de verdade
-  (fogo, água, trovão, "zoom" de velocidade, buffs...), por tipo e formato.
+- **Itens a cada ronda** (escolha 1 de 3, sortear de novo, loja): poções, reviver, Doces Raros,
+  Pedra da Evolução, Disco Técnico, Mentas, Cápsula de Habilidade, itens X, dinheiro e itens de
+  segurar (Restos, Choice Band, Life Orb...).
+- **XP, níveis, golpes novos e evolução** (por nível, pedra, troca ou amizade), com animação.
+- **Mega evolução**: a Mega Pedra vira a pedra do Pokémon escolhido (1 por time) e você liga a
+  mega no menu de golpes quando quiser.
+- **Ginásios**: 8 por região com os líderes oficiais (em Alola, as 7 provas). Compre o ingresso e
+  marque a ronda; o time do líder cresce com as suas insígnias. Perder não acaba a run.
+- **Lendas**: treinadores lendários de cada região (Red, Lance, Steven, Cynthia, Leon...). O
+  **Rastro da lenda** sobe vencendo chefes e ajudando nos eventos, e é a chance de ela te desafiar.
+- **Viajantes e Diário**: ajude alguém e ganhe uma dica enigmática sobre um lendário, com onde procurar.
+- **Eventos entre rondas**: casa abandonada, árvore de frutas, comerciante, rival, vidente,
+  eventos do bioma e da vida de treinador. Não gastam ronda.
+- **Torneios da temporada** nas rondas 30/60/90/120: League Cup, Regional, International e
+  World Championship, com sorteio animado, chaveamento, narrador e festa de campeão.
+- **Fama, Ranking e Conquistas**: pontos de torneios, lendas, insígnias e viajantes; ranking da
+  temporada contra os rivais do circuito e ranking geral.
+
+## Entre as runs
+
+- **Coleção** com uma **ficha por linha evolutiva**: IVs (repetidos melhoram), natures e
+  habilidades capturadas, **doces** (golpe inicial, custo menor, mais chance de shiny),
+  **corações** de amizade (buffs pequenos), **Tutor**, **EVs** e **apelidos**. Um **parceiro** por time.
+- **Creche**: dois Pokémon do mesmo egg group fazem um ovo que choca durante a run.
+- **Glória**: moeda permanente ganha no fim de cada run, gasta em melhorias (orçamento do time,
+  faro para raros e shiny, mais recompensas, descontos...).
+- **Perfil e histórico**: vitórias, derrotas e % de vitória por modo (offline e online) e as
+  últimas partidas com os times. A **lista de jogadores** mostra todo mundo que já jogou online,
+  com o histórico de cada um.
+
+## Para quem está começando
+
+- **Tutorial** guiado na primeira vez em cada tela, e o botão **Ajuda** explicando rondas e itens.
+- **Tudo mastigado**: tipos sempre visíveis, fraquezas do adversário na tela, calculadora de tipos,
+  painel de fraquezas do time e cada golpe mostrando se é super efetivo, pouco efetivo ou sem efeito.
+  Antes da luta, o jogo sugere quem começa.
 - **Golpes com nome em inglês e descrição em português.**
-- **Ajuda** dentro do jogo explicando rondas e itens.
-- **Coleção** permanente com o perfil do treinador (números e Pokémon favorito) e uma
-  **ficha por linha evolutiva**: setinhas pela evolução, teia de IVs (repetidos
-  melhoram), natures e habilidades já capturadas (escolha qual usar no início),
-  **doces** da linha (capturar, vencer, chefe, evoluir) e **corações de amizade**.
-- **Doces** compram golpe inicial (ex.: Charmander começando com Flamethrower),
-  custo menor no time e mais chance de shiny.
-- **Tutor** na ficha: escolha a nature ou habilidade e um plano (quanto mais doces,
-  mais chance); se não sair, ganha outra que ainda não tem.
-- **EVs** por linha: vitórias enchem um banco que você distribui na ficha, com
-  sugestões prontas. Vitaminas e itens Power ajudam.
-- **Parceiro** (um por time) e **apelidos**.
-- **Eventos entre rondas** (às vezes, sem gastar ronda): casa abandonada, árvore de
-  frutas, comerciante misterioso, Pokémon machucado, treinador rival e vidente.
-- **Mega evolução**: a Mega Pedra (rara, a partir da ronda 20, ou bem cara na loja) vira
-  a pedra do Pokémon escolhido, que mega-evolui sozinho no início da batalha. 1 por time.
-- **Creche**: dois Pokémon da coleção do mesmo egg group (ou Ditto) fazem um ovo, com
-  Pedra Eterna (nature), Laço do Destino (5 IVs) e itens Power (IV garantido). O ovo vai
-  numa run e choca depois de 5/10/15 rondas vencidas. Tem o **Manual do Criador**.
-- **Glória**: moeda permanente ganha no fim de cada run (1 por ronda, bônus por chefes e
-  por terminar a etapa). Compra melhorias gerais: orçamento do time até 10, faro para
-  raros e shiny, mais biomas para escolher, 4 recompensas por ronda, começo rico,
-  mochila cheia e descontos na loja.
-- **Corações** (até 5) dão buffs pequenos: +5% de EXP, curar status sozinho, aguentar
-  com 1 HP, mais crítico e +10% de EXP.
-- **Temporada de 120 rondas** com torneios oficiais nas rondas 30/60/90/120: League
-  Cup, Regional, International e World Championship. Explicação de cada um, sorteio
-  animado, chaveamento, narrador (que conhece sua fama, seus títulos e suas finais
-  perdidas) e histórico com os times e lances de cada partida.
-- **Animação de evolução** no centro da tela.
-- Run salva automaticamente no navegador (dá pra fechar e continuar).
+- **Visual pixel art**, modo claro e escuro, fundos por bioma e animações de golpe em partículas
+  por tipo. **Sons** de gritos e efeitos de golpe. Dá para pular animações e desligar o som.
+- Tudo salvo automaticamente no navegador (dá para fechar e continuar). Cada aparelho tem o próprio save.
 
-Ideias para as próximas etapas: [docs/IDEIAS.md](docs/IDEIAS.md).
+## Para desenvolver
 
-Veja [docs/ARQUITETURA.md](docs/ARQUITETURA.md) para a organização do código e o
-plano das etapas 2 e 3.
+- Organização do código: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+- Ligar o online no Firebase: [docs/SEGURANCA-ONLINE.md](docs/SEGURANCA-ONLINE.md).
+- Ideias para as próximas etapas: [docs/IDEIAS.md](docs/IDEIAS.md).
+- `npm test` roda os testes e `npm run build` checa os tipos e gera o site (os dois rodam em todo PR).
 
 ## Créditos
 
