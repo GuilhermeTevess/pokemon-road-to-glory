@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {doublesMode, drawPairs, duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky, rushMon} from '../../game/rush';
+import {doublesMode, draftPick, drawPairs, duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import {MISS_ERRORS, useDeferWatch} from '../lobby';
@@ -174,8 +174,7 @@ function Host({me, mode, onExit, mm}: {me: Player; mode: RushMode; onExit: () =>
     if (s.step !== 'draft') return;
     const who = s.round % 2;
     const pair = s.pairs[s.round];
-    teams.current[who].push(rushMon(pair[k], mode));
-    teams.current[1 - who].push(rushMon(pair[1 - k], mode));
+    teams.current = draftPick(teams.current, mode, pair, k, who);
     playCry(pair[k]);
     const names = (): [string[], string[]] => [teams.current[0].map(m => m.species), teams.current[1].map(m => m.species)];
     const toPrep = () => {

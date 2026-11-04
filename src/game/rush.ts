@@ -9,7 +9,7 @@ import {applySet} from './sets';
 import type {OwnedMon} from './types';
 import {isScore, sideScore, type MatchScore, type SideScore} from './ranking';
 
-export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky' | 'duo';
+export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky' | 'mirror' | 'duo';
 
 export interface RushModeInfo {
   id: RushMode;
@@ -27,6 +27,7 @@ export const RUSH_MODES: RushModeInfo[] = [
   {id: 'legend', name: 'Lendários', about: 'Só lendários e míticos, nível 70. Caos garantido.', level: 70},
   {id: 'mix', name: 'Misturado', about: 'Normais, Pokémon que mega-evoluem e lendários no mesmo sorteio, todos no nível 50. Cada um ganha uma Mega Pedra coringa.', level: 50},
   {id: 'lucky', name: 'Tiro de sorte', about: 'Igual ao Clássico, mas no fim a sorte escolhe um dos dois para ganhar um lendário MUITO mais forte que todo mundo.', level: 50},
+  {id: 'mirror', name: 'Espelho', about: 'Quem está na vez escolhe um dos dois e ele entra nos DOIS times. No fim os times são iguais: ganha quem jogar melhor.', level: 50},
   {id: 'duo', name: 'Dupla', about: 'Igual ao Clássico, mas a batalha é em dupla: 2 Pokémon de cada lado em campo, e você escolhe o golpe de cada um.', level: 50},
 ];
 
@@ -53,6 +54,7 @@ function fits(s: Species, mode: RushMode): boolean {
       return (!s.nfe && !legend) || MEGA_SPECIES.has(s.name) || legend;
     case 'nv50':
     case 'lucky':
+    case 'mirror':
     case 'duo':
       return !s.nfe && !legend;
     case 'evo1':
@@ -125,6 +127,18 @@ function withSet(mon: OwnedMon): OwnedMon {
   applySet(mon);
   mon.hp = calcStats(mon).hp;
   return mon;
+}
+
+/**
+ * Uma escolha do sorteio: quem está na vez (`who`) fica com `pair[k]` e o outro vai para o adversário.
+ * No Espelho, o escolhido entra nos dois times (cópias idênticas) e o outro sai do jogo.
+ */
+export function draftPick(teams: [OwnedMon[], OwnedMon[]], mode: RushMode, pair: [string, string], k: 0 | 1, who: number): [OwnedMon[], OwnedMon[]] {
+  const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
+  const chosen = rushMon(pair[k], mode);
+  next[who].push(chosen);
+  next[1 - who].push(mode === 'mirror' ? structuredClone(chosen) : rushMon(pair[1 - k], mode));
+  return next;
 }
 
 // ------------------------------------------------------------------ Tiro de sorte

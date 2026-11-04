@@ -7,7 +7,7 @@ import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
 import {koFromLog} from '../../game/recap';
 import type {Ko} from '../../game/recap';
-import {LUCKY_LEVEL, RUSH_MODES, doublesMode, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode, rushMon} from '../../game/rush';
+import {LUCKY_LEVEL, RUSH_MODES, doublesMode, draftPick, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode} from '../../game/rush';
 import type {DuelMove, DuelReq, LuckyShot} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
 import {quickPid, useGame} from '../../game/store';
@@ -278,9 +278,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
   const who = round % 2;
   const pickMon = (k: 0 | 1) => {
     const pair = pairs[round];
-    const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
-    next[who].push(rushMon(pair[k], mode));
-    next[1 - who].push(rushMon(pair[1 - k], mode));
+    const next = draftPick(teams, mode, pair, k, who);
     playCry(pair[k]);
     if (round + 1 >= pairs.length) {
       setPrepFor(0);
@@ -426,7 +424,11 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
               <input type="checkbox" checked={curtain} onChange={e => setCurtain(e.target.checked)} /> Esconder as escolhas na batalha (passar a vez com cortina)
             </label>
           )}
-          <p className="hint">Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez fica com um e o outro vai para o adversário. No fim, cada um tem 6.</p>
+          <p className="hint">
+            {mode === 'mirror'
+              ? 'Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez escolhe um, ele entra nos dois times e o outro sai. No fim, os dois têm os mesmos 6.'
+              : 'Cada um escolhe 3 vezes. Em cada vez aparecem 2 Pokémon: quem está na vez fica com um e o outro vai para o adversário. No fim, cada um tem 6.'}
+          </p>
           <button className="btn primary big" onClick={start}>
             Começar o sorteio
           </button>
@@ -550,10 +552,12 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
         <div className="rush-turn">
           <TrainerAvatar avatar={players[who].avatar} name={players[who].name} size={64} />
           <b>Vez de {players[who].name}</b>
-          <span className="muted">{canPick ? `Fique com um. O outro vai para ${players[1 - who].name}.` : `Esperando ${players[who].name} escolher...`}</span>
+          <span className="muted">{canPick ? (mode === 'mirror' ? 'Escolha um: ele entra nos dois times.' : `Fique com um. O outro vai para ${players[1 - who].name}.`) : `Esperando ${players[who].name} escolher...`}</span>
         </div>
         {mode === 'lucky' && <p className="lucky-banner">
             <PixelIcon name="target" /> Tiro de sorte: no fim do sorteio, a sorte escolhe um dos dois para ganhar um lendário quebrado no lugar do Pokémon mais fraco do time.</p>}
+        {mode === 'mirror' && <p className="lucky-banner mirror">
+            Espelho: o Pokémon escolhido vai para os dois times e o outro sai do jogo. Os times terminam iguais.</p>}
         {mode === 'duo' && <p className="lucky-banner duo">
             <PixelIcon name="people" /> Dupla: na batalha ficam 2 Pokémon de cada lado em campo, e você escolhe o golpe de cada um. Pense em quem combina junto.</p>}
         {mode === 'mix' && <p className="lucky-banner mix">
