@@ -8,8 +8,8 @@ describe('rush', () => {
     for (const m of RUSH_MODES) expect(rushPool(m.id).length, m.id).toBeGreaterThanOrEqual(12);
   });
 
-  it('são 8 modos (4 em cima, 4 embaixo)', () => {
-    expect(RUSH_MODES.length).toBe(8);
+  it('são 9 modos (3 linhas de 3)', () => {
+    expect(RUSH_MODES.length).toBe(9);
   });
 
   it('Misturado traz normais, megas e lendários', () => {

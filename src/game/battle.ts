@@ -338,6 +338,13 @@ export class BattleController {
     return events;
   }
 
+  /** Rush em dupla: a escolha inteira dos dois Pokémon de uma vez ("move 1 2, switch 4"). */
+  chooseFull(choice: string): BattleEvent[] {
+    const events = this.commit(choice);
+    this.markParticipant();
+    return events;
+  }
+
   /** Troca pela posição atual no time do simulador (1 = primeiro). Usado no Rush. */
   chooseSwitchSlot(n: number): BattleEvent[] {
     const events = this.commit(`switch ${n}`);

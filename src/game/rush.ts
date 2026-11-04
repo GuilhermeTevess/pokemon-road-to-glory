@@ -9,7 +9,7 @@ import {applySet} from './sets';
 import type {OwnedMon} from './types';
 import {isScore, sideScore, type MatchScore, type SideScore} from './ranking';
 
-export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky';
+export type RushMode = 'nv50' | 'evo1' | 'evo2' | 'evo3' | 'mega' | 'legend' | 'mix' | 'lucky' | 'duo';
 
 export interface RushModeInfo {
   id: RushMode;
@@ -27,7 +27,13 @@ export const RUSH_MODES: RushModeInfo[] = [
   {id: 'legend', name: 'Lendários', about: 'Só lendários e míticos, nível 70. Caos garantido.', level: 70},
   {id: 'mix', name: 'Misturado', about: 'Normais, Pokémon que mega-evoluem e lendários no mesmo sorteio, todos no nível 50. Cada um ganha uma Mega Pedra coringa.', level: 50},
   {id: 'lucky', name: 'Tiro de sorte', about: 'Igual ao Clássico, mas no fim a sorte escolhe um dos dois para ganhar um lendário MUITO mais forte que todo mundo.', level: 50},
+  {id: 'duo', name: 'Dupla', about: 'Igual ao Clássico, mas a batalha é em dupla: 2 Pokémon de cada lado em campo, e você escolhe o golpe de cada um.', level: 50},
 ];
+
+/** Modos em que a batalha é em dupla (2 de cada lado em campo). */
+export function doublesMode(mode: RushMode): boolean {
+  return mode === 'duo';
+}
 
 /** Modos em que cada um ganha a Mega Pedra coringa. */
 export function megaMode(mode: RushMode): boolean {
@@ -47,6 +53,7 @@ function fits(s: Species, mode: RushMode): boolean {
       return (!s.nfe && !legend) || MEGA_SPECIES.has(s.name) || legend;
     case 'nv50':
     case 'lucky':
+    case 'duo':
       return !s.nfe && !legend;
     case 'evo1':
       return !s.prevo && s.nfe && !legend;
@@ -185,8 +192,22 @@ export interface DuelMove {
   disabled: boolean;
   /** Golpe em andamento (Bounce/Fly/Dig no 2º turno, Outrage, recarga): única opção, sem PP. */
   locked?: boolean;
-  /** Eficácia contra quem está em campo do outro lado (null = golpe de status). */
+  /** Eficácia contra quem está em campo do outro lado (null = golpe de status). Na dupla, a maior entre os dois. */
   eff: number | null;
+  /** Dupla: final da escolha com o alvo quando não tem o que escolher (" 1", " -2" ou ""). */
+  aim?: string;
+  /** Dupla: os dois adversários de pé, quando o golpe acerta só um e dá para escolher qual. */
+  targets?: {aim: string; species: string; eff: number | null}[];
+}
+
+/** Dupla: o que um dos dois Pokémon em campo pode fazer. */
+export interface DuelSlot {
+  slot: number;
+  species: string;
+  forced: boolean;
+  trapped: boolean;
+  canMega: boolean;
+  moves: DuelMove[];
 }
 
 /** O que um lado pode fazer agora (vai pela rede para o amigo no online). */
@@ -197,6 +218,8 @@ export interface DuelReq {
   canMega: boolean;
   moves: DuelMove[];
   switches: {index: number; species: string; hp: number; maxhp: number; item?: string}[];
+  /** Dupla: uma escolha por Pokémon, na ordem. A resposta junta as escolhas com ", ". */
+  slots?: DuelSlot[];
 }
 
 export function duelNeeds(b: Battle, side: Side): boolean {
@@ -204,8 +227,56 @@ export function duelNeeds(b: Battle, side: Side): boolean {
   return !b.ended && (s.requestState === 'move' || s.requestState === 'switch') && !s.isChoiceDone();
 }
 
+type ReqActive = {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]; trapped?: boolean; canMegaEvo?: boolean};
+
+function duelMove(b: Battle, side: Side, slot: number, m: ReqActive['moves'][number], i: number): DuelMove {
+  const mv = dex.moves.get(m.id);
+  const locked = m.pp === undefined;
+  const foes = b[side === 'p1' ? 'p2' : 'p1'].active.map((p, k) => ({p, k})).filter(({p}) => p && !p.fainted);
+  const effOn = (p: (typeof foes)[number]['p']) => (mv.category === 'Status' ? null : typeMultiplier(mv.type, p.getTypes()));
+  const base: DuelMove = {
+    index: i + 1, id: mv.id, name: mv.name, type: mv.type, category: mv.category, basePower: mv.basePower,
+    pp: m.pp ?? 0, maxpp: m.maxpp ?? 0, disabled: !locked && !!m.disabled, locked,
+    eff: mv.category === 'Status' || !foes.length ? null : Math.max(...foes.map(f => effOn(f.p)!)),
+  };
+  // Alvo no formato do simulador: adversários são 1 e 2, o parceiro é -1/-2.
+  const kind = mv.target;
+  if (locked || !b.actions.targetTypeChoices(kind)) return {...base, aim: ''};
+  if (kind === 'adjacentAlly') return {...base, aim: ` -${2 - slot}`};
+  if (kind === 'adjacentAllyOrSelf') return {...base, aim: ` -${slot + 1}`};
+  const aims = foes.map(({p, k}) => ({aim: ` ${k + 1}`, species: p.species.name, eff: effOn(p)}));
+  return {...base, aim: aims[0]?.aim ?? ' 1', targets: aims.length > 1 ? aims : undefined};
+}
+
+/** Dupla: um pedido por Pokémon que precisa escolher (o simulador passa a vez dos que caíram). */
+function duelSlots(b: Battle, side: Side): DuelSlot[] {
+  const s = b[side];
+  const req = s.activeRequest as {active?: ReqActive[]} | null;
+  const forced = s.requestState === 'switch';
+  return s.active
+    .map((p, slot) => ({p, slot}))
+    .filter(({p}) => p && (forced ? p.switchFlag : !p.fainted))
+    .map(({p, slot}) => {
+      const act = req?.active?.[slot];
+      return {
+        slot, species: p.species.name, forced, trapped: !!act?.trapped, canMega: !!act?.canMegaEvo,
+        moves: forced ? [] : (act?.moves ?? []).map((m, i) => duelMove(b, side, slot, m, i)),
+      };
+    });
+}
+
 export function duelRequest(b: Battle, side: Side): DuelReq {
   const s = b[side];
+  if (b.gameType === 'doubles') {
+    const slots = duelSlots(b, side);
+    return {
+      side, forced: s.requestState === 'switch', trapped: false, canMega: slots.some(x => x.canMega), moves: [], slots,
+      switches: s.pokemon
+        .map((p, i) => ({p, i}))
+        .filter(({p}) => !p.isActive && !p.fainted)
+        .map(({p, i}) => ({index: i + 1, species: p.species.name, hp: p.hp, maxhp: p.maxhp, item: p.item || undefined})),
+    };
+  }
   const req = s.activeRequest as {active?: {moves: {id: string; pp?: number; maxpp?: number; disabled?: boolean}[]; trapped?: boolean; canMegaEvo?: boolean}[]} | null;
   const act = req?.active?.[0];
   const foe = b[side === 'p1' ? 'p2' : 'p1'].active[0];
@@ -254,6 +325,8 @@ export function guestScore(x: unknown): MatchScore | null {
 
 /** Aplica a escolha ("move 2", "switch 3") de um lado e devolve o que aconteceu. */
 export function duelChoose(ctl: BattleController, side: Side, choice: string, mega: boolean): BattleEvent[] {
+  // Dupla: a escolha já vem completa ("move 1 2, switch 3"), com o "mega" dentro.
+  if (ctl.doubles) return side === 'p2' ? ctl.chooseP2(choice) : ctl.chooseFull(choice);
   const [kind, n] = choice.split(' ');
   if (side === 'p2') return ctl.chooseP2(kind === 'move' && mega ? `${choice} mega` : choice);
   if (kind === 'switch') return ctl.chooseSwitchSlot(Number(n));
