@@ -32,6 +32,8 @@ import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
 import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
 import {useMatchGuard} from '../leaveGuard';
+import {OpenRooms, Searching, entryKey, useMatchmaking} from '../lobby';
+import type {OnlineEntry} from '../lobby';
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, fast() ? ms * 0.3 : ms));
 
@@ -247,8 +249,10 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
   const [winner, setWinner] = useState<number | null>(null);
   const [lucky, setLucky] = useState<LuckyShot | null>(null);
 
-  const [online, setOnline] = useState<{role: 'host' | 'guest'; code?: string} | null>(null);
+  const [online, setOnline] = useState<OnlineEntry | null>(null);
   const [joinCode, setJoinCode] = useState('');
+  const [listed, setListed] = useState(false);
+  const match = useMatchmaking('rush', mode, setOnline);
   // Sair no meio do sorteio ou da batalha conta como derrota para quem está neste aparelho.
   useMatchGuard(!online && (step === 'draft' || step === 'lucky' || step === 'prep' || step === 'battle'), () =>
     recordMatch(useGame.getState().trainer?.id, {
@@ -296,12 +300,24 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cpuTurn, round]);
 
-  if (online) return <OnlineRush role={online.role} code={online.code} me={mine} mode={mode} onExit={() => setOnline(null)} />;
+  if (online)
+    return (
+      <OnlineRush
+        key={entryKey(online)}
+        role={online.role}
+        code={online.code}
+        me={mine}
+        mode={mode}
+        onExit={() => setOnline(null)}
+        mm={{auto: online.auto, listed: online.listed, onMiss: online.auto ? match.miss : undefined, onSwitch: match.switchTo}}
+      />
+    );
+  if (match.searching) return <Searching title="Rush online" onExit={match.cancel} />;
   if (step === 'pick')
     return (
       <OnlineOffline
         title="Rush"
-        online="Cada um no seu aparelho (celular ou PC). Um cria a sala e manda o código para o outro."
+        online="Cada um no seu aparelho (celular ou PC). Procure uma partida com qualquer um ou crie uma sala para um amigo."
         offline="Sem internet: contra o computador ou com um amigo no mesmo aparelho."
         onPick={on => setStep(on ? 'online' : 'setup')}
         onBack={onExit}
@@ -322,10 +338,27 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
             <span>Seu nome</span>
             <input value={mine.name} maxLength={12} onChange={e => setMine({...mine, name: e.target.value || 'Jogador'})} />
           </label>
+          <ModePicker mode={mode} setMode={setMode} />
           <div className="rush-online">
-            <h3>Criar uma sala</h3>
-            <ModePicker mode={mode} setMode={setMode} />
-            <button className="btn primary big" onClick={() => setOnline({role: 'host'})}>
+            <h3>
+              <PixelIcon name="target" /> Jogar com qualquer um
+            </h3>
+            <p className="hint">Entra na sala de quem está esperando. Se não tiver ninguém, você espera o próximo que procurar. Se ninguém estiver no seu modo, entra em outro modo de Rush.</p>
+            <button className="btn primary big" onClick={match.start}>
+              Procurar partida
+            </button>
+            <OpenRooms game="rush" onJoin={c => setOnline({role: 'guest', code: c})} />
+          </div>
+          <div className="rush-online">
+            <h3>
+              <PixelIcon name="people" /> Jogar com um amigo
+            </h3>
+            <p className="hint">Crie uma sala, pegue o código de 5 letras e mande para o seu amigo.</p>
+            <label className="check-row">
+              <input type="checkbox" checked={listed} onChange={e => setListed(e.target.checked)} />
+              Mostrar também em "Salas abertas" (qualquer um pode entrar)
+            </label>
+            <button className="btn primary big" onClick={() => setOnline({role: 'host', listed})}>
               Criar sala e pegar o código
             </button>
           </div>

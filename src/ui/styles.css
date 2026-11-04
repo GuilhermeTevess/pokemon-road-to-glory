@@ -1964,3 +1964,15 @@ button.guide-mon:hover, .guide-mon.on { border-color: var(--line); background: v
   .versus-name { min-width: 0; flex: 1 1 0; padding: 3px 5px; font-size: 13px; }
   .versus-name .foe-balls { flex-wrap: wrap; }
 }
+
+/* Salas abertas e "Procurar partida" */
+.check-row { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; font-size: 14px; cursor: pointer; }
+.check-row input { width: 18px; height: 18px; flex: none; }
+.open-rooms { margin-top: 12px; }
+.open-rooms-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.open-rooms-head h3 { margin: 0; }
+.open-rooms-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.open-room { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel-2); border: 2px solid var(--line); }
+.open-room-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.open-room-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.open-room-info small { color: var(--ink-soft); }
