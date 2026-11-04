@@ -8,8 +8,8 @@ describe('rush', () => {
     for (const m of RUSH_MODES) expect(rushPool(m.id).length, m.id).toBeGreaterThanOrEqual(12);
   });
 
-  it('são 9 modos (3 linhas de 3)', () => {
-    expect(RUSH_MODES.length).toBe(9);
+  it('são 10 modos (2 linhas de 5)', () => {
+    expect(RUSH_MODES.length).toBe(10);
   });
 
   it('Espelho: o escolhido entra nos dois times, igualzinho, e o outro sai', () => {

@@ -3,7 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {BattleController} from '../../game/battle';
 import type {BattleEvent} from '../../game/battle';
-import {draftPick, drawPairs, duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky} from '../../game/rush';
+import {doublesMode, draftPick, drawPairs, duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest, giveAllMegaStones, megaMode, rollLucky} from '../../game/rush';
 import type {DuelReq, LuckyShot, RushMode} from '../../game/rush';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
 import {MISS_ERRORS, useDeferWatch} from '../lobby';
@@ -218,7 +218,7 @@ function Host({me, mode, onExit, mm}: {me: Player; mode: RushMode; onExit: () =>
   const startBattle = () => {
     const [a, b] = teams.current;
     const s = sharedRef.current;
-    ctl.current = new BattleController(a, {mon: b[0], team: b, rarity: 'rare', boss: true, trainer: s.players[1].name, versus: s.players[0].name});
+    ctl.current = new BattleController(a, {mon: b[0], team: b, rarity: 'rare', boss: true, trainer: s.players[1].name, versus: s.players[0].name, double: doublesMode(mode)});
     publish({...s, step: 'battle'});
     afterBatch(ctl.current.initialEvents());
   };
@@ -284,6 +284,7 @@ function Host({me, mode, onExit, mm}: {me: Player; mode: RushMode; onExit: () =>
         team={teams.current[0]}
         foe={{player: s.players[1], team: s.teams[1]}}
         mega={megaMode(mode)}
+        doubles={doublesMode(mode)}
         curtain={false}
         onDone={team => {
           teams.current[0] = team;
@@ -300,6 +301,7 @@ function Host({me, mode, onExit, mm}: {me: Player; mode: RushMode; onExit: () =>
     return (
       <BattleView
         arena={arenaFor(code)}
+        doubles={doublesMode(s.mode)}
         players={s.players}
         teams={s.teams}
         bottom="p1"
@@ -421,6 +423,7 @@ function Guest({me, code, onExit, mm}: {me: Player; code: string; onExit: () => 
         team={prepTeam.team}
         foe={{player: s.players[0], team: s.teams[0]}}
         mega={prepTeam.mega}
+        doubles={doublesMode(s.mode)}
         curtain={false}
         onDone={team => {
           send({t: 'prepDone', order: team.map(m => m.uid)});
@@ -432,6 +435,7 @@ function Guest({me, code, onExit, mm}: {me: Player; code: string; onExit: () => 
   return (
     <BattleView
       arena={arenaFor(code)}
+      doubles={doublesMode(s.mode)}
       players={s.players}
       teams={s.teams}
       bottom="p2"

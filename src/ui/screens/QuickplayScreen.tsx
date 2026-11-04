@@ -7,8 +7,8 @@ import {BattleController} from '../../game/battle';
 import type {BattleEvent, Side} from '../../game/battle';
 import {koFromLog} from '../../game/recap';
 import type {Ko} from '../../game/recap';
-import {LUCKY_LEVEL, RUSH_MODES, draftPick, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode} from '../../game/rush';
-import type {DuelReq, LuckyShot} from '../../game/rush';
+import {LUCKY_LEVEL, RUSH_MODES, doublesMode, draftPick, drawGroups, drawPairs, duelBalls, duelChoose, duelNeeds, duelRequest, giveAllMegaStones, giveMegaStone, megaMode, rollLucky, rushMode} from '../../game/rush';
+import type {DuelMove, DuelReq, LuckyShot} from '../../game/rush';
 import type {RushMode} from '../../game/rush';
 import {quickPid, useGame} from '../../game/store';
 import {AVATARS} from '../../game/trainers';
@@ -471,6 +471,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         team={teams[prepFor]}
         foe={{player: players[1 - prepFor], team: teams[1 - prepFor].map(m => m.species)}}
         mega={megaMode(mode)}
+        doubles={doublesMode(mode)}
         curtain={curtain && !vsCpu}
         onDone={team => {
           const next: [OwnedMon[], OwnedMon[]] = [[...teams[0]], [...teams[1]]];
@@ -490,6 +491,7 @@ function RushGame({me, onExit}: {me: Player; onExit: () => void}) {
         teams={teams}
         curtain={curtain && !vsCpu}
         cpu={vsCpu}
+        doubles={doublesMode(mode)}
         onEnd={(w, ko) => {
           // Histórico do perfil: você é sempre o jogador 1 (esquerda).
           recordMatch(useGame.getState().trainer?.id, {
@@ -565,6 +567,8 @@ export function DraftView({players, mode, round, total, pair, teams, canPick, on
             <PixelIcon name="target" /> Tiro de sorte: no fim do sorteio, a sorte escolhe um dos dois para ganhar um lendário quebrado no lugar do Pokémon mais fraco do time.</p>}
         {mode === 'mirror' && <p className="lucky-banner mirror">
             Espelho: o Pokémon escolhido vai para os dois times e o outro sai do jogo. Os times terminam iguais.</p>}
+        {mode === 'duo' && <p className="lucky-banner duo">
+            <PixelIcon name="people" /> Dupla: na batalha ficam 2 Pokémon de cada lado em campo, e você escolhe o golpe de cada um. Pense em quem combina junto.</p>}
         {mode === 'mix' && <p className="lucky-banner mix">
             <PixelIcon name="dice" /> Misturado: normais, megas e lendários no mesmo sorteio. Depois cada um dá a Mega Pedra coringa para quem quiser.</p>}
         <div className="rush-pair">
@@ -763,8 +767,10 @@ function FoePreview({foe}: {foe: {player: Player; team: string[]}}) {
 }
 
 /** Antes da luta: vê os dois times, escolhe quem abre (e, com Mega Pedra, quem leva a pedra). */
-export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}: {
+export function PrepScreen({player, team, foe, mega, curtain, keepItems, doubles, onDone}: {
   player: Player;
+  /** Batalha em dupla: os 2 escolhidos abrem a luta. */
+  doubles?: boolean;
   team: OwnedMon[];
   /** Time do adversário (só os nomes): aparece do lado direito. */
   foe?: {player: Player; team: string[]};
@@ -775,7 +781,13 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
   onDone: (team: OwnedMon[]) => void;
 }) {
   const [hidden, setHidden] = useState(curtain);
-  const [lead, setLead] = useState(team[0].uid);
+  const need = doubles ? 2 : 1;
+  const [leads, setLeads] = useState(() => team.slice(0, need).map(m => m.uid));
+  const tapLead = (uid: string) => {
+    if (!doubles) return setLeads([uid]);
+    if (leads.includes(uid)) return leads.length > 1 && setLeads(leads.filter(x => x !== uid));
+    setLeads([...leads, uid].slice(-2));
+  };
   const [weak, setWeak] = useState(false);
   const megaOk = mega ? team.filter(m => giveMegaTest(m)) : [];
   if (hidden) return <Curtain player={player} text="Hora de montar a estratégia. O outro jogador não pode olhar!" onReady={() => setHidden(false)} />;
@@ -788,18 +800,18 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
       <div className="prep-cols">
         <div className="panel rush-prep">
           <b>Seu time</b>
-          <p>Toque em quem vai abrir a luta.</p>
+          <p>{doubles ? 'Toque nos 2 que vão abrir a luta (a batalha é em dupla).' : 'Toque em quem vai abrir a luta.'}</p>
           {foe && <p className="hint small">
               <PixelIcon name="sword" size={12} /> = os golpes do mesmo tipo dele dão 2x nesses. <PixelIcon name="shield" size={12} /> = os golpes do tipo desses dão 2x nele.
             </p>}
           <div className="rush-prep-grid">
             {team.map(m => (
-              <button key={m.uid} className={`rush-prep-mon ${lead === m.uid ? 'lead' : ''}`} onClick={() => setLead(m.uid)}>
+              <button key={m.uid} className={`rush-prep-mon ${leads.includes(m.uid) ? 'lead' : ''}`} onClick={() => tapLead(m.uid)}>
                 <Sprite name={m.species} size={72} />
                 <b>{species(m.species).name}</b>
                 <Types name={m.species} />
                 {foe && <MatchLine mine={m.species} foe={foe.team} />}
-                {lead === m.uid && <span className="win-tag">Abre</span>}
+                {leads.includes(m.uid) && <span className="win-tag">Abre</span>}
                 {megaOk.includes(m) && <span className="mega-tag">Pode Mega</span>}
               </button>
             ))}
@@ -819,8 +831,9 @@ export function PrepScreen({player, team, foe, mega, curtain, keepItems, onDone}
           )}
           <button
             className="btn primary big"
+            disabled={leads.length < need}
             onClick={() => {
-              const ordered = [...team.filter(m => m.uid === lead), ...team.filter(m => m.uid !== lead)].map(m => (keepItems ? {...m} : {...m, item: undefined as string | undefined}));
+              const ordered = [...leads.map(uid => team.find(m => m.uid === uid)!), ...team.filter(m => !leads.includes(m.uid))].map(m => (keepItems ? {...m} : {...m, item: undefined as string | undefined}));
               if (mega) giveAllMegaStones(ordered);
               onDone(ordered);
             }}
@@ -869,7 +882,7 @@ interface View {
  * Tela da batalha do Rush. Só mostra: quem decide o que acontece é o "driver"
  * (o mesmo PC revezando, ou a rede no online). `batches` cresce a cada turno resolvido.
  */
-export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, arena, onChoose, onIdle}: {
+export function BattleView({players, teams, bottom, batches, balls, req, waiting, curtainFor, arena, doubles, onChoose, onIdle}: {
   players: [Player, Player];
   /** Arena com plateia dos modos rápidos (sem ela, a arena de madeira de sempre). */
   arena?: number;
@@ -888,24 +901,30 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
   onChoose: (choice: string, mega: boolean) => void;
   /** Avisado quando terminou de mostrar tudo o que chegou. */
   onIdle?: () => void;
+  /** Batalha em dupla: 2 Pokémon de cada lado em campo. */
+  doubles?: boolean;
 }) {
-  const [views, setViews] = useState<Record<Side, View | null>>({p1: null, p2: null});
+  // Quem está em campo, por lado e posição ("p1" + 0 ou 1).
+  const [views, setViews] = useState<Record<string, View | null>>({});
   const [message, setMessage] = useState('');
   const [played, setPlayed] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [menu, setMenu] = useState<'main' | 'switch'>('main');
+  const [menu, setMenu] = useState<'main' | 'switch' | 'target'>('main');
+  // Dupla: escolhas já feitas neste turno (uma por Pokémon) e o golpe esperando o alvo.
+  const [picks, setPicks] = useState<string[]>([]);
+  const [aiming, setAiming] = useState<DuelMove | null>(null);
   const [mega, setMega] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
-  const [weakOf, setWeakOf] = useState<Side | null>(null);
+  const [weakOf, setWeakOf] = useState<string | null>(null);
   const [teamsOpen, setTeamsOpen] = useState(false);
   // Quem já desmaiou de cada lado (para marcar no "Times").
   const [down, setDown] = useState<Record<Side, string[]>>({p1: [], p2: []});
-  const onField = useRef<Record<Side, string>>({p1: '', p2: ''});
+  const onField = useRef<Record<string, string>>({});
   const fxRef = useRef<HTMLDivElement>(null);
   const arenaRef = useRef<HTMLDivElement>(null);
   const top: Side = bottom === 'p1' ? 'p2' : 'p1';
   const {tracker, push} = useBattleTracker();
-  const [boostOf, setBoostOf] = useState<Side | null>(null);
+  const [boostOf, setBoostOf] = useState<string | null>(null);
   // Cada lote entra no histórico uma vez só (o modo estrito do React roda o efeito duas vezes).
   const fed = useRef(new Set<number>());
 
@@ -918,15 +937,17 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
     void (async () => {
       for (const ev of events) {
         if (feed) push(ev);
+        const at = (side: Side) => `${side}${ev.slot ?? 0}`;
         if (ev.switchIn) {
           const sw = ev.switchIn;
-          onField.current[sw.side] = teamName(sw.species);
-          setViews(v => ({...v, [sw.side]: {species: sw.species, level: sw.level ?? 50, hp: sw.hp, maxhp: sw.maxhp, shiny: sw.shiny, anim: 'enter'}}));
+          onField.current[at(sw.side)] = teamName(sw.species);
+          setViews(v => ({...v, [at(sw.side)]: {species: sw.species, level: sw.level ?? 50, hp: sw.hp, maxhp: sw.maxhp, shiny: sw.shiny, anim: 'enter'}}));
           playCry(sw.species);
         }
         if (ev.forme) {
           const f = ev.forme;
-          const el = arenaRef.current?.querySelector<HTMLElement>(f.side === bottom ? '.player-slot' : '.wild-slot');
+          const key = at(f.side);
+          const el = arenaRef.current?.querySelector<HTMLElement>(`${f.side === bottom ? '.player-slot' : '.wild-slot'}.s${ev.slot ?? 0}`);
           if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
             // Megaevolução animada: junta energia, clarão e a forma nova aparece.
             preloadSprites(f.species, {back: f.side === bottom, shiny: !!el.querySelector('img')?.src.includes('shiny')});
@@ -934,13 +955,13 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
             await Promise.race([
               playMegaFx(fxRef.current, el, () => {
                 playMega('burst');
-                setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: undefined} : null}));
+                setViews(v => ({...v, [key]: v[key] ? {...v[key]!, species: f.species, anim: undefined} : null}));
                 playCry(f.species);
               }),
               wait(3000),
             ]);
           } else {
-            setViews(v => ({...v, [f.side]: v[f.side] ? {...v[f.side]!, species: f.species, anim: 'enter'} : null}));
+            setViews(v => ({...v, [key]: v[key] ? {...v[key]!, species: f.species, anim: 'enter'} : null}));
             playCry(f.species);
             await wait(700);
           }
@@ -949,7 +970,8 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
           const mv = ev.move;
           if (ev.text) setMessage(ev.text);
           playMove(mv.move);
-          setViews(v => ({...v, [mv.side]: v[mv.side] ? {...v[mv.side]!, anim: 'attack'} : null}));
+          const key = at(mv.side);
+          setViews(v => ({...v, [key]: v[key] ? {...v[key]!, anim: 'attack'} : null}));
           // A animação usa "p1" para quem está embaixo.
           const fxSide = mv.side === bottom ? 'p1' : 'p2';
           // Com a aba em segundo plano a animação pode parar: nunca espera mais que 2,5 s.
@@ -962,17 +984,20 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         if (ev.hit) {
           const h = ev.hit;
           playHit(h.effect);
-          setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, anim: 'hit'} : null}));
+          const key = at(h.side);
+          setViews(v => ({...v, [key]: v[key] ? {...v[key]!, anim: 'hit'} : null}));
         }
         if (ev.hp) {
           const h = ev.hp;
-          setViews(v => ({...v, [h.side]: v[h.side] ? {...v[h.side]!, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v[h.side]!.maxhp : h.maxhp, status: h.status ?? v[h.side]!.status} : null}));
+          const key = at(h.side);
+          setViews(v => ({...v, [key]: v[key] ? {...v[key]!, hp: h.status === 'fnt' ? 0 : h.hp, maxhp: h.status === 'fnt' ? v[key]!.maxhp : h.maxhp, status: h.status ?? v[key]!.status} : null}));
         }
         if (ev.faint) {
           const side = ev.faint;
-          const name = onField.current[side];
+          const key = at(side);
+          const name = onField.current[key];
           setDown(d => (d[side].includes(name) ? d : {...d, [side]: [...d[side], name]}));
-          setViews(v => ({...v, [side]: v[side] ? {...v[side]!, hp: 0, anim: 'faint'} : null}));
+          setViews(v => ({...v, [key]: v[key] ? {...v[key]!, hp: 0, anim: 'faint'} : null}));
         }
         if (ev.text) {
           setMessage(ev.text);
@@ -995,20 +1020,60 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
   useEffect(() => {
     setMenu('main');
     setMega(false);
+    setPicks([]);
+    setAiming(null);
   }, [reqKey]);
 
   const who = req ? (req.side === 'p1' ? 0 : 1) : 0;
   const showCurtain = idle && req && curtainFor && shown !== reqKey;
+  // Dupla: o pedido do Pokémon da vez, no mesmo formato da batalha simples.
+  const slotReq = req?.slots?.[picks.length] ?? null;
+  const cur: DuelReq | null =
+    req && slotReq
+      ? {
+          ...req,
+          forced: slotReq.forced,
+          trapped: slotReq.trapped,
+          canMega: slotReq.canMega && !picks.some(x => x.endsWith(' mega')),
+          moves: slotReq.moves,
+          switches: req.switches.filter(sw => !picks.includes(`switch ${sw.index}`)),
+        }
+      : req;
   const choose = (choice: string) => {
-    onChoose(choice, mega);
+    if (!req?.slots) {
+      onChoose(choice, mega);
+      setShown(null);
+      return;
+    }
+    const next = [...picks, choice];
+    setMenu('main');
+    setMega(false);
+    setAiming(null);
+    if (next.length < req.slots.length) return setPicks(next);
+    setPicks([]);
+    onChoose(next.join(', '), false);
     setShown(null);
   };
+  /** Golpe escolhido: na dupla, junta o alvo (ou pergunta qual) e o "mega". */
+  const chooseMove = (m: DuelMove) => {
+    if (!req?.slots) return choose(`move ${m.index}`);
+    if (m.targets) {
+      setAiming(m);
+      setMenu('target');
+      return;
+    }
+    choose(`move ${m.index}${m.aim ?? ''}${mega ? ' mega' : ''}`);
+  };
+  const slotsShown = doubles ? [0, 1] : [0];
+  const firstUp = (side: Side) => slotsShown.map(k => views[`${side}${k}`]).find(v => v && v.hp > 0) ?? views[`${side}0`] ?? null;
+  const choosingSlot = idle && req?.slots && !showCurtain ? slotReq?.slot : undefined;
 
-  const box = (side: Side, isBottom: boolean) => {
-    const v = views[side];
+  const box = (side: Side, slot: number, isBottom: boolean) => {
+    const key = `${side}${slot}`;
+    const v = views[key];
     if (!v) return null;
     const info = (
-      <div className={`info-box ${isBottom ? 'player-box' : 'wild-box'} s0`}>
+      <div key={`i${key}`} className={`info-box ${isBottom ? 'player-box' : 'wild-box'} s${slot}`}>
         <div className="info-name">
           <SpeciesButton name={v.species} /> <span className="lv">Nv. {v.level}</span>
         </div>
@@ -1019,25 +1084,25 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
         <HpBar hp={v.hp} maxhp={v.maxhp} showNumbers />
         <div className="info-btns">
           <button
-            className={`weak-btn ${weakOf === side ? 'open' : ''}`}
+            className={`weak-btn ${weakOf === key ? 'open' : ''}`}
             onClick={() => {
               setBoostOf(null);
-              setWeakOf(weakOf === side ? null : side);
+              setWeakOf(weakOf === key ? null : key);
             }}
           >
-            Fraquezas {weakOf === side ? '▴' : '▾'}
+            Fraquezas {weakOf === key ? '▴' : '▾'}
           </button>
           <BoostButton
             above={isBottom}
-            boosts={tracker.boostsAt(side)}
-            open={boostOf === side}
+            boosts={tracker.boostsAt(side, slot)}
+            open={boostOf === key}
             onToggle={() => {
               setWeakOf(null);
-              setBoostOf(boostOf === side ? null : side);
+              setBoostOf(boostOf === key ? null : key);
             }}
           />
         </div>
-        {weakOf === side && (
+        {weakOf === key && (
           <div className={`weak-pop ${isBottom ? 'above' : 'below'}`}>
             <MatchupPanel types={[...species(v.species).types]} />
             <p className="weak-pop-hint">Toque num tipo para abrir a calculadora.</p>
@@ -1046,11 +1111,11 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
       </div>
     );
     const sprite = (
-      <div className={`mon-slot ${isBottom ? 'player-slot' : 'wild-slot'} s0 ${v.anim ?? ''}`}>
+      <div className={`mon-slot ${isBottom ? 'player-slot' : 'wild-slot'} s${slot} ${v.anim ?? ''} ${isBottom && choosingSlot === slot ? 'choosing' : ''}`}>
         <Sprite name={v.species} back={isBottom} shiny={v.shiny} />
       </div>
     );
-    return <div className="slot-group">{isBottom ? <>{sprite}{info}</> : <>{info}{sprite}</>}</div>;
+    return <div key={key} className="slot-group">{isBottom ? <>{sprite}{info}</> : <>{info}{sprite}</>}</div>;
   };
 
   return (
@@ -1063,7 +1128,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
               <PixelIcon name="people" /> Times
             </button>
           )}
-          <CalcButton types={views[top] ? species(views[top]!.species).types : []} label="Calculadora" />
+          <CalcButton types={firstUp(top) ? species(firstUp(top)!.species).types : []} label="Calculadora" />
           <BattleLog tracker={tracker} mine={bottom} owner={side => players[side === 'p1' ? 0 : 1].name} />
         </span>
         {(['p1', 'p2'] as Side[]).map((side, i) => (
@@ -1077,11 +1142,11 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
           </span>
         ))}
       </div>
-      <div className="arena" ref={arenaRef}>
+      <div className={`arena ${doubles ? 'doubles' : ''}`} ref={arenaRef}>
         {arena != null ? <ArenaStage arena={arena} /> : <ArenaBackdrop tier={1} color="#7aa860" />}
         <div className="fx-layer" ref={fxRef} />
-        {box(top, false)}
-        {box(bottom, true)}
+        {slotsShown.map(k => box(top, k, false))}
+        {slotsShown.map(k => box(bottom, k, true))}
       </div>
       <div className="battle-bottom">
         <div className="message">
@@ -1096,25 +1161,49 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
                 Sou {curtainFor.name}, mostrar golpes
               </button>
             </div>
-          ) : req ? (
+          ) : cur ? (
             <>
               {/* "Mega evoluir" na mesma linha da pergunta: sobra altura para os golpes caberem na tela. */}
               <div className="versus-turn">
                 <span>
-                  <b>{players[who].name}</b>, {req.forced ? 'escolha quem entra' : 'o que vai fazer?'}
+                  <b>{players[who].name}</b>,{' '}
+                  {slotReq
+                    ? cur.forced
+                      ? `quem entra no lugar de ${species(slotReq.species).name}?`
+                      : menu === 'target'
+                        ? `em quem ${species(slotReq.species).name} vai usar ${aiming?.name}?`
+                        : `o que ${species(slotReq.species).name} vai fazer?`
+                    : cur.forced
+                      ? 'escolha quem entra'
+                      : 'o que vai fazer?'}
                 </span>
-                {menu === 'main' && !req.forced && req.canMega && (
+                {menu === 'main' && !cur.forced && cur.canMega && (
                   <button className={`mega-toggle ${mega ? 'on' : ''}`} onClick={() => setMega(v => !v)}>
                     <span className="mega-box">{mega ? '✓' : ''}</span> Mega evoluir
                   </button>
                 )}
               </div>
-              {menu === 'main' && !req.forced ? (
+              {menu === 'target' && aiming?.targets ? (
+                <div className="list-actions">
+                  {aiming.targets.map(t => {
+                    const eff = effectivenessLabel(t.eff);
+                    return (
+                      <button key={t.aim} className="btn item-btn" onClick={() => choose(`move ${aiming.index}${t.aim}${mega ? ' mega' : ''}`)}>
+                        <Sprite name={t.species} size={40} still /> {species(t.species).name} <Types name={t.species} />
+                        {eff && <span className={`eff ${eff.cls}`}>{eff.text}</span>}
+                      </button>
+                    );
+                  })}
+                  <button className="btn small back" onClick={() => setMenu('main')}>
+                    ← Voltar
+                  </button>
+                </div>
+              ) : menu === 'main' && !cur.forced ? (
                 <div className="move-grid">
-                  {req.moves.map(m => {
+                  {cur.moves.map(m => {
                     const eff = effectivenessLabel(m.eff);
                     return (
-                      <button key={m.id + m.index} className="move-btn" title={moveDescPt(m.name)} disabled={m.disabled || (!m.locked && m.pp <= 0)} style={{['--mc' as string]: TYPE_COLORS[m.type]}} onClick={() => choose(`move ${m.index}`)}>
+                      <button key={m.id + m.index} className="move-btn" title={moveDescPt(m.name)} disabled={m.disabled || (!m.locked && m.pp <= 0)} style={{['--mc' as string]: TYPE_COLORS[m.type]}} onClick={() => chooseMove(m)}>
                         <span className="move-name">{m.name}</span>
                         <span className="move-meta">
                           <TypeBadge type={m.type} small />
@@ -1127,14 +1216,19 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
                       </button>
                     );
                   })}
-                  <button className="btn small back" onClick={() => setMenu('switch')} disabled={req.trapped || !req.switches.length}>
+                  <button className="btn small back" onClick={() => setMenu('switch')} disabled={cur.trapped || !cur.switches.length}>
                     <img className="act-icon" src={FX('switchright.png')} alt="" /> Trocar
                   </button>
+                  {picks.length > 0 && (
+                    <button className="btn small back" onClick={() => setPicks(picks.slice(0, -1))}>
+                      ← Voltar para {species(req!.slots![picks.length - 1].species).name}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="list-actions">
-                  {req.switches.map(sw => {
-                    const foe = views[req.side === 'p1' ? 'p2' : 'p1'];
+                  {cur.switches.map(sw => {
+                    const foe = firstUp(cur.side === 'p1' ? 'p2' : 'p1');
                     const mt = species(sw.species).types;
                     // Quanto os tipos de quem está do outro lado tiram desse Pokémon.
                     const worst = foe && foe.hp > 0 ? Math.max(...species(foe.species).types.map(t => typeMultiplier(t, mt))) : null;
@@ -1154,7 +1248,12 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
                       </button>
                     );
                   })}
-                  {!req.forced && (
+                  {cur.forced && slotReq && !cur.switches.length && (
+                    <button className="btn item-btn" onClick={() => choose('pass')}>
+                      Ninguém pode entrar: seguir com um só
+                    </button>
+                  )}
+                  {!cur.forced && (
                     <button className="btn small back" onClick={() => setMenu('main')}>
                       ← Voltar
                     </button>
@@ -1208,12 +1307,12 @@ function TeamsModal({players, teams, down, onClose}: {players: [Player, Player];
 }
 
 /** Mesmo PC: os dois lados decidem aqui, um de cada vez. */
-export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; onEnd: (winner: number, ko: Ko[]) => void}) {
+export function LocalDuel({players, teams, curtain, cpu, doubles, onEnd}: {players: [Player, Player]; teams: [OwnedMon[], OwnedMon[]]; curtain: boolean; cpu?: boolean; doubles?: boolean; onEnd: (winner: number, ko: Ko[]) => void}) {
   // Cada luta sorteia uma das arenas com plateia.
   const [arena] = useState(randomArena);
   // Contra o computador, o lado de cima é decidido pela IA do jogo (sem "versus").
   const ctl = useMemo(
-    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name}),
+    () => new BattleController(teams[0], {mon: teams[1][0], team: teams[1], rarity: 'rare', boss: true, trainer: players[1].name, versus: cpu ? undefined : players[0].name, double: doubles}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -1231,6 +1330,7 @@ export function LocalDuel({players, teams, curtain, cpu, onEnd}: {players: [Play
   return (
     <BattleView
       arena={arena}
+      doubles={doubles}
       players={players}
       teams={[teams[0].map(m => m.species), teams[1].map(m => m.species)]}
       bottom="p1"

@@ -39,8 +39,9 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
 - **Quickplay**: partidas rápidas, online (cada um no seu aparelho) ou offline (contra o computador
   ou um amigo no mesmo aparelho).
   - **Rush**: aparecem 2 Pokémon sorteados, quem está na vez fica com um e o outro vai para o
-    adversário, até cada um ter 6. Nove modos: Clássico Nv. 50, Evo 1, Evo 2, Evo 3, Mega,
-    Lendários, Misturado, Tiro de sorte e Espelho (o escolhido entra nos dois times, que terminam iguais).
+    adversário, até cada um ter 6. Dez modos: Clássico Nv. 50, Evo 1, Evo 2, Evo 3, Mega,
+    Lendários, Misturado, Tiro de sorte, Espelho (o escolhido entra nos dois times, que terminam iguais)
+    e Dupla (batalha com 2 Pokémon de cada lado em campo).
   - **Escadinha**: lutas de 1 Pokémon contra 1, contra o computador ou um amigo no mesmo aparelho.
     Cada um tem uma escada de 8 Pokémon que vai piorando (lendário no topo, filhote no fim): quem
     vence desce um degrau e ganha quem vencer com o último.
