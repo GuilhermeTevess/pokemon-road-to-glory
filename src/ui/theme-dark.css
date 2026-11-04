@@ -99,6 +99,7 @@
 [data-theme="dark"] .dialogue.narrator { background: #3a2c1a; }
 [data-theme="dark"] .lucky-banner { background: #3a2c1a; border-color: var(--dk-gold-line); }
 [data-theme="dark"] :is(.lucky-banner.mix, .mega-hint) { background: #33244d; border-color: #b77be8; }
+[data-theme="dark"] .lucky-banner.mirror { background: #1d3247; border-color: #6aa8e0; }
 [data-theme="dark"] .mega-toggle.on { background: linear-gradient(90deg, #6a2d5c, #4a3d82, #23527a); }
 
 /* ---------- Coleção, creche, naturezas */
