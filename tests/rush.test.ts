@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {LUCKY_LEVEL, LUCKY_POOL, RUSH_MODES, drawPairs, giveMegaStone, rollLucky, rushMon, rushPool} from '../src/game/rush';
+import {LUCKY_LEVEL, LUCKY_POOL, RUSH_MODES, draftPick, drawPairs, giveMegaStone, rollLucky, rushMon, rushPool} from '../src/game/rush';
 import {isLegendary, species} from '../src/data/dex';
 import {BattleController} from '../src/game/battle';
 
@@ -8,8 +8,26 @@ describe('rush', () => {
     for (const m of RUSH_MODES) expect(rushPool(m.id).length, m.id).toBeGreaterThanOrEqual(12);
   });
 
-  it('são 8 modos (4 em cima, 4 embaixo)', () => {
-    expect(RUSH_MODES.length).toBe(8);
+  it('são 9 modos (3 linhas de 3)', () => {
+    expect(RUSH_MODES.length).toBe(9);
+  });
+
+  it('Espelho: o escolhido entra nos dois times, igualzinho, e o outro sai', () => {
+    let teams: [ReturnType<typeof rushMon>[], ReturnType<typeof rushMon>[]] = [[], []];
+    const pairs = drawPairs('mirror');
+    pairs.forEach((pair, round) => {
+      teams = draftPick(teams, 'mirror', pair, 0, round % 2);
+    });
+    expect(teams[0].length).toBe(6);
+    expect(teams[0]).toEqual(teams[1]);
+    expect(teams[0][0]).not.toBe(teams[1][0]);
+    expect(teams[0].map(m => m.species)).toEqual(pairs.map(p => p[0]));
+  });
+
+  it('nos outros modos o par se divide entre os dois', () => {
+    const next = draftPick([[], []], 'nv50', ['Pikachu', 'Eevee'], 1, 0);
+    expect(next[0][0].species).toBe('Eevee');
+    expect(next[1][0].species).toBe('Pikachu');
   });
 
   it('Misturado traz normais, megas e lendários', () => {

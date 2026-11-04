@@ -1185,11 +1185,12 @@ table.move-info td { padding: 3px 0; }
 .rush-curtain { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; background: repeating-linear-gradient(90deg, #8a1f2b 0 24px, #a3283a 24px 48px); color: #fff; border: var(--px) solid var(--line); padding: 20px; }
 .rush-curtain.inline { min-height: 0; padding: 14px; }
 .rush-curtain .muted { color: #ffd8de; }
-/* 8 modos: 4 em cima e 4 embaixo */
-.rush-modes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* 9 modos: 3 linhas de 3 */
+.rush-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .rush-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .lucky-banner { margin: 0; padding: 8px 12px; max-width: 640px; text-align: center; background: #fff3c4; border: var(--px) solid #c99a1a; font-size: 13px; }
 .lucky-banner.mix { background: #efe2ff; border-color: #8a3cc8; }
+.lucky-banner.mirror { background: #dff1ff; border-color: #3a7fc1; }
 .lucky-reveal { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .lucky-players { display: flex; gap: 28px; justify-content: center; }
 .lucky-player { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border: var(--px) solid var(--line); background: var(--panel-2); transition: transform .08s; }
