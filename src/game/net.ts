@@ -5,6 +5,7 @@
 // É um pouquinho mais lento (meio segundo por mensagem), mas funciona em qualquer rede.
 // Com `?net=local` a caixa fica no localStorage (duas abas do mesmo navegador, para testes).
 import {cloudRaw} from './cloud';
+import {listRoom, type Listing} from './lobby';
 
 export interface Link {
   send(msg: unknown): void;
@@ -109,14 +110,22 @@ class Mailbox implements Link {
   }
 }
 
-/** Cria a sala e espera o amigo entrar. */
-export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, onClose: () => void, onError: (e: string) => void): Promise<Link> {
+/**
+ * Cria a sala e espera o amigo entrar. Com `listing`, a sala também aparece em "Salas abertas"
+ * (e sai da lista assim que alguém entra).
+ */
+export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, onClose: () => void, onError: (e: string) => void, listing?: Listing): Promise<Link> {
   const base = roomBase(code);
   const sid = rid();
   let box: Mailbox | null = null;
   let closed = false;
   let beat: ReturnType<typeof setInterval> | null = null;
   const room: RoomDoc = {sid, at: Date.now()};
+  let card: {stop: () => void} | null = null;
+  const unlist = () => {
+    card?.stop();
+    card = null;
+  };
   const open = async () => {
     for (let tries = 0; !closed; tries++) {
       try {
@@ -131,8 +140,12 @@ export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, o
   };
   void open().then(ok => {
     if (!ok || closed) return;
+    if (listing) card = listRoom(code, listing);
     box = new Mailbox(base, sid, 'h', msg => {
-      if (msg.t === '__hello') return onOpen();
+      if (msg.t === '__hello') {
+        unlist();
+        return onOpen();
+      }
       if (msg.t === '__bye') return onClose();
       onMsg(msg);
     });
@@ -144,6 +157,7 @@ export async function hostRoom(code: string, onMsg: OnMsg, onOpen: () => void, o
     close: () => {
       closed = true;
       if (beat) clearInterval(beat);
+      unlist();
       box?.close();
       // Só apaga a sala se ela ainda for desta conexão (pode já existir outra com o mesmo código).
       void cloudRaw

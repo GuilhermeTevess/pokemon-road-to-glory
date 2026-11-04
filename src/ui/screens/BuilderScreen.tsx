@@ -21,6 +21,8 @@ import {LocalDuel, PrepScreen, RushResult} from './QuickplayScreen';
 import type {Player} from './QuickplayScreen';
 import {TrainerAvatar} from './StartScreens';
 import {OnlineBuilt} from './OnlineBuilt';
+import {OpenRooms, Searching, entryKey, useMatchmaking} from '../lobby';
+import type {OnlineEntry} from '../lobby';
 import {useMatchGuard} from '../leaveGuard';
 
 export const BUILDER_NAME = 'Dream Team';
@@ -559,8 +561,10 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
   const [winner, setWinner] = useState(0);
   const [friends, setFriends] = useState<SharedTeam[] | null>(null);
   const [friendErr, setFriendErr] = useState(false);
-  const [online, setOnline] = useState<{role: 'host' | 'guest'; code?: string} | null>(null);
+  const [online, setOnline] = useState<OnlineEntry | null>(null);
   const [joinCode, setJoinCode] = useState('');
+  const [listed, setListed] = useState(false);
+  const match = useMatchmaking('built', undefined, setOnline);
 
   useEffect(() => {
     if (!trainer) return;
@@ -591,7 +595,19 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
     setStep('prep');
   };
 
-  if (online) return <OnlineBuilt role={online.role} code={online.code} me={me} team={team} onExit={() => setOnline(null)} />;
+  if (online)
+    return (
+      <OnlineBuilt
+        key={entryKey(online)}
+        role={online.role}
+        code={online.code}
+        me={me}
+        team={team}
+        onExit={() => setOnline(null)}
+        mm={{auto: online.auto, listed: online.listed, onMiss: online.auto ? match.miss : undefined, onSwitch: match.switchTo}}
+      />
+    );
+  if (match.searching) return <Searching title="Dream Team online" onExit={match.cancel} />;
 
   if (step === 'pick')
     return (
@@ -645,8 +661,20 @@ function PlayBuilt({team, onExit}: {team: BuiltTeam; onExit: () => void}) {
             <h3>
               <PixelIcon name="globe" /> Online
             </h3>
-            <p className="hint small">Cada um no seu aparelho, com o time que montou. Um cria a sala e manda o código.</p>
-            <button className="btn primary big" onClick={() => setOnline({role: 'host'})}>
+            <p className="hint small">Cada um no seu aparelho, com o time que montou.</p>
+            <button className="btn primary big" onClick={match.start}>
+              Procurar partida
+            </button>
+            <p className="hint small">Entra na sala de quem está esperando. Se não tiver ninguém, você espera o próximo.</p>
+            <OpenRooms game="built" onJoin={c => setOnline({role: 'guest', code: c})} />
+            <h4>
+              <PixelIcon name="people" /> Com um amigo
+            </h4>
+            <label className="check-row">
+              <input type="checkbox" checked={listed} onChange={e => setListed(e.target.checked)} />
+              Mostrar também em "Salas abertas"
+            </label>
+            <button className="btn big" onClick={() => setOnline({role: 'host', listed})}>
               Criar sala e pegar o código
             </button>
             <p className="hint small">Ou entre na sala do amigo:</p>

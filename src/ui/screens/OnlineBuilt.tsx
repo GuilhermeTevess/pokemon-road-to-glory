@@ -9,6 +9,7 @@ import {recordMatch, type MatchExtra} from '../../game/history';
 import {flipKo, koFromLog, saneKo} from '../../game/recap';
 import type {Ko} from '../../game/recap';
 import {hostRoom, joinRoom, newRoomCode} from '../../game/net';
+import {MISS_ERRORS, useDeferWatch} from '../lobby';
 import {arenaFor} from '../../game/arenas';
 import type {Link} from '../../game/net';
 import {duelBalls, duelChoose, duelScore, guestScore, scoreFor, duelNeeds, duelRequest} from '../../game/rush';
@@ -18,7 +19,8 @@ import type {OwnedMon} from '../../game/types';
 import {PixelIcon} from '../components';
 import {playCrowd, playFanfare} from '../audio';
 import {BattleView, PrepScreen, RushResult} from './QuickplayScreen';
-import {quitTitle} from './OnlineRush';
+import {quitTitle, waitTexts} from './OnlineRush';
+import type {Matchmaking} from './OnlineRush';
 import {requestLeave, useMatchGuard} from '../leaveGuard';
 import type {Player} from './QuickplayScreen';
 
@@ -60,7 +62,7 @@ const playing = (step?: Shared['step']) => step === 'prep' || step === 'battle';
 const QUIT = 'Saiu no meio da partida';
 const FOE_QUIT = 'O adversário saiu da partida';
 
-function Lobby({code, status, error, onExit}: {code?: string; status: string; error?: string; onExit: () => void}) {
+function Lobby({code, codeHint, status, error, onExit}: {code?: string; codeHint?: string; status: string; error?: string; onExit: () => void}) {
   return (
     <div className="screen quickplay">
       <header className="bar">
@@ -72,7 +74,7 @@ function Lobby({code, status, error, onExit}: {code?: string; status: string; er
       <div className="panel rush-lobby">
         {code && (
           <>
-            <p>Mande este código para o seu amigo:</p>
+            <p>{codeHint ?? 'Mande este código para o seu amigo:'}</p>
             <div className="room-code">{code}</div>
           </>
         )}
@@ -82,14 +84,15 @@ function Lobby({code, status, error, onExit}: {code?: string; status: string; er
   );
 }
 
-export function OnlineBuilt({role, code, me, team, onExit}: {role: 'host' | 'guest'; code?: string; me: Player; team: BuiltTeam; onExit: () => void}) {
-  return role === 'host' ? <Host me={me} team={team} onExit={onExit} /> : <Guest me={me} team={team} code={code ?? ''} onExit={onExit} />;
+export function OnlineBuilt({role, code, me, team, onExit, mm = {}}: {role: 'host' | 'guest'; code?: string; me: Player; team: BuiltTeam; onExit: () => void; mm?: Matchmaking}) {
+  return role === 'host' ? <Host me={me} team={team} onExit={onExit} mm={mm} /> : <Guest me={me} team={team} code={code ?? ''} onExit={onExit} mm={mm} />;
 }
 
 // ------------------------------------------------------------------ Dono da sala
 
-function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => void}) {
+function Host({me, team, onExit, mm}: {me: Player; team: BuiltTeam; onExit: () => void; mm: Matchmaking}) {
   const [code] = useState(newRoomCode);
+  const [opened] = useState(Date.now);
   const link = useRef<Link | null>(null);
   const [error, setError] = useState<string>();
   const teams = useRef<[OwnedMon[], OwnedMon[]]>([teamToOwned(team), []]);
@@ -181,6 +184,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
       () => send({t: 'state', s: sharedRef.current}),
       () => alive && !foeLeft() && sharedRef.current.step !== 'end' && setError('Seu amigo saiu da sala.'),
       e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
+      mm.auto || mm.listed ? {game: 'built', name: me.name, avatar: me.avatar, auto: !!mm.auto, opened} : undefined,
     ).then(l => {
       if (alive) link.current = l;
       else l.close();
@@ -191,10 +195,13 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useDeferWatch(!!mm.auto && shared.step === 'lobby' && !error, {code, game: 'built', opened}, c => {
+    if (sharedRef.current.step === 'lobby') mm.onSwitch?.(c);
+  });
 
   const s = shared;
   if (error && s.step !== 'end') return <Lobby code={code} status="" error={error} onExit={onExit} />;
-  if (s.step === 'lobby') return <Lobby code={code} status="Esperando o amigo entrar na sala..." onExit={onExit} />;
+  if (s.step === 'lobby') return <Lobby code={code} {...waitTexts(mm)} onExit={onExit} />;
   if (s.step === 'prep') {
     if (myPrep) return <Lobby status={`Esperando ${s.players[1].name} escolher quem abre...`} onExit={leave} />;
     return (
@@ -238,7 +245,7 @@ function Host({me, team, onExit}: {me: Player; team: BuiltTeam; onExit: () => vo
 
 // ------------------------------------------------------------------ Amigo que entrou
 
-function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: string; onExit: () => void}) {
+function Guest({me, team, code, onExit, mm}: {me: Player; team: BuiltTeam; code: string; onExit: () => void; mm: Matchmaking}) {
   const link = useRef<Link | null>(null);
   const [mine] = useState(() => teamToOwned(team));
   const [error, setError] = useState<string>();
@@ -299,8 +306,14 @@ function Guest({me, team, code, onExit}: {me: Player; team: BuiltTeam; code: str
         setConnected(true);
         send({t: 'hello', player: me, team: mine, name: team.name});
       },
-      () => alive && !foeLeft() && !over.current && setError('A conexão com a sala caiu.'),
-      e => setError(ERRORS[e] ?? `Erro de conexão: ${e}`),
+      () => {
+        if (!alive || foeLeft() || over.current) return;
+        // "Procurar partida": a sala fechou antes de começar, então procura outra.
+        if (mm.onMiss && (!sharedRef.current || sharedRef.current.step === 'lobby')) return mm.onMiss();
+        setError('A conexão com a sala caiu.');
+      },
+      e => (mm.onMiss && MISS_ERRORS.has(e) ? mm.onMiss() : setError(ERRORS[e] ?? `Erro de conexão: ${e}`)),
+      mm.onMiss ? 5000 : undefined,
     ).then(l => {
       if (alive) link.current = l;
       else l.close();

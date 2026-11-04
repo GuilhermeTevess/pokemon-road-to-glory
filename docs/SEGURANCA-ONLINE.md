@@ -72,3 +72,19 @@ O App Check confere se o pedido veio do site de verdade. Mas quem trapaceia vai 
 
 ### E se alguém tentar gastar o banco?
 Se o projeto estiver no plano gratuito (Spark), o Firebase **não cobra**: se passar do limite do dia, o online só para até o dia seguinte. Não ative o plano pago sem colocar um alerta de orçamento.
+
+## Salas abertas e "Procurar partida"
+
+Quem procura partida (ou marca "Mostrar também em Salas abertas") deixa um cartãozinho em
+`careers/LOBBY/msgs` com nome, avatar, modo e o código da sala. As regras conferem que:
+
+- o nome do cartão começa com a identidade de quem grava (ninguém anuncia sala no nome de outro);
+- o cartão é pequeno (até ~4 KB) e traz `at`, a hora do "ainda estou aqui", conferida pelo próprio banco;
+- cartão sem notícia há mais de 3 minutos (o dono fechou o jogo sem avisar) qualquer um pode apagar.
+  O jogo faz essa faxina sozinho quando alguém abre a lista.
+
+Para gastar pouco do plano grátis: o cartão é regravado a cada 30 s, a lista se atualiza a cada 10 s
+por no máximo 3 minutos (depois só no botão "Atualizar") e nada é lido com a aba escondida.
+
+**Ao juntar o PR das salas abertas:** junte o PR e depois cole o `firestore.rules` novo (passo 3 acima).
+Sem as regras novas o jogo continua funcionando, mas as salas não aparecem na lista.

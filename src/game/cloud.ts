@@ -22,7 +22,7 @@ const BASE = () => `https://firestore.googleapis.com/v1/projects/${FIREBASE.proj
 const KEY = () => `key=${encodeURIComponent(FIREBASE.apiKey)}`;
 
 type FsValue = {stringValue?: string; integerValue?: string; doubleValue?: number; booleanValue?: boolean; mapValue?: {fields?: Record<string, FsValue>}};
-type Doc = {name?: string; fields?: {json?: {stringValue?: string}; owner?: {stringValue?: string}} & Record<string, FsValue>};
+type Doc = {name?: string; updateTime?: string; fields?: {json?: {stringValue?: string}; owner?: {stringValue?: string}} & Record<string, FsValue>};
 
 /** Campos extras (fora do `json`) para as regras do banco conseguirem conferir: só números inteiros e mapas. */
 export type Extra = {[k: string]: number | Extra};
@@ -145,11 +145,11 @@ async function call(url: string, init: RequestInit = {}, json = false): Promise<
   return fetch(url, {...init, headers: await headers(json)});
 }
 
-function extraFields(extra?: Record<string, Extra>): Record<string, FsValue> {
+function extraFields(extra?: Record<string, number | Extra>): Record<string, FsValue> {
   return extra ? Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, toFs(v)])) : {};
 }
 
-async function body(value: unknown, extra?: Record<string, Extra>): Promise<string> {
+async function body(value: unknown, extra?: Record<string, number | Extra>): Promise<string> {
   const a = await auth();
   const doc: Doc = {fields: {json: {stringValue: JSON.stringify(value)}, ...(a ? {owner: {stringValue: a.uid}} : {}), ...extraFields(extra)}};
   return JSON.stringify(doc);
@@ -173,7 +173,7 @@ async function getDoc<T>(path: string): Promise<T | null> {
   return parse<T>(await res.json());
 }
 
-async function putDoc(path: string, value: unknown, extra?: Record<string, Extra>): Promise<void> {
+async function putDoc(path: string, value: unknown, extra?: Record<string, number | Extra>): Promise<void> {
   if (localMode()) {
     localStorage.setItem(`rtg-fakecloud/${path}`, JSON.stringify({fields: {json: {stringValue: JSON.stringify(value)}, ...extraFields(extra)}}));
     return;
@@ -216,7 +216,16 @@ async function delDoc(path: string): Promise<void> {
 }
 
 /** Acesso direto a documentos (as salas do Rush e do campeonato rápido online usam). */
-export const cloudRaw = {get: getDoc, put: putDoc, del: delDoc, createOnce, list: listDocs, listWith, getField};
+export const cloudRaw = {get: getDoc, put: putDoc, del: delDoc, createOnce, list: listDocs, listWith, listTimed, getField};
+
+/** Lista junto com a hora (do servidor) em que cada documento foi gravado pela última vez. */
+async function listTimed<T>(path: string): Promise<{value: T; savedAt?: number}[]> {
+  return (await listRaw(path)).flatMap(d => {
+    const value = parse<T>(d);
+    const t = d.updateTime ? Date.parse(d.updateTime) : NaN;
+    return value ? [{value, savedAt: Number.isFinite(t) ? t : undefined}] : [];
+  });
+}
 
 /** Lê um campo extra de um documento (ex.: os pontos do ranking que o banco aceitou). */
 async function getField(path: string, field: string): Promise<unknown> {
