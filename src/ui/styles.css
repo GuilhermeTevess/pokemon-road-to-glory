@@ -203,6 +203,9 @@ img.sprite, .item-icon, .fx, .act-icon, .nav-icon, .ball-sprite { image-renderin
 .fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 .mon-slot { position: absolute; display: flex; align-items: flex-end; justify-content: center; width: 34%; height: 40%; z-index: 2; }
 .mon-slot img.sprite { max-height: 100%; max-width: 100%; transform: scale(var(--s, 1.6)); transform-origin: bottom center; }
+/* Imagem bem maior que um sprite de jogo (megas novas sem sprite próprio): sem margem vazia,
+   ela ficava enorme e invadia a plateia. Fica do tamanho de um Pokémon normal. */
+.mon-slot img.sprite.big-src { max-height: min(85%, 84px); max-width: min(85%, 84px); }
 .wild-slot { right: 11%; top: 13%; --s: 1.7; }
 .player-slot { left: 8%; bottom: 3%; --s: 2.1; }
 .wild-slot.boss img.sprite { --s: 2.1; filter: drop-shadow(0 0 4px #e47ea6) drop-shadow(0 0 2px #e47ea6); }

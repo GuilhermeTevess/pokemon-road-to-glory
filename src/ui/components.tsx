@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import type {ReactNode} from 'react';
+import type {CSSProperties, ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {ALL_TYPES, RARITY_LABEL, TYPE_COLORS, TYPE_PT, defensiveMatchups, dex, itemSpriteUrl, species, spriteUrls, typeMultiplier} from '../data/dex';
 import type {Rarity} from '../data/dex';
@@ -15,14 +15,32 @@ import type {OwnedMon} from '../game/types';
 export function Sprite(props: {name: string; back?: boolean; shiny?: boolean; still?: boolean; className?: string; size?: number}) {
   const urls = spriteUrls(props.name, {back: props.back, shiny: props.shiny, still: props.still});
   const [i, setI] = useState(0);
-  useEffect(() => setI(0), [props.name, props.back, props.shiny]);
+  // Enquanto procura um endereço que funcione, a imagem fica escondida: nada de ícone de
+  // imagem quebrada nem do nome escrito no lugar (aparecia nas megas sem sprite próprio).
+  const [hidden, setHidden] = useState(false);
+  // Sprite parado de jogo tem 96px; um PNG bem maior (arte oficial) é reduzido pelo CSS.
+  // Os GIFs animados variam de tamanho de verdade e ficam como estão.
+  const [big, setBig] = useState(false);
+  useEffect(() => {
+    setI(0);
+    setHidden(false);
+  }, [props.name, props.back, props.shiny]);
+  const style: CSSProperties = {...(props.size ? {maxWidth: props.size, maxHeight: props.size} : {}), ...(hidden ? {visibility: 'hidden'} : {})};
   return (
     <img
-      className={`sprite ${props.className ?? ''}`}
+      className={`sprite ${big ? 'big-src' : ''} ${props.className ?? ''}`}
       src={urls[Math.min(i, urls.length - 1)]}
       alt={props.name}
-      style={props.size ? {maxWidth: props.size, maxHeight: props.size} : undefined}
-      onError={() => setI(x => (x < urls.length - 1 ? x + 1 : x))}
+      style={style}
+      onLoad={e => {
+        setHidden(false);
+        const img = e.currentTarget;
+        setBig(!img.src.endsWith('.gif') && img.naturalHeight > 128);
+      }}
+      onError={() => {
+        setHidden(true);
+        setI(x => (x < urls.length - 1 ? x + 1 : x));
+      }}
       draggable={false}
       loading="lazy"
     />
