@@ -726,6 +726,9 @@ export class BattleController {
       case '-item':
         return [{text: `${this.name(a).name} obteve ${b}.`}];
       case 'detailschange': {
+        // Sem a posição ("p1: X" em vez de "p1a: X") o Pokémon já saiu de campo: é a mega que
+        // volta ao normal ao desmaiar. Mostrar isso traria o Pokémon desmaiado de volta à arena.
+        if (/^p\d: /.test(a)) return null;
         const {side} = this.name(a);
         return [{forme: {side, species: b.split(',')[0]}}];
       }

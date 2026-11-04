@@ -1,6 +1,6 @@
 // Quickplay: Rush e Campeonato rápido, cada um online (cada um no seu aparelho) ou offline.
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {TYPE_COLORS, species, typeMultiplier} from '../../data/dex';
+import {TYPE_COLORS, preloadSprites, species, typeMultiplier} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import {BattleController} from '../../game/battle';
@@ -28,6 +28,7 @@ import {HistorySummary} from './HistoryScreens';
 import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
+import {LadderGame} from './LadderScreen';
 import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
 import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
@@ -45,11 +46,12 @@ export interface Player {
 /** Menu do Quickplay. */
 export function QuickplayScreen() {
   const {setScreen, trainer, startQuickTour, startQuickTourOnline} = useGame();
-  const [mode, setMode] = useState<'menu' | 'rush' | 'tourPick' | 'tour' | 'tourOnline'>('menu');
+  const [mode, setMode] = useState<'menu' | 'rush' | 'ladder' | 'tourPick' | 'tour' | 'tourOnline'>('menu');
   const [kind, setKind] = useState<TourKind | null>(null);
   const me = {name: trainer?.name ?? 'Jogador 1', avatar: trainer?.avatar ?? 'red'};
   if (kind) return <TourDraft kind={kind} onBack={() => setKind(null)} onDone={team => startQuickTour(kind, team)} />;
   if (mode === 'rush') return <RushGame me={me} onExit={() => setMode('menu')} />;
+  if (mode === 'ladder') return <LadderGame me={me} onExit={() => setMode('menu')} />;
   if (mode === 'tourPick')
     return (
       <OnlineOffline
@@ -78,6 +80,13 @@ export function QuickplayScreen() {
             </span>
             <b>Rush</b>
             <span>Aparecem 2 Pokémon: você fica com um e o outro vai para o adversário. Depois, batalha! Online com um amigo ou offline.</span>
+          </button>
+          <button className="qp-card" onClick={() => setMode('ladder')}>
+            <span className="qp-icon">
+              <PixelIcon name="ladder" size={30} />
+            </span>
+            <b>Escadinha</b>
+            <span>Lutas de 1 contra 1. Cada vitória te dá um Pokémon mais fraco: começa com um lendário e termina com um filhote. Ganha quem vencer no último degrau.</span>
           </button>
           <button className="qp-card" onClick={() => setMode('tourPick')}>
             <span className="qp-icon">
@@ -941,6 +950,7 @@ export function BattleView({players, teams, bottom, batches, balls, req, waiting
           const el = arenaRef.current?.querySelector<HTMLElement>(`${f.side === bottom ? '.player-slot' : '.wild-slot'}.s${ev.slot ?? 0}`);
           if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
             // Megaevolução animada: junta energia, clarão e a forma nova aparece.
+            preloadSprites(f.species, {back: f.side === bottom, shiny: !!el.querySelector('img')?.src.includes('shiny')});
             playMega('charge');
             await Promise.race([
               playMegaFx(fxRef.current, el, () => {

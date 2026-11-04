@@ -147,3 +147,4 @@
 :root[data-theme="dark"] .elo-name { color: var(--elo-l); }
 :root[data-theme="dark"] .hist-pts.v, :root[data-theme="dark"] .ranking-help .v { color: #74d39b; }
 :root[data-theme="dark"] .hist-pts.d, :root[data-theme="dark"] .ranking-help .d { color: #f08a80; }
+[data-theme="dark"] .ladder-steps li.on .ladder-step { background: var(--dk-gold); box-shadow: inset 0 0 0 2px var(--dk-gold-line); }

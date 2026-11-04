@@ -199,6 +199,7 @@ const OFFLINE: {key: string; label: string; icon: string; about: string}[] = [
   {key: 'tour', label: 'Torneios da temporada', icon: 'trophy', about: 'Partidas dos torneios dentro das runs.'},
   {key: 'rival', label: 'Rivais', icon: 'sword', about: 'Rivais que aparecem no caminho.'},
   {key: 'rush:', label: 'Rush', icon: 'bolt', about: 'Contra o computador ou um amigo no mesmo aparelho.'},
+  {key: 'ladder', label: 'Escadinha', icon: 'ladder', about: 'Lutas de 1 contra 1 numa escada que vai piorando.'},
   {key: 'qtour', label: 'Campeonato rápido', icon: 'bracket', about: 'Partidas do campeonato rápido offline.'},
   {key: 'built', label: 'Dream Team', icon: 'ball', about: 'Seu time montado contra o computador ou contra os times dos amigos.'},
 ];

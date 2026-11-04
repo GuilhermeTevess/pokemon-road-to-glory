@@ -212,6 +212,12 @@ export function spriteUrls(name: string, opts: {back?: boolean; shiny?: boolean;
   return [...new Set(urls)];
 }
 
+/** Baixa antes os sprites de uma forma nova (mega), para a troca no clarão não piscar. */
+export function preloadSprites(name: string, opts: {back?: boolean; shiny?: boolean} = {}): void {
+  if (typeof Image === 'undefined') return;
+  for (const url of spriteUrls(name, opts)) new Image().src = url;
+}
+
 export function itemSpriteUrl(slug: string): string {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`;
 }

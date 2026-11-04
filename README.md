@@ -42,11 +42,14 @@ Actions**. Cada push na `main` gera o jogo e publica (workflow `deploy.yml`).
     adversário, até cada um ter 6. Dez modos: Clássico Nv. 50, Evo 1, Evo 2, Evo 3, Mega,
     Lendários, Misturado, Tiro de sorte, Espelho (o escolhido entra nos dois times, que terminam iguais)
     e Dupla (batalha com 2 Pokémon de cada lado em campo).
+  - **Escadinha**: lutas de 1 Pokémon contra 1, contra o computador ou um amigo no mesmo aparelho.
+    Cada um tem uma escada de 8 Pokémon que vai piorando (lendário no topo, filhote no fim): quem
+    vence desce um degrau e ganha quem vencer com o último.
   - **Campeonato rápido**: chave com os amigos (até 8) e bots completando as vagas.
 - **Dream Team**: monte até 5 times com Pokémon, habilidade, nature, EVs, golpes e item (todos no
   nível 50 com IVs perfeitos) e jogue contra o computador, contra os times dos amigos ou online.
 
-Sair no meio de uma partida de Rush, Dream Team ou campeonato rápido conta como derrota.
+Sair no meio de uma partida de Rush, Escadinha, Dream Team ou campeonato rápido conta como derrota.
 
 ## O que tem na run
 
