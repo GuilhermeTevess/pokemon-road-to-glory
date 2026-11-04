@@ -1,7 +1,7 @@
 import {roundOf, roundsOf} from '../../game/career';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {getBiome} from '../../data/biomes';
-import {TYPE_COLORS, species} from '../../data/dex';
+import {TYPE_COLORS, preloadSprites, species} from '../../data/dex';
 import {getItem} from '../../data/items';
 import {moveDescPt} from '../../data/movesPt';
 import type {BattleController, BattleEvent} from '../../game/battle';
@@ -141,6 +141,7 @@ export function BattleScreen() {
           const el = arenaRef.current?.querySelector<HTMLElement>(`.${f.side === 'p1' ? 'player-slot' : 'wild-slot'}.s${slot}`);
           if (isMegaForme(species(f.species).forme) && !fast() && fxRef.current && el) {
             // Megaevolução animada: junta energia, clarão e a forma nova aparece.
+            preloadSprites(f.species, {back: f.side === 'p1', shiny: !!el.querySelector('img')?.src.includes('shiny')});
             playMega('charge');
             await Promise.race([
               playMegaFx(fxRef.current, el, () => {

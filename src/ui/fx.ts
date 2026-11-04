@@ -153,6 +153,8 @@ class Stage {
   tasks: ((t: number, dt: number) => boolean)[] = [];
   bolts: {pts: V[]; until: number; col: string}[] = [];
   flashes: {col: string; from: number; to: number}[] = [];
+  /** Anéis que abrem ou fecham (raio de r0 a r1). */
+  rings: {at: V; r0: number; r1: number; from: number; to: number; col: string}[] = [];
   t = 0;
 
   constructor(layer: HTMLElement) {
@@ -212,6 +214,18 @@ class Stage {
 
   flash(col: string, ms: number): void {
     this.flashes.push({col, from: this.t, to: this.t + ms});
+  }
+
+  ring(at: V, r0: number, r1: number, ms: number, col: string): void {
+    this.rings.push({at, r0, r1, from: this.t, to: this.t + ms, col});
+  }
+
+  private circle(c: V, r: number): void {
+    const n = Math.max(8, Math.round(r * 6.3));
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2;
+      this.g.fillRect(Math.round(c.x + Math.cos(ang) * r), Math.round(c.y + Math.sin(ang) * r), 1, 1);
+    }
   }
 
   bolt(a: V, b: V, ms: number, col = '#fff59a'): void {
@@ -282,11 +296,8 @@ class Stage {
         g.fillRect(x, y, 1, 1);
         break;
       case 'ring': {
-        const r = Math.round(s + f * 6 * this.u);
-        g.fillRect(x - r, y - r, r * 2 + 1, 1);
-        g.fillRect(x - r, y + r, r * 2 + 1, 1);
-        g.fillRect(x - r, y - r, 1, r * 2 + 1);
-        g.fillRect(x + r, y - r, 1, r * 2 + 1);
+        // Círculo em pixel (antes eram quatro linhas e o anel parecia um quadrado).
+        this.circle({x, y}, Math.round(s + f * 6 * this.u));
         break;
       }
       case 'bubble':
@@ -341,9 +352,17 @@ class Stage {
           for (let i = 1; i < b.pts.length; i++) this.line(b.pts[i - 1], b.pts[i], '#ffffff', 1);
         }
         this.bolts = this.bolts.filter(b => this.t < b.until);
+        for (const rg of this.rings) {
+          const k = (this.t - rg.from) / (rg.to - rg.from);
+          if (k < 0 || k > 1) continue;
+          g.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+          g.fillStyle = rg.col;
+          this.circle(rg.at, rg.r0 + (rg.r1 - rg.r0) * k);
+        }
+        this.rings = this.rings.filter(rg => this.t < rg.to);
         for (const p of this.parts) this.draw(p);
         g.globalAlpha = 1;
-        const done = !this.tasks.length && !this.parts.length && !this.bolts.length && !this.flashes.length;
+        const done = !this.tasks.length && !this.parts.length && !this.bolts.length && !this.flashes.length && !this.rings.length;
         if (done || this.t > maxMs) {
           this.c.remove();
           resolve();
@@ -579,8 +598,8 @@ export async function playMegaFx(layer: HTMLElement, slot: HTMLElement | null, s
       });
     }
   });
-  // Anéis que se fecham, cada vez mais rápido.
-  for (let i = 0; i < 3; i++) st.at(i * 240, () => st.add('Fairy', c, {speed: [0, 0], life: [0.35, 0.35], shape: 'ring', size: 6 - i * 2}));
+  // Anéis grandes que se fecham sobre o Pokémon, cada vez mais rápido (nada parado no meio dele).
+  for (let i = 0; i < 3; i++) st.at(i * 220, () => st.ring(c, R * 1.1, R * 0.15, 380 - i * 60, i % 2 ? '#c4aef0' : '#ffc2e2'));
 
   // Clarão: troca de forma, explosão de brilhos e a forma nova saindo do branco.
   st.at(charge, () => {
@@ -599,7 +618,7 @@ export async function playMegaFx(layer: HTMLElement, slot: HTMLElement | null, s
     for (const type of MEGA_COLORS) {
       for (let i = 0; i < 9; i++) st.add(type, c, {speed: [70, 190], life: [0.35, 0.75], jitter: 3, shape: i % 3 ? 'star' : 'sq', size: 2});
     }
-    for (let i = 0; i < 2; i++) st.add('Normal', c, {speed: [0, 0], life: [0.4, 0.5], shape: 'ring', size: 4 + i * 6});
+    for (let i = 0; i < 2; i++) st.ring(c, R * 0.3, R * (1.2 + i * 0.4), 420 + i * 120, '#ffffff');
   });
   // Brilhinhos que continuam subindo por um instante.
   st.during(charge + 100, charge + 650, () => {

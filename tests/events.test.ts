@@ -66,6 +66,16 @@ describe('mega', () => {
     const evs = ctl.chooseMove(1, true);
     expect(evs.some(e => e.forme?.species === 'Charizard-Mega-Y')).toBe(true);
   });
+
+  it('mega que desmaia e volta ao normal não reaparece na arena', async () => {
+    const {BattleController} = await import('../src/game/battle');
+    const ctl = new BattleController([createMon('Charizard', {level: 50})], {mon: createMon('Pidgey', {level: 5}), rarity: 'common', boss: false});
+    const tr = (line: string) => (ctl as unknown as {translate(p: string[]): unknown}).translate(line.split('|').slice(1));
+    // Ainda em campo: é a megaevolução.
+    expect(tr('|detailschange|p1a: Zeraora|Zeraora-Mega, L50')).toEqual([{forme: {side: 'p1', species: 'Zeraora-Mega'}}]);
+    // Depois do desmaio o simulador manda a forma normal sem posição ("p1:"): ignora.
+    expect(tr('|detailschange|p1: Zeraora|Zeraora, L50|[silent]')).toBeNull();
+  });
 });
 
 describe('mega própria', () => {
