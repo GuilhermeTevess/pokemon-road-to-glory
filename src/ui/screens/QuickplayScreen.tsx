@@ -28,6 +28,7 @@ import {HistorySummary} from './HistoryScreens';
 import {cardOf, loadHistory, mirrorCard, recordMatch} from '../../game/history';
 import type {HistCard} from '../../game/history';
 import {QuickTourOnline} from './QuickTourOnline';
+import {LadderGame} from './LadderScreen';
 import {FX, isMegaForme, playMegaFx, playMoveFx} from '../fx';
 import {MonInfo} from './BiomeGuide';
 import {BattleLog, BoostButton, SpeciesButton, useBattleTracker} from '../battleInfo';
@@ -45,11 +46,12 @@ export interface Player {
 /** Menu do Quickplay. */
 export function QuickplayScreen() {
   const {setScreen, trainer, startQuickTour, startQuickTourOnline} = useGame();
-  const [mode, setMode] = useState<'menu' | 'rush' | 'tourPick' | 'tour' | 'tourOnline'>('menu');
+  const [mode, setMode] = useState<'menu' | 'rush' | 'ladder' | 'tourPick' | 'tour' | 'tourOnline'>('menu');
   const [kind, setKind] = useState<TourKind | null>(null);
   const me = {name: trainer?.name ?? 'Jogador 1', avatar: trainer?.avatar ?? 'red'};
   if (kind) return <TourDraft kind={kind} onBack={() => setKind(null)} onDone={team => startQuickTour(kind, team)} />;
   if (mode === 'rush') return <RushGame me={me} onExit={() => setMode('menu')} />;
+  if (mode === 'ladder') return <LadderGame me={me} onExit={() => setMode('menu')} />;
   if (mode === 'tourPick')
     return (
       <OnlineOffline
@@ -78,6 +80,13 @@ export function QuickplayScreen() {
             </span>
             <b>Rush</b>
             <span>Aparecem 2 Pokémon: você fica com um e o outro vai para o adversário. Depois, batalha! Online com um amigo ou offline.</span>
+          </button>
+          <button className="qp-card" onClick={() => setMode('ladder')}>
+            <span className="qp-icon">
+              <PixelIcon name="ladder" size={30} />
+            </span>
+            <b>Escadinha</b>
+            <span>Lutas de 1 contra 1. Cada vitória te dá um Pokémon mais fraco: começa com um lendário e termina com um filhote. Ganha quem vencer no último degrau.</span>
           </button>
           <button className="qp-card" onClick={() => setMode('tourPick')}>
             <span className="qp-icon">
